@@ -65,4 +65,5 @@ After running SPFIT and SPCAT, compare the generated output files (e.g., `[basen
 ## Notes
 
 *   SPFIT and SPCAT overwrite existing output files in the current directory. Each test case is in its own directory to prevent interference.
-*   The reference output files were downloaded from the CDMS Pickett examples website.
+*   The reference_output files were downloaded from the CDMS Pickett examples website.
+*   The v2008_output files should be the reference for future modifications of this code.

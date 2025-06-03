@@ -1,4 +1,4 @@
-  CsF (nach Zorn et al.)                                Tue Jun  3 23:17:18 2025
+  CsF (nach Zorn et al.)                                Tue Jun  3 23:29:04 2025
 LINES REQUESTED=   14 NUMBER OF PARAMETERS=  6 NUMBER OF ITERATIONS=  5
   MARQUARDT PARAMETER = 1.0000E-10 max (OBS-CALC)/ERROR =1.0000E+06
                               PARAMETERS - A.PRIORI ERROR 
@@ -80,4 +80,4 @@ MARQUARDT PARAMETER = 0, TRUST EXPANSION = 1.00
   2  5 -0.119267  2  6 -0.189791  3  1 -0.000000  3  2 -0.158530  3  4  0.104307  3  5 -0.034351  3  6 -0.002388  4  1  0.000000
   4  2  0.029567  4  3  0.104307  4  5 -0.093447  4  6 -0.177955  5  1  0.000000  5  2 -0.119267  5  3 -0.034351  5  4 -0.093447
   5  6 -0.096372  6  1  0.000000  6  2 -0.189791  6  3 -0.002388  6  4 -0.177955  6  5 -0.096372
-  CsF (nach Zorn et al.)                                Tue Jun  3 23:17:18 2025
+  CsF (nach Zorn et al.)                                Tue Jun  3 23:29:04 2025

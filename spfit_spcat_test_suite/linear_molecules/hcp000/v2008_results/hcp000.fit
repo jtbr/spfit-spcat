@@ -1,4 +1,4 @@
- HCP                                                    Tue Jun  3 23:19:29 2025
+ HCP                                                    Tue Jun  3 23:31:15 2025
 LINES REQUESTED=   22 NUMBER OF PARAMETERS=  3 NUMBER OF ITERATIONS=  2
   MARQUARDT PARAMETER = 1.0000E-10 max (OBS-CALC)/ERROR =1.0000E+06
                               PARAMETERS - A.PRIORI ERROR 
@@ -49,4 +49,4 @@ MARQUARDT PARAMETER = 0, TRUST EXPANSION = 1.00
  MICROWAVE RMS =        0.319110 MHz, IR RMS =        0.00000
  END OF ITERATION  1 OLD, NEW RMS ERROR=        0.69709         0.69709
   1  2 -0.925360  1  3  0.618404  2  1 -0.925360  2  3 -0.846501  3  1  0.618404  3  2 -0.846501
- HCP                                                    Tue Jun  3 23:19:29 2025
+ HCP                                                    Tue Jun  3 23:31:15 2025

@@ -1,4 +1,4 @@
-HCN  v2=1, Hyperfein                                    Tue Jun  3 23:19:29 2025
+HCN  v2=1, Hyperfein                                    Tue Jun  3 23:31:15 2025
 LINES REQUESTED=   23 NUMBER OF PARAMETERS=  8 NUMBER OF ITERATIONS=  3
   MARQUARDT PARAMETER = 1.0000E-10 max (OBS-CALC)/ERROR =1.0000E+05
                               PARAMETERS - A.PRIORI ERROR 
@@ -74,4 +74,4 @@ MARQUARDT PARAMETER = 0, TRUST EXPANSION = 1.00
   5  6  0.300203  5  7 -0.174364  5  8 -0.347406  6  1 -0.000000  6  2  0.404026  6  3 -0.191354  6  4  0.594523  6  5  0.300203
   6  7 -0.670669  6  8 -0.760518  7  1  0.000000  7  2 -0.198402  7  3  0.088482  7  4 -0.324684  7  5 -0.174364  7  6 -0.670669
   7  8  0.358440  8  1  0.000000  8  2 -0.371595  8  3  0.104277  8  4 -0.684705  8  5 -0.347406  8  6 -0.760518  8  7  0.358440
-HCN  v2=1, Hyperfein                                    Tue Jun  3 23:19:29 2025
+HCN  v2=1, Hyperfein                                    Tue Jun  3 23:31:15 2025

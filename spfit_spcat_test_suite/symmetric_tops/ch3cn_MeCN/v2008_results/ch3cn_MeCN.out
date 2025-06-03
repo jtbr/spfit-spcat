@@ -1,8 +1,8 @@
-CH3CN                                                   Tue Jun  3 23:19:29 2025
+CH3CN                                                   Tue Jun  3 23:31:15 2025
 ID= 41505 QSPINROT=     14683.6324 MIN, MAX QN=   0 135
 MIN.LOG.STR=    -7.000 MIN.LOG.STR(FRQ/300GHZ)**2=    -8.500 MAX FREQ     1807.0 GHZ, TEMP=   300.00
      1   001  3.92197
-.VAR FILE TITLE :CH3CN                                                   Tue Jun  3 23:19:29 2025
+.VAR FILE TITLE :CH3CN                                                   Tue Jun  3 23:31:15 2025
                               PARAMETERS - A.PRIORI ERROR 
      1      1          1099   1.4890007449653E+05    6.499901E-02 A-B
      2      2           199   9.1988991342384E+03    1.127482E-05 B

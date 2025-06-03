@@ -1,10 +1,10 @@
-O2                                                      Tue Jun  3 23:17:18 2025
+O2                                                      Tue Jun  3 23:29:04 2025
 ID= 32508 QSPINROT=       218.5290 MIN, MAX QN=   0  99
 MIN.LOG.STR=   -20.000 MIN.LOG.STR(FRQ/300GHZ)**2=   -20.000 MAX FREQ    15000.0 GHZ, TEMP=   300.00
      1      1000  2.004838
      2     11000 -0.002813
      3       000 -0.000126
-.VAR FILE TITLE :O2                                                      Tue Jun  3 23:17:18 2025
+.VAR FILE TITLE :O2                                                      Tue Jun  3 23:29:04 2025
                               PARAMETERS - A.PRIORI ERROR 
      1      1             0  -7.3701978979779E+03    2.715584E-03 E(0)
      2      2           100   4.3100442755976E+04    8.796174E-04 B

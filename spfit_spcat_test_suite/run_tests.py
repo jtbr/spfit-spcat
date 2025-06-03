@@ -89,7 +89,7 @@ def run_commands_and_move_outputs_dynamic(output_subdir_name, suite_base_path='.
                             spcat_command = [os.path.join(EXE_PATH, "spcat"), local_basename]
                             print(f"    Running SPCAT: {' '.join(spcat_command)}")
                             try:
-                                spcat_result = subprocess.run(spcat_command, capture_output=True, text=True, check=False, timeout=300)
+                                spcat_result = subprocess.run(spcat_command, capture_output=True, text=True, check=False, timeout=120)
                                 if spcat_result.returncode == 0:
                                     print("    SPCAT completed successfully.")
                                     spcat_success = True

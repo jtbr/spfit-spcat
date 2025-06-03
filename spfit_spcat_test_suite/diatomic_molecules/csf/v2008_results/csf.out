@@ -1,8 +1,8 @@
-  IF                                                    Tue Jun  3 23:17:18 2025
+  IF                                                    Tue Jun  3 23:29:04 2025
 ID=146001 QSPINROT=      6887.8333 MIN, MAX QN=   0   6
 MIN.LOG.STR=    -9.300 MIN.LOG.STR(FRQ/300GHZ)**2=    -9.300 MAX FREQ       40.0 GHZ, TEMP=   225.00
      1    001  1.948
-.VAR FILE TITLE :  CsF (nach Zorn et al.)                                Tue Jun  3 23:17:18 2025
+.VAR FILE TITLE :  CsF (nach Zorn et al.)                                Tue Jun  3 23:29:04 2025
                               PARAMETERS - A.PRIORI ERROR 
      1      1           100   5.4900000000000E+03    1.000000E-37 B
      2      2     110010000   1.8556087799415E+00    4.568803E-04 1.5eQq

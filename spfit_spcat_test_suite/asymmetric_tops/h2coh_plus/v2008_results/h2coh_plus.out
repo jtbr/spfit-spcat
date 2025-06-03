@@ -1,9 +1,9 @@
-H2COH+                                                  Tue Jun  3 23:17:18 2025
+H2COH+                                                  Tue Jun  3 23:29:03 2025
 ID= 31504 QSPINROT=      1975.4721 MIN, MAX QN=   0  60
 MIN.LOG.STR=    -7.000 MIN.LOG.STR(FRQ/300GHZ)**2=    -5.000 MAX FREQ     2000.0 GHZ, TEMP=   300.00
      1    1   1.
      2    2   1.
-.VAR FILE TITLE :H2COH+                                                  Tue Jun  3 23:17:18 2025
+.VAR FILE TITLE :H2COH+                                                  Tue Jun  3 23:29:03 2025
                               PARAMETERS - A.PRIORI ERROR 
      1      1         10000   1.9758155943295E+05    2.103911E-02 A
      2      2         20000   3.4350547395885E+04    2.497906E-03 B

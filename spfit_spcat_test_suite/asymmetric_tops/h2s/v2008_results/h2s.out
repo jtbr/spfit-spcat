@@ -1,8 +1,8 @@
-    H2S                                                 Tue Jun  3 23:17:18 2025
+    H2S                                                 Tue Jun  3 23:29:04 2025
 ID= 34002 QSPINROT=       514.4470 MIN, MAX QN=   0  21
 MIN.LOG.STR=    -8.900 MIN.LOG.STR(FRQ/300GHZ)**2=    -9.900 MAX FREQ     9999.0 GHZ, TEMP=   300.00
      1      2     0.974  / b dipole moment
-.VAR FILE TITLE : H2(32)S  ground state, Ir rep.                    10:21Tue Jun  3 23:17:18 2025
+.VAR FILE TITLE : H2(32)S  ground state, Ir rep.                    10:21Tue Jun  3 23:29:04 2025
                               PARAMETERS - A.PRIORI ERROR 
      1      1         10000   3.1058357069938E+05    1.254690E-02 
      2      2         20000   2.7036767624932E+05    1.517829E-02 

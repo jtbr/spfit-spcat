@@ -1,4 +1,4 @@
-FSO3                                                    Tue Jun  3 23:19:30 2025
+FSO3                                                    Tue Jun  3 23:31:15 2025
 LINES REQUESTED=  255 NUMBER OF PARAMETERS= 17 NUMBER OF ITERATIONS=  8
   MARQUARDT PARAMETER = 0.0000E+00 max (OBS-CALC)/ERROR =5.0000E+03
                               PARAMETERS - A.PRIORI ERROR 
@@ -359,4 +359,4 @@ MARQUARDT PARAMETER = 0, TRUST EXPANSION = 1.00
  14 11 -0.008999 14 12 -0.231264 14 13  0.135864 14 15 -0.043484 15  1  0.000000 15  2 -0.002339 15  3 -0.014054 15  4  0.003085
  15  5  0.003725 15  6  0.010821 15  7 -0.003482 15  8  0.000348 15  9  0.068475 15 10  0.018013 15 11 -0.000819 15 12  0.038788
  15 13 -0.016205 15 14 -0.043484
-FSO3                                                    Tue Jun  3 23:19:30 2025
+FSO3                                                    Tue Jun  3 23:31:15 2025

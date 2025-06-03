@@ -1,4 +1,4 @@
-O2                                                      Tue Jun  3 23:17:18 2025
+O2                                                      Tue Jun  3 23:29:04 2025
 LINES REQUESTED=   52 NUMBER OF PARAMETERS= 13 NUMBER OF ITERATIONS=  5
   MARQUARDT PARAMETER = 0.0000E+00 max (OBS-CALC)/ERROR =1.0000E+07
                               PARAMETERS - A.PRIORI ERROR 
@@ -109,4 +109,4 @@ MARQUARDT PARAMETER = 0, TRUST EXPANSION = 1.00
   9  1 -0.189556  9  2 -0.067750  9  3  0.033232  9  4 -0.028746  9  5 -0.164754  9  6  0.303370  9  7 -0.364527  9  8 -0.889458
   9 10 -0.965125 10  1  0.222419 10  2  0.028968 10  3  0.010330 10  4 -0.017419 10  5  0.193821 10  6 -0.371216 10  7  0.466474
  10  8  0.790891 10  9 -0.965125
-O2                                                      Tue Jun  3 23:17:18 2025
+O2                                                      Tue Jun  3 23:29:04 2025

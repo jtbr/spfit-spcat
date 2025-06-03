@@ -1,10 +1,10 @@
-Ar-SO2, 1K                                              Tue Jun  3 23:17:18 2025
+Ar-SO2, 1K                                              Tue Jun  3 23:29:03 2025
 ID=104599 QSPINROT=        39.7761 MIN, MAX QN=   0  50
 MIN.LOG.STR=    -8.000 MIN.LOG.STR(FRQ/300GHZ)**2=    -6.000 MAX FREQ      200.0 GHZ, TEMP=     1.00
      1    001     0.2674 / a dipole moment
      2    111     0.2674 / a dipole moment
      3    013     1.465  / c dipole moment
-.VAR FILE TITLE :Ar - O32SO                                              Tue Jun  3 23:17:18 2025
+.VAR FILE TITLE :Ar - O32SO                                              Tue Jun  3 23:29:03 2025
                               PARAMETERS - A.PRIORI ERROR 
      1      1            11   9.7891973273190E+02    1.331339E-01 DeltaE
      2      2         10000   9.1429819592665E+03    6.763161E-02 A

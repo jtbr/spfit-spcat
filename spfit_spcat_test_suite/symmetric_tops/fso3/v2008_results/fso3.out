@@ -1,8 +1,8 @@
-FSO3                                                    Tue Jun  3 23:19:30 2025
+FSO3                                                    Tue Jun  3 23:31:15 2025
 ID= 99500 QSPINROT=     75644.7093 MIN, MAX QN=   0  99
 MIN.LOG.STR=    -7.000 MIN.LOG.STR(FRQ/300GHZ)**2=    -6.000 MAX FREQ      300.0 GHZ, TEMP=   300.00
      1  111  1.0
-.VAR FILE TITLE :FSO3                                                    Tue Jun  3 23:19:30 2025
+.VAR FILE TITLE :FSO3                                                    Tue Jun  3 23:31:15 2025
                               PARAMETERS - A.PRIORI ERROR 
      1      1          1099   2.5240000000000E+02    1.000000E-36 A-B
      2      2           199   5.1955284378735E+03    1.150422E-04 B

@@ -1,8 +1,8 @@
-H2COH                                                   Tue Jun  3 23:19:18 2025
+H2COH                                                   Tue Jun  3 23:31:04 2025
 ID= 31515 QSPINROT=     36239.1835 MIN, MAX QN=   0  65
 MIN.LOG.STR=    -7.500 MIN.LOG.STR(FRQ/300GHZ)**2=    -5.500 MAX FREQ     1000.0 GHZ, TEMP=   300.00
      1    012     1.47  / b dipole moment
-.VAR FILE TITLE :H2COH                                                   Tue Jun  3 23:19:18 2025
+.VAR FILE TITLE :H2COH                                                   Tue Jun  3 23:31:04 2025
                               PARAMETERS - A.PRIORI ERROR 
      1      1            99   2.8374023502106E+01    3.563899E-01 E(0)
      2      2            11   1.5834836049379E+02    7.513378E-01 E(1)
