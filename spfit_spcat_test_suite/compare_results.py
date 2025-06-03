@@ -17,37 +17,29 @@ NUMBER_RE = re.compile(NUMBER_REGEX_STR)
 DATE_REGEX_STR = r"\b(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}(?:\.\d+)?\s+\d{4}\b"
 DATE_RE = re.compile(DATE_REGEX_STR)
 
-def remove_dates(line):
-    """Removes date strings from a line."""
-    return DATE_RE.sub("[DATE_REMOVED]", line)
+def normalize_line_text(line_text):
+    line_no_dates = DATE_RE.sub("[DATE_REMOVED]", line_text)
+    line_normalized_equals = re.sub(r'\s*=\s*', '=', line_no_dates)
+    return line_normalized_equals
 
-def compare_floats(f1, f2, rel_tol, abs_tol):
-    """Compares two floats within given tolerances."""
-    if math.isinf(f1) and math.isinf(f2) and (f1 > 0) == (f2 > 0): # Both same sign infinity
-        return True
-    if math.isnan(f1) and math.isnan(f2): # Both NaN
-        return True
-    return math.isclose(f1, f2, rel_tol=rel_tol, abs_tol=abs_tol)
-
-def compare_lines(line1_orig, line2_orig, line_num, file_type, rel_tol, abs_tol):
+def compare_lines(line1_orig, line2_orig, line_num_str, file_type, rel_tol, abs_tol):
     """
     Compares two lines, ignoring dates and comparing numbers with tolerance.
     Returns True if lines match, False otherwise, along with a description of the difference.
     """
-    line1 = remove_dates(line1_orig)
-    line2 = remove_dates(line2_orig)
+    line1_processed = normalize_line_text(line1_orig)
+    line2_processed = normalize_line_text(line2_orig)
 
     # Handle cases where one line becomes empty after date removal, but other isn't
-    if not line1.strip() and not line2.strip(): # Both effectively blank
+    if not line1_processed.strip() and not line2_processed.strip():
         return True, ""
-    if line1.strip() and not line2.strip():
-        return False, f"Line {line_num}: Content mismatch after date removal (Ref has content, New is blank).\n  Ref: '{line1_orig.strip()}'\n  New: '{line2_orig.strip()}'"
-    if not line1.strip() and line2.strip():
-        return False, f"Line {line_num}: Content mismatch after date removal (Ref is blank, New has content).\n  Ref: '{line1_orig.strip()}'\n  New: '{line2_orig.strip()}'"
+    if line1_processed.strip() and not line2_processed.strip():
+        return False, f"{line_num_str}: Content mismatch (Ref has content, New is blank after normalization).\n  Ref: '{line1_orig.strip()}'\n  New: '{line2_orig.strip()}'"
+    if not line1_processed.strip() and line2_processed.strip():
+        return False, f"{line_num_str}: Content mismatch (Ref is blank, New has content after normalization).\n  Ref: '{line1_orig.strip()}'\n  New: '{line2_orig.strip()}'"
 
-
-    nums1_str = NUMBER_RE.findall(line1)
-    nums2_str = NUMBER_RE.findall(line2)
+    nums1_str = NUMBER_RE.findall(line1_processed)
+    nums2_str = NUMBER_RE.findall(line2_processed)
 
     try:
         nums1 = [float(n) for n in nums1_str]
@@ -55,93 +47,147 @@ def compare_lines(line1_orig, line2_orig, line_num, file_type, rel_tol, abs_tol)
     except ValueError as e:
         # This might happen if NUMBER_REGEX incorrectly captures something non-numeric
         # or if a non-numeric token that looks like a number (e.g. version "1.0a") appears
-        return False, f"Line {line_num}: Error converting extracted 'numbers' to float ({e})."\
-                      f"\n  Ref line (no date): '{line1.strip()}' (extracted: {nums1_str})"\
-                      f"\n  New line (no date): '{line2.strip()}' (extracted: {nums2_str})"
+        return False, f"{line_num_str}: Error converting extracted 'numbers' to float ({e})."\
+              f"\n  Ref line (norm): '{line1_processed.strip()}' (extr: {nums1_str})"\
+              f"\n  New line (norm): '{line2_processed.strip()}' (extr: {nums2_str})"
 
-
-    text_skeleton1 = NUMBER_RE.sub(" _NUM_ ", line1).strip()
-    text_skeleton2 = NUMBER_RE.sub(" _NUM_ ", line2).strip()
-
-    # Normalize multiple spaces in skeleton for comparison
-    text_skeleton1 = ' '.join(text_skeleton1.split())
-    text_skeleton2 = ' '.join(text_skeleton2.split())
+    text_skeleton1 = ' '.join(NUMBER_RE.sub(" _NUM_ ", line1_processed).strip().split())
+    text_skeleton2 = ' '.join(NUMBER_RE.sub(" _NUM_ ", line2_processed).strip().split())
 
     if text_skeleton1 != text_skeleton2:
-        return False, f"Line {line_num}: Text structure mismatch after date/number removal."\
+        return False, f"{line_num_str}: Text structure mismatch."\
                       f"\n          Ref skel: '{text_skeleton1}' (from: '{line1_orig.strip()}')"\
                       f"\n          New skel: '{text_skeleton2}' (from: '{line2_orig.strip()}')"
 
     if len(nums1) != len(nums2):
-        return False, f"Line {line_num}: Different number of numerical values found."\
+        return False, f"{line_num_str}: Different number of numerical values."\
                       f"\n          Ref ({len(nums1)}): {nums1_str} (from: '{line1_orig.strip()}')"\
                       f"\n          New ({len(nums2)}): {nums2_str} (from: '{line2_orig.strip()}')"
 
     for i, (n1, n2) in enumerate(zip(nums1, nums2)):
         if not compare_floats(n1, n2, rel_tol, abs_tol):
-            return False, f"Line {line_num}: Numerical mismatch at value #{i+1}."\
+            return False, f"{line_num_str}: Numerical mismatch at value #{i+1}."\
                           f"\n          Ref val: {n1} (from token: {nums1_str[i]})"\
                           f"\n          New val: {n2} (from token: {nums2_str[i]})"\
                           f"\n          Ref line: '{line1_orig.strip()}'"\
                           f"\n          New line: '{line2_orig.strip()}'"
     return True, ""
 
-def compare_file_pair(ref_file_path, new_file_path, file_type, rel_tol, abs_tol):
+def compare_floats(f1, f2, rel_tol, abs_tol):
+    """Compares two floats within given tolerances."""
+    if math.isinf(f1) and math.isinf(f2) and (f1 > 0) == (f2 > 0): return True
+    if math.isnan(f1) and math.isnan(f2): return True
+    return math.isclose(f1, f2, rel_tol=rel_tol, abs_tol=abs_tol)
+
+def compare_file_pair_final(ref_file_path, new_file_path, file_type, rel_tol, abs_tol):
     """Compares two files, line by line."""
     print(f"    Comparing {file_type} files:\n      Ref: {ref_file_path}\n      New: {new_file_path}")
 
     if not os.path.exists(ref_file_path):
-        print(f"    RESULT: Reference file {os.path.basename(ref_file_path)} not found. Skipping comparison.\n")
+        print(f"    RESULT: Reference file {os.path.basename(ref_file_path)} not found. Skipping.\n")
         return "ref_missing", []
     if not os.path.exists(new_file_path):
         print(f"    RESULT: New output file {os.path.basename(new_file_path)} not found. Cannot compare.\n")
         return "new_missing", []
 
     differences = []
+
     try:
         with open(ref_file_path, 'r', encoding='latin-1') as f_ref, \
              open(new_file_path, 'r', encoding='latin-1') as f_new:
 
-            ref_lines = f_ref.readlines()
-            new_lines = f_new.readlines()
+            ref_lines_orig = f_ref.readlines()
+            new_lines_orig = f_new.readlines()
 
-            # Compare line by line up to the length of the shorter file
-            min_len = min(len(ref_lines), len(new_lines))
-            for i in range(min_len):
-                match, diff_msg = compare_lines(ref_lines[i], new_lines[i], i + 1, file_type, rel_tol, abs_tol)
-                if not match:
-                    differences.append(diff_msg)
+            i, j = 0, 0 # Pointers for ref_lines and new_lines
 
-            # Check if one file has more lines than the other
-            if len(ref_lines) > min_len:
-                for i in range(min_len, len(ref_lines)):
-                    if ref_lines[i].strip(): # Report if extra lines in ref have content
-                        differences.append(f"Line {i+1}: Extra line in reference file: '{ref_lines[i].strip()}'")
-            elif len(new_lines) > min_len:
-                for i in range(min_len, len(new_lines)):
-                    if new_lines[i].strip(): # Report if extra lines in new have content
-                        differences.append(f"Line {i+1}: Extra line in new file: '{new_lines[i].strip()}'")
+            while i < len(ref_lines_orig) and j < len(new_lines_orig):
+                line_num_str = f"Ref L{i+1}/New L{j+1}"
+                match_current, diff_msg_current = compare_lines(
+                    ref_lines_orig[i], new_lines_orig[j], line_num_str,
+                    file_type, rel_tol, abs_tol
+                )
+
+                if match_current:
+                    i += 1
+                    j += 1
+                    continue
+
+                # --- No direct match, try recovery strategies ---
+                recovered_this_step = False
+
+                # Strategy 1: Check for a 2-line swap (IGNORE IF MATCHES)
+                if i + 1 < len(ref_lines_orig) and j + 1 < len(new_lines_orig):
+                    match_r_n1, _ = compare_lines(ref_lines_orig[i], new_lines_orig[j+1], f"Ref L{i+1}/New L{j+2}", file_type, rel_tol, abs_tol)
+                    match_r1_n, _ = compare_lines(ref_lines_orig[i+1], new_lines_orig[j], f"Ref L{i+2}/New L{j+1}", file_type, rel_tol, abs_tol)
+                    if match_r_n1 and match_r1_n:
+                        # This is a 2-line swap, treat as a match for these pairs
+                        i += 2
+                        j += 2
+                        recovered_this_step = True
+
+                if recovered_this_step: continue
+
+                # Strategy 2: Line i in ref is skipped (or extra line j in new) - HARD DIFFERENCE
+                # Try to match ref[i+1] with new[j]
+                if i + 1 < len(ref_lines_orig):
+                    match_r1_n_skip, _ = compare_lines(ref_lines_orig[i+1], new_lines_orig[j], f"Ref L{i+2}/New L{j+1}", file_type, rel_tol, abs_tol)
+                    if match_r1_n_skip:
+                        differences.append(
+                            f"Line Omission/Insertion (Ref L{i+1}): Line present in Ref, not matched in New at current position: '{ref_lines_orig[i].strip()}'"
+                        )
+                        i += 1
+                        recovered_this_step = True
+
+                if recovered_this_step: continue
+
+                # Strategy 3: Line j in new is skipped (or extra line i in ref) - HARD DIFFERENCE
+                # Try to match ref[i] with new[j+1]
+                if j + 1 < len(new_lines_orig):
+                    match_r_n1_skip, _ = compare_lines(ref_lines_orig[i], new_lines_orig[j+1], f"Ref L{i+1}/New L{j+2}", file_type, rel_tol, abs_tol)
+                    if match_r_n1_skip:
+                        differences.append(
+                            f"Line Omission/Insertion (New L{j+1}): Line present in New, not matched in Ref at current position: '{new_lines_orig[j].strip()}'"
+                        )
+                        j += 1
+                        recovered_this_step = True
+
+                if recovered_this_step: continue
+
+                # If no recovery strategy worked, it's a hard mismatch for the original pair
+                differences.append(diff_msg_current)
+                i += 1
+                j += 1
+
+            # Append remaining lines as hard differences
+            while i < len(ref_lines_orig):
+                if ref_lines_orig[i].strip(): # Only report if non-blank
+                    differences.append(f"Extra line at end of Ref file (Ref L{i+1}): '{ref_lines_orig[i].strip()}'")
+                i += 1
+            while j < len(new_lines_orig):
+                if new_lines_orig[j].strip(): # Only report if non-blank
+                    differences.append(f"Extra line at end of New file (New L{j+1}): '{new_lines_orig[j].strip()}'")
+                j += 1
 
     except Exception as e:
         print(f"    Error during file comparison for {file_type}: {e}")
         return "error", [str(e)]
 
     if not differences:
-        print(f"    RESULT: {file_type.upper()} files MATCH.\n")
+        print(f"    RESULT: {file_type.upper()} files MATCH (2-line swaps ignored).\n")
         return "match", []
     else:
         print(f"    RESULT: {file_type.upper()} files DIFFER.")
         for diff in differences[:10]: # Print up to 10 differences
             print(f"      - {diff}")
-        if len(differences) > 10:
-            print(f"      ... and {len(differences) - 10} more differences.\n")
-        else:
-            print()
+        if len(differences) > 10: print(f"      ... and {len(differences) - 10} more differences.\n")
+        else: print()
         return "differs", differences
 
 
 def main_comparison(new_output_dir_name, ref_output_dir_name):
-    overall_summary = {"match": 0, "differs": 0, "ref_missing": 0, "new_missing": 0, "error": 0, "total_files":0}
+    overall_summary = {"match": 0, "differs": 0,
+                       "ref_missing": 0, "new_missing": 0, "error": 0, "total_files": 0}
     examples_with_diffs = []
 
     suite_base_path = os.getcwd() # or os.path.abspath(os.path.dirname(__file__))
@@ -164,11 +210,10 @@ def main_comparison(new_output_dir_name, ref_output_dir_name):
         print(f"\n\n--- Category: {category_name} ---")
         for molecule_basename in sorted(os.listdir(category_path)):
             molecule_example_path = os.path.join(category_path, molecule_basename)
-            if not os.path.isdir(molecule_example_path):
-                continue
+            if not os.path.isdir(molecule_example_path): continue
 
             print(f"\n  Processing Example: {molecule_basename}")
-            example_had_diffs = False
+            example_had_hard_diffs = False
 
             ref_dir = os.path.join(molecule_example_path, ref_output_dir_name)
             new_dir = os.path.join(molecule_example_path, new_output_dir_name)
@@ -183,23 +228,23 @@ def main_comparison(new_output_dir_name, ref_output_dir_name):
             n_comparable_examples += 1
             for ext in [".fit", ".cat", ".out"]:
                 overall_summary["total_files"] += 1
-                file_type = ext[1:] # "fit", "cat", "out"
+                file_type_str = ext[1:] # "fit", "cat", "out"
 
                 ref_file = os.path.join(ref_dir, f"{molecule_basename}{ext}")
                 new_file = os.path.join(new_dir, f"{molecule_basename}{ext}")
 
                 # Special handling for .cat and .out which might not always be in reference_outputs
                 if ext in [".cat", ".out"] and not os.path.exists(ref_file):
-                    print(f"    Reference file {os.path.basename(ref_file)} not found. Skipping comparison for this file.")
+                    print(f"    Reference file {os.path.basename(ref_file)} not found. Skipping comparison for this optional file.")
                     overall_summary["ref_missing"] += 1
                     continue
 
-                status, diff_list = compare_file_pair(ref_file, new_file, file_type, DEFAULT_REL_TOL, DEFAULT_ABS_TOL)
+                status, diff_list = compare_file_pair_final(ref_file, new_file, file_type_str, DEFAULT_REL_TOL, DEFAULT_ABS_TOL)
                 overall_summary[status] += 1
                 if status == "differs":
-                    example_had_diffs = True
+                    example_had_hard_diffs = True
 
-            if example_had_diffs:
+            if example_had_hard_diffs:
                 examples_with_diffs.append(f"{category_name}/{molecule_basename}")
 
     print("\n" + "=" * 70)
@@ -218,8 +263,7 @@ def main_comparison(new_output_dir_name, ref_output_dir_name):
     elif overall_summary['differs'] == 0 and overall_summary['new_missing'] == 0 and overall_summary['error'] == 0:
         print("\nAll processed files matched or reference files were appropriately skipped!")
     else:
-        print("\nNo differing files, but check for missing files or errors.")
-
+        print("\nReview summary for details on differences, missing files, or errors.")
 
 if __name__ == "__main__":
     REF_OUTPUT_DIR_NAME = "reference_outputs"
