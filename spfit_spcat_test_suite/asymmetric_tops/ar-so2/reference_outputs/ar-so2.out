@@ -1,0 +1,49 @@
+Ar-SO2, 1K                                              Thu Feb 23 16:19:27 2006
+ID=104599 QSPINROT=        39.7761 MIN, MAX QN=   0  50
+MIN.LOG.STR=    -8.000 MIN.LOG.STR(FRQ/300GHZ)**2=    -6.000 MAX FREQ      200.0 GHZ, TEMP=     1.00
+     1    001     0.2674 / a dipole moment
+     2    111     0.2674 / a dipole moment
+     3    013     1.465  / c dipole moment
+.VAR FILE TITLE :Ar - O32SO                                              Thu Feb 23 16:19:18 2006
+                              PARAMETERS - A.PRIORI ERROR 
+     1      1            11  9.7891973273190E+002   1.331339E-001 DeltaE
+     2      2         10000  9.1429819592665E+003   6.763161E-002 A
+     3      3         10011  9.1399548076306E+003   1.563120E-001 A
+     4      4         20000  1.4862197422194E+003   1.186795E-003 B
+     5      5         20011  1.4864263145140E+003   2.040402E-003 B
+     6      6         30000  1.3233959497129E+003   9.271415E-003 C
+     7      7         30011  1.3237659585596E+003   9.739333E-003 C
+     8      8           299 -1.1159866649730E-002   4.027983E-006 -DelJ
+     9      9          1199 -3.1613293772479E-001   2.507552E-005 -DelJK
+    10     10          2099 -1.7579468679845E-001   1.477039E-002 -DelK
+    11     11         40199 -1.2167524392775E-003   9.072193E-007 -delJ
+    12     12         41099 -1.9006725695949E-001   4.543993E-004 -delK
+    13     13           399 -4.5693756127018E-007   3.091684E-008 PhiJ
+    14     14          1299 -4.3888989634288E-005   7.285539E-007 PhiJK
+    15     15        410001  2.1338176635931E+002   1.896049E-001 Fac
+15 parameters read, 15 independent parameters
+IQNFMT = 1404
+EIGENVECTOR SORT OF STATES
+PROLATE ROTOR
+    V KMIN KMAX WTPL WTMN ESYMWT NSYM SPINS
+    0    0    8    1    1    999    2
+    0    0    8    0    0    999    B
+    1    0    8    0    0    999    2
+    1    0    8    1    1    999    B
+BLOCK - WT - SYM - V - TSP - N  -  other quanta  (rel. to F=0 )
+    1    1    x    0    0
+    1    1    b    1    0
+    2    1    a    0    0
+    2    1    c    1    0
+Maximum Dimension for Hamiltonian = 9
+INITIAL Q =        39.7761, NEW Q IS RELATIVE TO MIN.EGY.=         0.0000
+ NUMBER OF LINES =    556
+TEMPERATURE - Q(SPIN-ROT.) - log Q(SPIN-ROT.)
+    300.000     32310.1552    4.5093
+    225.000     29367.4754    4.4679
+    150.000     24476.4047    4.3887
+     75.000     15145.4692    4.1803
+     37.500      7395.8986    3.8690
+     18.750      3046.8581    3.4839
+      9.375      1138.4462    3.0563
+      1.000        39.7761    1.5996

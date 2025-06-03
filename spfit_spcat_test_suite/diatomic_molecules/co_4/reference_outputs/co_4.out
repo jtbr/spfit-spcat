@@ -1,0 +1,34 @@
+CO, v = 0                                               Tue Jul 24 14:19:47 2001
+ID= 28503 QSPINROT=       108.8651 MIN, MAX QN=   0  99
+MIN.LOG.STR=   -40.000 MIN.LOG.STR(FRQ/300GHZ)**2=   -40.000 MAX FREQ    10330.0 GHZ, TEMP=   300.00
+1      1  0.1101135
+2  30001 -1.133238E-05
+3  50001  3.321521E-08
+4  90001 -3.810608E-11
+5 100001 -3.156326E-12
+.VAR FILE TITLE :CO; G. Winnewisser, et al.                              Tue Jul 24 14:18:28 2001
+                              PARAMETERS - A.PRIORI ERROR 
+     1      1              100  5.7635968040505E+004   3.412438E-005 B
+     2      2              200 -1.8350528370499E-001   3.740196E-007 -D
+     3      3              300  1.7230215929251E-007   5.316107E-010 H
+     4      4              400 -2.5557380247197E-013   2.153375E-013 L
+4 parameters read, 4 independent parameters
+NO DIAGONALIZATION NEEDED
+PROLATE ROTOR
+LINEAR MOLECULE QUANTA, K SUPPRESSED
+   V KMIN KMAX ESYMWT SPINS
+   0    0    0   -1
+BLOCK - WT - SYM - V - TSP - N  -  other quanta  (rel. to F=0 )
+    1    1    0    0    0
+    2    1    3    0    0
+Maximum Dimension for Hamiltonian = 1
+INITIAL Q =       108.8651, NEW Q IS RELATIVE TO MIN.EGY.=         0.0000
+ NUMBER OF LINES =     95
+TEMPERATURE - Q(SPIN-ROT.) - log Q(SPIN-ROT.)
+    300.000       108.8651    2.0369
+    225.000        81.7184    1.9123
+    150.000        54.5814    1.7370
+     75.000        27.4545    1.4386
+     37.500        13.8965    1.1429
+     18.750         7.1223    0.8526
+      9.375         3.7435    0.5733
