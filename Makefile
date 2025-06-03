@@ -1,21 +1,25 @@
 CC=gcc
 CFLAGS=-g -O3 -Wall
 #CFLAGS=-O2 -Wall
-EXEQ=spfit spcat calmrg dpfit dpcat calbak
-EXEA=${EXEQ} iamcalc moiam stark termval sortn
+EXEQ=spfit spcat calmrg dpfit dpcat
+EXEA=${EXEQ} iamcalc moiam stark termval sortn calbak
 #next line for atlas blas
 #BLASLIB=-lcblas -latlas
 #next line for fortran blas and cblas wrappers
 #BLASLIB=-lcblas -lblas
-#next line for supplied routines
-BLASLIB=
+#OpenBLAS from libopenblas-dev apt package
+BLASLIB=-lopenblas
+#next line for supplied fallback routines
+#BLASLIB=
 ifndef ($(BLASLIB))
 	LBLAS=dblas.o
 endif
-default: ${EXEQ} 
+default: ${EXEQ}
 all: ${EXEA}
-install:  
-	-mv ${EXEQ} /usr/local/bin 
+install:
+	-mv ${EXEQ} /usr/local/bin
+clean:
+	rm -f ${EXEA} *.o *.a
 dpfit: calfit.o subfit.o dpi.o splib.a; gcc -o $@ $^ $(BLASLIB) -lm
 dpcat: calcat.o sortsub.o dpi.o splib.a; gcc -o $@ $^ $(BLASLIB) -lm
 spfit: calfit.o subfit.o spinv.o spinit.o splib.a; gcc -o $@ $^ $(BLASLIB) -lm
@@ -26,7 +30,6 @@ termval: termval.o splib.a; gcc -o $@ $^ $(BLASLIB) -lm
 stark: stark.o splib.a ; gcc -o $@ $^ $(BLASLIB) -lm
 moiam: moiam.o ftran.o splib.a; gcc -o $@ $^ $(BLASLIB) -lm
 iamcalc: iamcalc.o ftran.o splib.a; gcc -o $@ $^ $(BLASLIB) -lm
-calbak: calbak.o splib.a ; gcc -o $@ $^ $(BLASLIB) -lm
 cnvwn: cnvwn.o splib.a ; gcc -o $@ $^ $(BLASLIB) -lm
 
 splib.a: ulib.o cnjj.o slibgcc.o catutil.o lsqfit.o $(LBLAS)
