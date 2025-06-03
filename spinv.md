@@ -1,6 +1,12 @@
 # DOCUMENTATION for SPFIT and SPCAT
 
-These programs use subroutines in SPINV.C to calculate energies and intensities for asymmetric rotors and linear molecules with up to 999 vibrational states and up to 9 spins. No distinction is made between electronic states and vibrational states, or between electronic and nuclear spins. SPFIT is used for fitting transitions and term values, with no requirement that the transitions obey any particular selection rules. SPFIT takes input files with extensions .par and .lin, copies the .par file to a .bak file, creates new text output files with extensions .par, .fit, .var. The .par and .var files follow essentially the same format and contain fitting parameters and optionally correlation information. The .fit file contains the results of the fit. SPCAT is used for predicting line positions and strengths. It takes the .var file as input along with an .int file that specifies limits for the calculation and contains the transition dipoles. The main output files for SPCAT use extensions .out and .cat, which are for general information and for the catalog output format, respectively. The .cat file follows the format of the JPL catalog, but does not have experimental data flagged. Auxiliary output files with extensions .egy and .str can also be requested. The .egy file can contain energies, derivatives with respect to the parameters, eigenvalues, and the undiagonalized Hamiltonian. The .str file contains a list of all transition dipole moments. The file names for SPFIT and SPCAT can be specified as command line arguments in any order. The first file name is used as the base file name for any files not explicitly specified. If no command line arguments are specified the program will give a prompt for the file names.
+These programs use subroutines in `spinv.c` to calculate energies and intensities for asymmetric rotors and linear molecules with up to 999 vibrational states and up to 9 spins. No distinction is made between electronic states and vibrational states, or between electronic and nuclear spins.
+
+**SPFIT** is used for fitting transitions and term values, with no requirement that the transitions obey any particular selection rules. SPFIT takes input files with extensions .par and .lin, copies the .par file to a .bak file, creates new text output files with extensions .par, .fit, .var. The .par and .var files follow essentially the same format and contain fitting parameters and optionally correlation information. The .fit file contains the results of the fit.
+
+**SPCAT** is used for predicting line positions and strengths. It takes the .var file as input along with an .int file that specifies limits for the calculation and contains the transition dipoles. The main output files for SPCAT use extensions .out and .cat, which are for general information and for the catalog output format, respectively. The .cat file follows the format of the JPL catalog, but does not have experimental data flagged. Auxiliary output files with extensions .egy and .str can also be requested. The .egy file can contain energies, derivatives with respect to the parameters, eigenvalues, and the undiagonalized Hamiltonian. The .str file contains a list of all transition dipole moments.
+
+The file names for SPFIT and SPCAT can be specified as command line arguments in any order. The first file name is used as the base file name for any files not explicitly specified. If no command line arguments are specified the program will give a prompt for the file names.
 
 Some of the details of the program are described in H. M. Pickett, "The Fitting and Prediction of Vibration-Rotation Spectra with Spin Interactions," *J. Molec. Spectroscopy*, **148**, 371-377 (1991). The $I_{tot}$ spin-coupling basis is described in H. M. Pickett, 'Spin eigenfunctions and operators for the $D_n$ groups.' *J. Molec. Spectroscopy*, **228**, 659-663 (2004). The Euler series is described in H. M. Pickett, 'Use of Euler series to fit spectra with application to water.' *J. Molec. Spectroscopy*, **233**, 174-179 (2005).
 
@@ -121,10 +127,12 @@ NPAR, NLINE, NITR, NXPAR, THRESH , ERRTST, FRAC, CAL
 (only NPAR is used by SPCAT)
 
 - **NPAR** = maximum number of parameters
-- **sign NLINE**: negative value allows up to 10 quanta per state
-- **mag NLINE** = maximum number of lines
-- **sign NITR** negative value in SPFIT enables line assignment diagnostics
-- **mag NITR** = maximum number of iterations
+- **NLINE**
+  - *sign*: negative value allows up to 10 quanta per state
+  - *magnitude* = maximum number of lines
+- **NITR**
+  - *sign*: negative value enables line assignment diagnostics in SPFIT
+  - *magnitude* = maximum number of iterations
 - **NXPAR** = number of parameters to exclude from end of list when fitting special lines (see notes)
 - **THRESH** = initial Marquardt-Levenburg parameter
 - **ERRTST** = maximum [(obs-calc)/error]
@@ -138,18 +146,21 @@ CHR, SPIND, NVIB, KNMIN, KNMAX, IXX, IAX, WTPL, WTMN, VSYM, EWT, DIAG, XOPT
 There can be one option line or multiple lines, as controlled by the option parameter VSYM. The first option line sets the default behavior of all the vibronic states, and successive lines (if present) modify the default behavior.
 
 - **CHR** = character to modify parameter names file (must be in first column) sping.nam, default is 'g'. 'a' is used for Watson A set, 's' is used for Watson S set. Other character replaces the 'g' in the name 'sping'. Only used to label the .fit output file. (Ignored on all but first option line.) SPFIT looks for the .nam files in the current directory and then in the path given by the SPECNAME environment variable. (i.e. put something like SET SPECNAME=C:\SPECTRA\ in AUTOEXEC.BAT for Windows or setenv SPECNAME /spectra/ for unix). The trailing path delimiter is required.
-- **sign SPIND** = If negative, use symmetric rotor quanta. If positive, use asymmetric rotor quanta (Sign ignored on all but first option line.)
-- **mag SPIND** = degeneracy of spins, first spin degeneracy in units digit, second in tens digit, etc. (If last digit is zero, spin degeneracies occupy two decimal digits and the zero is ignored.) This field can specify up to 9 spins using up to 19 digits.
-- **sign NVIB** = positive, prolate rotor (z = a, y = b, x = c) negative, oblate rotor (z = c, y = b, x = a) (Sign ignored on all but first option line.)
-- **mag NVIB** = number of vibronic states on the first option line, identity of the vibronic state on all but the first option line. (max. value = 99 for 16-bit systems, max. value = 999 otherwise, vibrational quanta > 359 will be indicated by ** in the .cat file)
+- **SPIND**
+  - *sign* = If negative, use symmetric rotor quanta. If positive, use asymmetric rotor quanta (Sign ignored on all but first option line.)
+  - *magnitude* = degeneracy of spins, first spin degeneracy in units digit, second in tens digit, etc. (If last digit is zero, spin degeneracies occupy two decimal digits and the zero is ignored.) This field can specify up to 9 spins using up to 19 digits.
+- **NVIB**
+  - *sign*: positive, prolate rotor (z = a, y = b, x = c); negative, oblate rotor (z = c, y = b, x = a) (Sign ignored on all but first option line.)
+  - *magnitude* = number of vibronic states on the first option line, identity of the vibronic state on all but the first option line. (max. value = 99 for 16-bit systems, max. value = 999 otherwise, vibrational quanta > 359 will be indicated by ** in the .cat file)
 - **KNMIN, KNMAX** = minimum and maximum K values. If both = 0, then linear molecule is selected.
 - **IXX** = binary flags for inclusion of interactions: bit 0 set means no $\Delta N \neq 0$ interactions, bit 1 means no delta J, bit 2 means no delta $F_1$, etc. [default = 0 includes all interactions] (Ignored on all but first option line.)
-  - **mag IAX** = axis for statistical weight (1=a; 2=b; 3=c; 4= A, 2-fold top; 5=B, 2-fold top; 6= 3-fold top; 7=A, E, 4-fold top; 8=B, 4-fold top; 9=5-fold top; 10=A, E2, 6-fold top; 11=B, E1, 6-fold top). For mag IAX > 3, axis is b. (See Special Considerations for Symmetric Tops).
-  - **sign IAX** = If negative, use $I_{tot}$ basis in which the last n spins are summed to give $I_{tot}$, which is then combined with the other spins to give F. (Sign is significant for all option lines.)
+- **IAX**
+  - *magnitude* = axis for statistical weight (1=a; 2=b; 3=c; 4= A, 2-fold top; 5=B, 2-fold top; 6= 3-fold top; 7=A, E, 4-fold top; 8=B, 4-fold top; 9=5-fold top; 10=A, E2, 6-fold top; 11=B, E1, 6-fold top). For mag IAX > 3, axis is b. (See [Special Considerations for Symmetric Tops](#special-considerations-for-symmetric-tops)).
+  - *sign*: if negative, use $I_{tot}$ basis in which the last n spins are summed to give $I_{tot}$, which is then combined with the other spins to give F. (Sign is significant for all option lines.)
 - **WTPL, WTMN** = statistical weights for even and odd state
 - **VSYM** = If the value of VSYM on the first line is positive or zero, there is only one option line. The vibronic symmetry is coded as decimal digits (odd digit means reverse WTPL with WTMN) example: 10 = (v=0 even, v=1 odd) (Only works for the first 15 states) If VSYM is negative, signal that the next line is also an option line. If VSYM is positive or zero, signal that this is the last option line. In the multiple option line mode, the magnitude of VSYM is ignored.
-- **sign EWT** If positive EWTFAC = 100. If negative EWTFAC = 1000. (Sign is ignored on all but first option line.)
 - **EWT** = EWT0 + (EWT1 + EWT2) *EWTFAC = weight for states with E symmetry. (WTPL and WTMN apply to singly degenerate symmetries.) Ignore EWT0 if IAX < 6 or EWT0 = EWTFAC - 1. For the special case of n = 3 when WTPL = 0 or WTMN = 0, EWT0 should be doubled because only half of the states with MOD(K,3) $\neq$ 0 are calculated. See [Special Considerations for Symmetric Tops](#special-considerations-for-symmetric-tops). The weights WTPL, WTMN, and EWT0 can be divided by a common multiple if the rotational partition function is divided by the same factor.
+    - *sign*: If positive EWTFAC = 100. If negative EWTFAC = 1000. (Sign is ignored on all but first option line.)
 
     **Note**: If EWT1 = 0, then the state is non-degenerate with symmetry defined by IAX. Otherwise, the state is l-doubled and MUST be specified in adjacent pairs. The positive l state has EWT1 = l, and the negative l state has EWT1' = n' - |l|. For the pair of states, EWT1 + EWT1' = n'. For an n-fold top n' must be a multiple of n. When EWT1 = EWT1', the positive l is arbitrarily assigned to the lower v. States with MOD(EWT1, n) = 0 are $A_1$ and $A_2$ symmetry. States with MOD(EWT1,n) = n / 2 are $B_1$ and $B_2$ symmetry. Otherwise the states have E symmetry. E symmetry states will be designated with positive K for symmetric top quanta when n $\ge$ 3. For asymmetric top quanta with l > 0, $K_a + K_c = N+1$. For asymmetric top quanta with l < 0, $K_a + K_c = N$. If both WTPL and WTMN are not zero, there will be two states with the same nominal quantum number. (CALMRG will merge the degenerate transitions into a single line.) The value of EWT2 = 10 can be used to designate odd vibrational states.
 
