@@ -1,0 +1,49 @@
+# SPFIT/SPCAT Modernization Task List
+
+This document outlines the prioritized tasks for modernizing the SPFIT/SPCAT software suite, focusing on enabling programmatic use, improving performance, and enhancing readability/maintainability, while ensuring quantitative results and current functionality are retained.
+
+## In Progress Tasks
+
+- [ ] **Task 1: Code Readability and Clarity Improvements**
+    - **Description**: Enhance the readability and clarity of the core C code by adding comments, documenting functions, and making targeted, safe variable name changes. This is a preliminary step to facilitate subsequent refactoring.
+    - **Implementation Plan**:
+        - **Target Files**: `calfit.c`, `calcat.c`, `spinv.c`, `ulib.c`, `lsqfit.c`, `dpi.c`, `spinit.c`, `slibgcc.c`.
+        - **Actions**:
+            - Add inline comments to non-obvious code blocks and complex logic.
+            - Document function headers with their purpose, parameters, and return values.
+            - Rename variables to be more descriptive, but *only* when their meaning is absolutely clear and the change is low-risk. There can be value in keeping short variable names as well.
+        - **Constraint**: Only add comments or change variable names when *certain* of understanding the code in question. Limit changes as much as possible to avoid introducing bugs. DO NOT change the code logic itself.
+
+## Future Tasks
+
+- [ ] **Task 2: Obsolete Functions, Portability Issues, and Unused File Removal**
+    - **Description**: Address minor code quality issues identified by `cppcheck`, including replacing obsolete functions, fixing portability warnings, and removing files that are no longer used.
+    - **Implementation Plan**:
+        - **Replace Obsolete Functions**: Update calls to `gets` (e.g., in `catlist.c`) with safer alternatives like `fgets`.
+        - **Address Portability Warnings**: Review and correct pointer casting issues reported by `cppcheck` in `blas.c` and `dblas.c` to improve portability and adherence to modern C standards.
+        - **Remove Unused Code Files**: Delete files identified as unused by `cppcheck` (e.g., `dblas.c`, `blas.c`, `catread.c`, `util.c`, `fdate.c`, `calfitno.c`, `cnvir.c`, `dpix.c`, `hundscvt.c`, `iambak.c`, `iamcalc.c`, `jelim.c`, `moiam.c`, `readopt.c`, `reassign.c`, `slibgen.c`, `sortegy.c`, `sortn.c`, `sortsub.c`, `stark.c`, `termval.c`, `testi.c`, `whats.new`). *Note: This list needs to be carefully verified before deletion. It is probably valuable to keep the fallback BLAS library, for example, in case a system version is missing, even if it is currently unused.*
+    - **Constraint**: Quantitative results must remain unchanged, and current functionality must be retained.
+
+- [ ] **Task 3: Modularization and Decoupling with C++ Interface**
+    - **Description**: Refactor the core SPFIT/SPCAT functionality to be more modular, using C structs/C++ classes for inputs/outputs, and creating a clean C++ interface layer. This is crucial for enabling programmatic use from modern software like Python.
+    - **Implementation Plan**:
+        - **Identify Core Calculation Logic**: Pinpoint the exact functions within SPFIT/SPCAT that perform the core scientific calculations (e.g., Hamiltonian setup, diagonalization, parameter fitting, intensity calculation).
+        - **Encapsulate State**: Group related global variables into C structs or C++ classes (e.g., `SPFIT_Context`, `SPCAT_Context`, `SpfitParameters`, `SpcatLineData`). Pass these structures explicitly to functions, reducing reliance on global state.
+        - **Define Clear C++ APIs**: Create well-defined C++ class interfaces (e.g., `Spfit`, `Spcat`) with methods that encapsulate core functionalities. These methods should take C++ data structures as input and return C++ data structures as output.
+        - **Separate I/O from Logic**: Modify core calculation functions to operate on in-memory data structures (passed via the new C++/C structs/classes) rather than directly performing file I/O. Create separate C++ utility functions or methods for reading from and writing to files.
+        - **Leverage C++ Features**: Utilize RAII (Resource Acquisition Is Initialization) with `std::unique_ptr` and `std::vector` for robust memory management within the new C++ interface layer.
+    - **Expected Outcome**: A highly modular codebase with a clean C++ API, enabling easy programmatic integration and future Python bindings.
+    - **Constraint**: Quantitative results must remain unchanged, and current functionality must be retained.
+
+## Implementation Plan
+
+The tasks will be executed sequentially, with thorough testing and verification after each major change to ensure the core requirements are met.
+
+### Relevant Files
+
+*   `TASKS.md` - This task list itself.
+*   `memory-bank/activeContext.md` - Will be updated with progress and insights.
+*   `memory-bank/progress.md` - Will be updated with overall project status.
+*   Core C files: `calfit.c`, `calcat.c`, `spinv.c`, `ulib.c`, `lsqfit.c`, `dpi.c`, `spinit.c`, `slibgcc.c` (for Task 1).
+*   Files identified by `cppcheck` for issues or potential removal (for Task 2).
+*   New C++ header and source files (e.g., `spfit_api.hpp`, `spfit_api.cpp`) for Task 3.
