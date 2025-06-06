@@ -2,7 +2,7 @@ CC=gcc
 CFLAGS=-g -O3 -Wall
 #CFLAGS=-O2 -Wall
 EXEQ=spfit spcat calmrg dpfit dpcat
-EXEA=${EXEQ} iamcalc moiam stark termval sortn calbak
+EXEA=${EXEQ} moiam stark termval sortn calbak reassign sortegy iambak # iamcalc is broken
 #next line for atlas blas
 #BLASLIB=-lcblas -latlas
 #next line for fortran blas and cblas wrappers
@@ -31,6 +31,10 @@ stark: stark.o splib.a ; gcc -o $@ $^ $(BLASLIB) -lm
 moiam: moiam.o ftran.o splib.a; gcc -o $@ $^ $(BLASLIB) -lm
 iamcalc: iamcalc.o ftran.o splib.a; gcc -o $@ $^ $(BLASLIB) -lm
 cnvwn: cnvwn.o splib.a ; gcc -o $@ $^ $(BLASLIB) -lm
+sortn: sortn.o sortsub.o; gcc -o $@ $^
+reassign: reassign.o splib.a ; gcc -o $@ $^ $(BLASLIB) -lm
+sortegy: sortegy.o splib.a ; gcc -o $@ $^ $(BLASLIB) -lm
+iambak: iambak.o splib.a readopt.o ; gcc -o $@ $^ $(BLASLIB) -lm
 
 splib.a: ulib.o cnjj.o slibgcc.o catutil.o lsqfit.o $(LBLAS)
 	ar r splib.a $^
@@ -47,8 +51,10 @@ calcat.o:calcat.c calpgm.h
 sortsub.o: sortsub.c calpgm.h
 calmrg.o:calmrg.c calpgm.h
 termval.o:termval.c calpgm.h
+readopt.o:readopt.c readopt.h
 stark.o:stark.c calpgm.h
 iamcalc.o:iamcalc.c calpgm.h
+reassign.o:reassign.c calpgm.h
 moiam.o:moiam.c calpgm.h
 ulib.o:ulib.c calpgm.h
 cnjj.o:cnjj.c cnjj.h
@@ -67,4 +73,3 @@ dblas.o: dblas.c
 util.o:util.c
 calbak.o:calbak.c
 cnvwn.o:cnvwn.c
-sortn: sortn.o sortsub.o; gcc -o $@ $^

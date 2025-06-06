@@ -1,9 +1,21 @@
 *.o
 *.a
+# build targets
 spcat
 spfit
 dpcat
 dpfit
 calbak
 calmrg
+# build "all" targets
+moiam
+stark
+termval
+sortn
+calbak
+reassign
+sortegy
+iambak
+iamcalc
+
 *~
