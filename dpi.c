@@ -4,17 +4,24 @@
 
 /*   Herbert M. Pickett, 20 March 1989 */
 /*   Revised version in c, 22 March 1999 */
-/*   18 Aug.  2003: code cleanup, @comment@ is for splint */ 
+/*   18 Aug.  2003: code cleanup, @comment@ is for splint */
 
 /*   PACKAGE FOR DOUBLET PI  */
+/*   This module implements the Hamiltonian for a doublet Pi electronic state.
+ *   It handles the fine structure splitting, hyperfine interactions, and
+ *   other effects relevant for molecules with a doublet Pi ground state.
+ */
 #include <stdlib.h>
 #include <math.h>
 #include <string.h>
 #include "calpgm.h"
 /* Common Declarations */
 
-static double zero = 0.;
-static int nvib, iwhole, isdgn, nqn;
+static double zero = 0.;        /* Constant zero value */
+static int nvib;                /* Number of vibrational states */
+static int iwhole;              /* Flag for whole/half-integer quantum numbers */
+static int isdgn;               /* Nuclear spin degeneracy */
+static int nqn;                 /* Number of quantum numbers */
 
 int hamx(iblk, nsize, npar, idpar, par, egy, t, dedp, pmix, ifdump)
 const int iblk, nsize, npar;
@@ -40,7 +47,7 @@ double *egy, *t, *dedp, *pmix;
   int ii, jj, kk, kq, aji, ajf, aii, iv, ibcd, ndbcd;
   bcd_t ibtmp;
   BOOL ofdiag;
-  
+
   ndbcd = (int) idpar[0];
   if (iblk == 0) {
     wz[0] = 1.;
@@ -80,7 +87,7 @@ double *egy, *t, *dedp, *pmix;
     nl = (size_t) nsize;
     nl *= nl * sizeof(double);
     ioff = 0;
-    nfit = npar; 
+    nfit = npar;
     for (j = 0, ibcd = 0; j < npar; ++j, ibcd += ndbcd) {
       if (NEGBCD(idpar[ibcd]) != 0) {
         --nfit;
@@ -98,7 +105,7 @@ double *egy, *t, *dedp, *pmix;
         continue;
       }
       ixpar[j] = (kpar << 7) + iv;
-      if (kpar != 0 && wp[kpar] == NULL) 
+      if (kpar != 0 && wp[kpar] == NULL)
         wp[kpar] = (double *) mallocq(nl);
       if (iv == 99)
         iv = 0;
@@ -108,13 +115,13 @@ double *egy, *t, *dedp, *pmix;
     for (kk = 15; kk <= 19; ++kk) { /* fill in required elements */
 	    jj = kk - 4;
       if (kk == 19) --jj;
-      if (wp[kk] != NULL && wp[jj] == NULL) 
+      if (wp[kk] != NULL && wp[jj] == NULL)
         wp[jj] = (double *) mallocq(nl);
     }
     for (kk = 23; kk <= 26; ++kk) { /* fill in required elements */
 	    jj = kk - 3;
       if (kk == 26) --jj;
-      if (wp[kk] != NULL && wp[jj] == NULL) 
+      if (wp[kk] != NULL && wp[jj] == NULL)
         wp[jj] = (double *) mallocq(nl);
     }
     return nsize;
@@ -257,37 +264,37 @@ double *egy, *t, *dedp, *pmix;
         case 11: /* and 15 */
           aa = 2. * gg * c3jj(aji, 2, ajf, -1, 0, 1);
           w[j + i * nsize] = aa;
-          if (ww != NULL) 
+          if (ww != NULL)
             ww[j + i * nsize] = sqj * aa;
           break;
         case 12: /* and 16 */
           aa = rt2 * g * c3jj(aji, 2, ajf, -1, 2, -1);
           w[j + i * nsize] = aa;
-          if (ww != NULL) 
+          if (ww != NULL)
             ww[j + i * nsize] = sqj * aa;
           break;
         case 13: /* and 17 */
           bb = -gg * c3jj(aji, 2, ajf, -3, 0, 3) / 1.5;
           w[jj + ii * nsize] = bb;
-          if (ww != NULL) 
+          if (ww != NULL)
             ww[jj + ii * nsize] = sqj * bb;
           break;
         case 14: /* and 18 and 19 */
           ab = rt2 * gg * c3jj(ajf, 2, aji, -3, 2, 1);
           w[jj + i * nsize] = ab;
-          if (ww != NULL) 
+          if (ww != NULL)
             ww[jj + i * nsize] = sqj * ab;
           if (j != i) {
             ba = rt2 * gg * c3jj(aji, 2, ajf, -3, 2, 1);
-            w[j + ii * nsize] = ba; 
-            if (ww != NULL) 
+            w[j + ii * nsize] = ba;
+            if (ww != NULL)
               ww[j + ii * nsize] = sqj * ba;
           }
           ww = wp[19];
           if (ww == NULL) break;
           z = -0.5 * (double)(jq[i] + jq[j]);
           ww[jj + i * nsize] = z * ab;
-          if (j != i) 
+          if (j != i)
             ww[j + ii * nsize] = z * ba;
           break;
         }
@@ -324,31 +331,31 @@ double *egy, *t, *dedp, *pmix;
           case 20: /* and 23 */
             aa = qq * c3jj(aji, 4, ajf, -1, 0, 1);
             w[j + i * nsize] = aa;
-            if (ww != NULL) 
+            if (ww != NULL)
               ww[j + i * nsize] = sqj * aa;
             break;
           case 21: /* and 24 */
             bb = -qq * c3jj(aji, 4, ajf, -3, 0, 3);
-            w[jj + ii * nsize] = bb; 
-            if (ww != NULL) 
+            w[jj + ii * nsize] = bb;
+            if (ww != NULL)
                ww[jj + ii * nsize] = sqj * bb;
             break;
           case 22: /* and 25 and 26 */
             ab = -q * c3jj(aji, 4, ajf, -1, 4, -3);
             w[jj + i * nsize] = ab;
-            if (ww != NULL) 
+            if (ww != NULL)
               ww[jj + i * nsize] = sqj * ab;
             if (i != j) {
               ba = q * c3jj(aji, 4, ajf, -3, 4, -1);
               w[j + ii * nsize] = ba;
-              if (ww != NULL) 
+              if (ww != NULL)
                 ww[j + ii * nsize] = sqj * ba;
             }
             ww = wp[26];
             if (ww == NULL) break;
             z = -0.5 * (double)(jq[i] + jq[j]);
             ww[jj + i * nsize] = z * ab;
-            if (j != i) 
+            if (j != i)
               ww[j + ii * nsize] = z * ba;
           } /* case */
         } /* kq loop */
@@ -359,7 +366,7 @@ double *egy, *t, *dedp, *pmix;
   dcopy(nsq, &zero, 0, t, 1);
   egy0 = zero; kk = 0;
   for (ipar = 0, ibcd = 0; ipar < npar; ++ipar, ibcd += ndbcd) {
-    if (NEGBCD(idpar[ibcd]) == 0) 
+    if (NEGBCD(idpar[ibcd]) == 0)
       kk = ipar;
     kpar = ixpar[ipar];
     ii = kpar & 127;
@@ -447,6 +454,23 @@ double *egy, *t, *dedp, *pmix;
 }                               /* hamx */
 
 
+/**
+ * @brief Calculate intensity matrix elements for transitions
+ *
+ * This function calculates the intensity matrix elements for transitions
+ * between states in different blocks. It handles selection rules and
+ * calculates the appropriate matrix elements using 3-j and 6-j symbols.
+ *
+ * @param iblk Upper state block index
+ * @param isiz Size of upper state block
+ * @param jblk Lower state block index
+ * @param jsiz Size of lower state block
+ * @param ndip Number of dipole moment parameters
+ * @param idip Dipole moment identifiers in BCD format
+ * @param dip Dipole moment values
+ * @param s Output intensity matrix
+ * @return int Degeneracy of upper state, or 0 if no transition allowed
+ */
 int intens(iblk, isiz, jblk, jsiz, ndip, idip, dip, s)
 const int iblk, isiz, jblk, jsiz, ndip;
 const bcd_t *idip;
@@ -533,6 +557,20 @@ double *s;
 }                               /* intens */
 
 
+/**
+ * @brief Initialize intensity calculation parameters
+ *
+ * This function sets up parameters for intensity calculations,
+ * including handling dipole moments and magnetic interactions.
+ *
+ * @param lu Output file pointer
+ * @param ifdiag Pointer to diagonalization flag
+ * @param nsav Pointer to number of saved blocks
+ * @param ndip Number of dipole moment parameters
+ * @param idip Dipole moment identifiers in BCD format
+ * @param isimag Array for magnetic interaction flags
+ * @return int Always returns 0
+ */
 int setint(lu, ifdiag, nsav, ndip, idip, isimag)
 FILE *lu;
 BOOL *ifdiag;
@@ -557,6 +595,19 @@ bcd_t *idip;
   return 0;
 }                               /* setint */
 
+/**
+ * @brief Get quantum numbers for a state
+ *
+ * This function retrieves the quantum numbers for a state in a given block.
+ * It handles the mapping between block indices and quantum numbers.
+ *
+ * @param iblk Block index
+ * @param indx State index within block (0 for block info)
+ * @param maxqn Maximum number of quantum numbers
+ * @param iqn Output array for quantum numbers
+ * @param idgn Pointer to degeneracy value
+ * @return int Number of quantum numbers
+ */
 int getqn(iblk, indx, maxqn, iqn, idgn)
 const int iblk, indx, maxqn;
 short *iqn;
@@ -594,6 +645,20 @@ int *idgn;
 }                               /* getqn */
 
 
+/**
+ * @brief Set options for doublet Pi calculations
+ *
+ * This function reads options from the input file and initializes
+ * parameters for the doublet Pi calculations, including nuclear spin,
+ * vibrational states, and quantum number format.
+ *
+ * @param luin Input file pointer
+ * @param nfmt Pointer to number of quantum number formats
+ * @param itd Pointer to transition type
+ * @param ndbcd Pointer to number of BCD digits per parameter
+ * @param namfil Output name file path
+ * @return int 1 for success, -1 for failure
+ */
 int setopt(luin, nfmt, itd, ndbcd, namfil)
 FILE *luin;
 int *nfmt, *itd, *ndbcd;
@@ -624,6 +689,16 @@ char *namfil;
   return 1;
 }                   /* setopt */
 
+/**
+ * @brief Set quantum number format
+ *
+ * This function sets the quantum number format based on the
+ * nuclear spin and vibrational state configuration.
+ *
+ * @param iqnfmt Pointer to quantum number format
+ * @param nfmt Number of quantum number formats
+ * @return int Number of quantum numbers
+ */
 int setfmt(iqnfmt, nfmt)
 int *iqnfmt, nfmt;
 {
@@ -637,6 +712,21 @@ int *iqnfmt, nfmt;
   return nqn;
 }
 
+/**
+ * @brief Set up block structure for Hamiltonian
+ *
+ * This function initializes the block structure for the Hamiltonian
+ * calculations, setting up the number of blocks per F quantum number
+ * and the maximum size of the energy matrix.
+ *
+ * @param lu Output file pointer
+ * @param npar Number of parameters
+ * @param idpar Parameter identifiers in BCD format
+ * @param par Parameter values
+ * @param nblkpf Pointer to number of blocks per F quantum number
+ * @param negy Pointer to maximum size of energy matrix
+ * @return int Size factor for vibrational states
+ */
 int setblk(lu, npar, idpar, par, nblkpf, negy)
 FILE *lu;
 const int npar;

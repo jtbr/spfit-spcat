@@ -35,6 +35,35 @@ This document outlines the prioritized tasks for modernizing the SPFIT/SPCAT sof
     - **Expected Outcome**: A highly modular codebase with a clean C++ API, enabling easy programmatic integration and future Python bindings.
     - **Constraint**: Quantitative results must remain unchanged, and current functionality must be retained.
 
+- [ ] **Task 4: Performance Optimizations**
+    - **Description**: Speed up calculations and exploit modern hardware.
+    - **Implementation Plan**:
+        - **Profile Critical Sections**: Use profiling tools (e.g., `gprof` or `perf`) to identify the most time-consuming parts of the code, especially matrix operations (Hamiltonian diagonalization, least-squares fitting).
+        - **Parallelization**: Explore opportunities for parallelizing independent calculations, particularly within matrix operations. OpenMP could be a suitable choice for C.
+        - **Leverage Optimized Libraries**: Ensure optimal and correct use of external BLAS/LAPACK libraries (like OpenBLAS) for all linear algebra operations, as these are highly optimized.
+        - **Memory Access Patterns**: Review and optimize data structures and access patterns to improve cache utilization and reduce memory access latency.
+    - **Constraint**: Quantitative results must remain unchanged, and current functionality must be retained.
+
+- [ ] **Task 5: Build System Modernization**
+    - **Description**: Simplify the process of building the software and integrating it with modern development environments.
+    - **Implementation Plan**:
+        - **Migrate to CMake**: Convert the existing `Makefile` build system to CMake. CMake provides superior cross-platform support, robust dependency tracking, and a more flexible way to define build configurations, including generating project files for various IDEs and creating shared/static libraries.
+    - **Constraint**: Quantitative results must remain unchanged, and current functionality must be retained.
+
+- [ ] **Task 6: Error Handling and Input Validation**
+    - **Description**: Improve robustness and provide better diagnostics for programmatic users.
+    - **Implementation Plan**:
+        - **Return Error Codes**: Modify functions to return explicit error codes or status indicators instead of calling `exit()`, allowing the calling program/script to handle errors gracefully.
+        - **Informative Logging**: Implement a simple, configurable logging mechanism to output detailed error messages, warnings, and debug information to `stderr` or a log file, providing context for issues.
+        - **Input Validation**: Add comprehensive checks at function boundaries to validate input parameters and data structures, preventing crashes due to malformed data.
+    - **Constraint**: Quantitative results must remain unchanged, and current functionality must be retained.
+
+- [ ] **Task 7: Memory Management Refinement**
+    - **Description**: Improve memory management practices to reduce leaks and improve stability.
+    - **Implementation Plan**:
+        - As part of the modularization effort (Task 3), ensure clear ownership and lifecycle management of dynamically allocated memory. This might involve designing APIs where callers provide buffers, or where modules explicitly manage their internal memory and provide cleanup functions.
+    - **Constraint**: Quantitative results must remain unchanged, and current functionality must be retained.
+
 ## Implementation Plan
 
 The tasks will be executed sequentially, with thorough testing and verification after each major change to ensure the core requirements are met.

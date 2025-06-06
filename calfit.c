@@ -8,7 +8,7 @@
 /*   30 Dec.  1999: include changes for dlsq */
 /*   10 Oct.  2001: change fit diverging code */
 /*   21 Sept. 2002: fix NRJ criterion */
-/*   18 Aug.  2003: code cleanup, @comment@ is for splint */ 
+/*   18 Aug.  2003: code cleanup, @comment@ is for splint */
 
 /**************************************************************************/
 /*                                                                        */
@@ -32,14 +32,63 @@
 #define NDCARD 130
 #define PR_DELAY 6    /* seconds delay between informational messages */
 /************** CALFIT interfaces ***********************************/
+/**
+ * @brief Format quantum numbers for output
+ *
+ * @param nqn Number of quantum numbers
+ * @param qnum Array of quantum numbers
+ * @param aqnum Output string for formatted quantum numbers
+ * @return int Always returns 0
+ */
 int qnfmt2(int nqn, short *qnum, /*@out@*/ char *aqnum);
-int parer(double par, double errx, double dif, 
+
+/**
+ * @brief Format parameter values, errors, and changes for output
+ *
+ * @param par Parameter value
+ * @param errx Parameter error
+ * @param dif Parameter change
+ * @param ptmp Output string for formatted parameter
+ * @return int Always returns 0
+ */
+int parer(double par, double errx, double dif,
                  /*@out@*/ char *ptmp);
+
+/**
+ * @brief Read experimental lines from input file
+ *
+ * @param luin Input file pointer
+ * @param nline Pointer to number of lines
+ * @param iqnfmt Quantum number format for line input
+ * @return int Largest quantum number encountered
+ */
 int linein(FILE * luin, int *nline, int iqnfmt);
+
+/**
+ * @brief Process lines and set up block structure for fitting
+ *
+ * @param lu Output file pointer for listing
+ * @param flg Flag for printing (negative for detailed output)
+ * @param nline Number of lines
+ * @param nblkpf Number of blocks per F quantum number
+ * @param iqnfmt Quantum number format for line input
+ * @return int Number of bad lines
+ */
 int lineix(FILE * lu, int flg, int nline, int nblkpf, int iqnfmt);
 /********************************************************************/
-static char card[NDCARD];
+static char card[NDCARD];  /* Buffer for reading input lines */
 
+/**
+ * @brief Main function for SPFIT - Spectroscopic Parameter Fitting program
+ *
+ * This program fits spectroscopic parameters to experimental line frequencies.
+ * It reads experimental data, performs least-squares fitting using the
+ * Marquardt-Levenberg algorithm, and outputs the fitted parameters.
+ *
+ * @param argc Number of command line arguments
+ * @param argv Array of command line arguments
+ * @return int Exit status (0 for success)
+ */
 int main(int argc, char *argv[])
 {
 #define NFILE 5
@@ -248,7 +297,7 @@ int main(int argc, char *argv[])
     }
     pfitd = NULL;
     pfit = fit;
-    for (i = 0; i < nfit; ++i) {  
+    for (i = 0; i < nfit; ++i) {
       n = i + 1;
       erpar[i] = ddot(n, pfit, ndfit, pfit, ndfit);
       ++pfit;
@@ -287,7 +336,7 @@ int main(int argc, char *argv[])
       pvar += (n + 1);
       pfitb += n;
       *pfitb = 1. / (*pvar);
-      if (*pfitb < 1.e-15) 
+      if (*pfitb < 1.e-15)
         --ndfree0;
       *pvar = 0.;
     }
@@ -307,7 +356,7 @@ int main(int argc, char *argv[])
   if (nline <= 0) {
     puts("no lines read");
     exit(EXIT_FAILURE);
-  }  
+  }
   /* initialize block structure */
   nblkpf = maxf;
   maxdm = nsize_p;
@@ -339,7 +388,7 @@ int main(int argc, char *argv[])
   /**********************************************************************/
   /* START ITERATION */
   itr = 0;
-  dpar[0] = 0.; 
+  dpar[0] = 0.;
   if (nitr < 0)
     nitr = -nitr;
   nsize = 0;
@@ -403,7 +452,7 @@ int main(int argc, char *argv[])
     }
     xsqt = ddot(nfit, pfitd, ndfit, pfitd, ndfit);
     pfitb = pfitd = pfit = NULL;
-    nf = nrj = nfir = 0; 
+    nf = nrj = nfir = 0;
     icnt = -1;
     for (i = 0; i < 40; ++i)
       fputc(' ', lufit);
@@ -492,9 +541,9 @@ int main(int argc, char *argv[])
           i = frqdat(lblnd, &iblnd, &xfrq, &xwt, &xerr, qnum);
           if ((iblnd & 1) != 0) {
             xfrq = 0.; frq = sqrt(cwid);
-            if (supblnd != 0) 
+            if (supblnd != 0)
               xsqt += cwid / (xwid * xwid);
-            qnfmt2(0, qnum, aqnum); 
+            qnfmt2(0, qnum, aqnum);
             if (xerr < 0.) {
               fprintf(lufit, FMT_xbgnIR, lblnd, aqnum, xfrq, frq, frq, xwid,
                       xfrq);
@@ -547,9 +596,9 @@ int main(int argc, char *argv[])
       pfit += ndfit;
       dcopy(k, &zero, 0, pfit, 1);
     }
-    varv[0] = xsqt + nrj * xerrmx * xerrmx; 
+    varv[0] = xsqt + nrj * xerrmx * xerrmx;
     marqlast = marqp[0];
-    marqflg = lsqfit(fit, ndfit, nfit, 1, marqp, varv, 
+    marqflg = lsqfit(fit, ndfit, nfit, 1, marqp, varv,
                      oldfit, erpar, dpar, iperm);
     if (marqflg != 0) {
       dcopy(npar, oldpar, 1, par, 1);
@@ -579,7 +628,7 @@ int main(int argc, char *argv[])
               marqp[0], marqp[2]);
     if (parfac0 < 0. && xsqt >= 0.) {
       ndfree = nf + ndfree0;
-      if (ndfree <= 0) 
+      if (ndfree <= 0)
         ndfree = 1;
       parfac = -parfac0 * sqrt(xsqt / ndfree);
       fputs("WARNING: parameter errors multiplied by ",lufit);
@@ -589,7 +638,7 @@ int main(int argc, char *argv[])
     xsqt = xsqt / nf;
     if (xsqt > 0.)
       xsqt = sqrt(xsqt);
-    if (xsqbest > xsqt) 
+    if (xsqbest > xsqt)
       xsqbest = xsqt;
     /*   get estimated errors  and print parameters */
     for (i = 0; i < 32; ++i)
@@ -751,6 +800,18 @@ int main(int argc, char *argv[])
   return 0;
 }                               /* MAIN */
 
+/**
+ * @brief Format quantum numbers as a string for output
+ *
+ * Converts an array of quantum numbers to a formatted string representation.
+ * Each quantum number is formatted as a 3-character field, and the string
+ * is padded to accommodate up to 12 quantum numbers.
+ *
+ * @param nqn Number of quantum numbers to format
+ * @param qnum Array of quantum numbers
+ * @param aqnum Output string buffer for formatted quantum numbers
+ * @return int Always returns 0
+ */
 int qnfmt2(int nqn, short *qnum, char *aqnum)
 {
   /* Local variables */
@@ -772,15 +833,29 @@ int qnfmt2(int nqn, short *qnum, char *aqnum)
   return 0;
 }                               /* qnfmt2 */
 
+/**
+ * @brief Format parameter values, errors, and changes for output
+ *
+ * Creates a specially formatted string representation of a parameter value,
+ * its error, and its change. The function automatically determines the
+ * appropriate number format (fixed or scientific notation) based on the
+ * magnitude of the values.
+ *
+ * @param par Parameter value
+ * @param errx Parameter error
+ * @param dif Parameter change
+ * @param ptmp Output string buffer for formatted parameter
+ * @return int Always returns 0
+ */
 int parer(par, errx, dif, ptmp)
 double par, errx, dif;
 char *ptmp;
 {
-  static int czero = (int) '0';
-  char *pfmt;
-  double adif, apar, aten, aerr;
-  char chexp[6], fmt[34];
-  int msd, id, ie, efield, ip, lsd, k;
+  static int czero = (int) '0';  /* ASCII code for '0' character */
+  char *pfmt;                    /* Pointer for building format string */
+  double adif, apar, aten, aerr; /* Working copies of input values */
+  char chexp[6], fmt[34];        /* Format string components */
+  int msd, id, ie, efield, ip, lsd, k; /* Format calculation variables */
 
 
   /*      sets up special format for parameters and errors */
@@ -866,16 +941,33 @@ char *ptmp;
 }                               /* parer */
 
 
+/**
+ * @brief Read experimental spectral lines from input file
+ *
+ * Reads spectral line data from the input file, including frequencies,
+ * errors, weights, and quantum numbers. Handles blended lines by
+ * identifying lines with matching frequencies. Stores the data in
+ * the global line buffer for later processing.
+ *
+ * @param luin Input file pointer
+ * @param nline Pointer to number of lines (input: max lines, output: actual lines)
+ * @param iqnfmt Quantum number format for line input
+ * @return int Largest quantum number encountered
+ */
 int linein(luin, nline, iqnfmt)
 FILE *luin;
 int *nline;
 int iqnfmt;
 {
   /* Local variables */
-  SXLINE *xline;
-  double xfrqn, xerrn, xwtn, xfrqx, xerrx;
-  int nqn, nqnu, nqnl, kqnu, kqnl, i, iqf, ipace, mxline, mxqn, isblnd, icmp;
-  short nbln, nqnt[20], *iqnum;
+  SXLINE *xline;                /* Pointer to line data structure */
+  double xfrqn, xerrn, xwtn;    /* Current line frequency, error, weight */
+  double xfrqx, xerrx;          /* Previous line frequency and error */
+  int nqn, nqnu, nqnl;          /* Number of quantum numbers */
+  int kqnu, kqnl;               /* Indices for upper/lower state quantum numbers */
+  int i, iqf, ipace, mxline;    /* Loop variables and counters */
+  int mxqn, isblnd, icmp;       /* Max quantum number, blend flag, comparison flag */
+  short nbln, nqnt[20], *iqnum; /* Blend counter, quantum number template, quantum number pointer */
 
   /*   get lines from input  and stores them */
 
@@ -901,7 +993,7 @@ int iqnfmt;
   for (i = 1; i <= mxline; ++i) {       /*  loop for reading lines */
     xline = lbufof(1, i);
     iqnum = xline->qn;
-    if (getlin(luin, nqn, nqnt, iqnum, &xfrqn, &xerrn, &xwtn, 
+    if (getlin(luin, nqn, nqnt, iqnum, &xfrqn, &xerrn, &xwtn,
                card, NDCARD) < 0) {
       *nline = i - 1;
       return mxqn;
@@ -938,7 +1030,7 @@ int iqnfmt;
     xline->linku = 0;
     xline->linkl = 0;
     isblnd = 0;
-    if (icmp != 0 && fabs(xfrqn - xfrqx) < fabs(xfrqn) * 1.e-14 + 1.e-8) { 
+    if (icmp != 0 && fabs(xfrqn - xfrqx) < fabs(xfrqn) * 1.e-14 + 1.e-8) {
       /* frq match */
       if (fabs(xerrn - xerrx) < 1e-7) {
         isblnd = 1;
@@ -969,6 +1061,21 @@ int iqnfmt;
   return mxqn;
 }                               /* linein */
 
+/**
+ * @brief Process spectral lines and set up block structure for fitting
+ *
+ * Processes the spectral lines read by linein(), determining the Hamiltonian
+ * blocks and indices for upper and lower states of each transition.
+ * Sets up links for calculating energies and derivatives in block order.
+ * Identifies and reports bad lines (those with invalid quantum numbers).
+ *
+ * @param lu Output file pointer for listing
+ * @param flg Flag for printing (negative for detailed output)
+ * @param nline Number of lines
+ * @param nblkpf Number of blocks per F quantum number
+ * @param iqnfmt Quantum number format for line input
+ * @return int Number of bad lines
+ */
 int lineix(lu, flg, nline, nblkpf, iqnfmt)
 FILE *lu;
 int flg, nline, nblkpf, iqnfmt;
@@ -1075,9 +1182,9 @@ int flg, nline, nblkpf, iqnfmt;
     }
     j = xline->bln;
     if (j != 0) {
-      xnorm += xwtn;      
+      xnorm += xwtn;
       if (j > 0) {     /* normalize weights */
-        xnorm = 1. / xnorm; 
+        xnorm = 1. / xnorm;
         for (j = nread - (j >> 1); j <= nread; ++j) {
           xline = lbufof(1, j);
           xline->xwt = (float) (xline->xwt * xnorm);
