@@ -147,14 +147,14 @@ extern short sptzero[]; /* Default spin table for a molecule with no spins: nset
 
 extern SSP ssp_head; /* Head of linked list for unique spin patterns */
 
-// extern struct {   /* Cached data for getqn function to speed up repeated calls for the same block */
-//   int cblk;       /* Cached block number */
-//   int cnblk;      /* Cached number of sub-blocks in this block */
-//   int csblk;      /* Cached current sub-block index being processed */
-//   int cff;        /* Cached 2*F value for this block */
-//   int cwt[5];     /* Cached statistical weights for this block */
-// } *cgetq, cgetv[2]; /* Two cache entries, presumably for upper and lower states of a transition */
-
+typedef struct {   /* Cached data for getqn function to speed up repeated calls for the same block */
+  int cblk;       /* Cached block number */
+  int cnblk;      /* Cached number of sub-blocks in this block */
+  int csblk;      /* Cached current sub-block index being processed */
+  int cff;        /* Cached 2*F value for this block */
+  int cwt[5];     /* Cached statistical weights for this block */
+} GETQN;
+extern GETQN *cgetq, cgetv[2]; /* Two cache entries, presumably for upper and lower states of a transition */
 
 extern SDIP dipinfo0; /* Default/first dipole info structure */
 extern /*@owned@*/ SDIP *dipinfo; /* Pointer to array of dipole info structures */
@@ -210,7 +210,6 @@ extern /*@owned@*/ short *jdx;   /* Column indices for sparse matrix elements */
 extern /*@owned@*/ short *iqnsep;/* Array storing separation information for sorting/diagonalization, or K values for projection sort */
 extern /*@owned@*/ short *ibkptr;/* Array of pointers to the start of each sub-block (Wang block * spin) */
 extern /*@owned@*/ short *ikmin; /* Array of minimum K values for each sub-block */
-
 
 
 /* Function Declarations */

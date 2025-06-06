@@ -22,8 +22,8 @@ clean:
 	rm -f ${EXEA} *.o *.a
 dpfit: calfit.o subfit.o dpi.o splib.a; gcc -o $@ $^ $(BLASLIB) -lm
 dpcat: calcat.o sortsub.o dpi.o splib.a; gcc -o $@ $^ $(BLASLIB) -lm
-spfit: calfit.o subfit.o spinv.o spinit.o splib.a; gcc -o $@ $^ $(BLASLIB) -lm
-spcat: calcat.o sortsub.o spinv.o spinit.o splib.a; gcc -o $@ $^ $(BLASLIB) -lm
+spfit: calfit.o subfit.o spinv.a spinit.o splib.a; gcc -o $@ $^ $(BLASLIB) -lm
+spcat: calcat.o sortsub.o spinv.a spinit.o splib.a; gcc -o $@ $^ $(BLASLIB) -lm
 calmrg: calmrg.o splib.a; gcc -o $@ $^ $(BLASLIB) -lm
 calbak: calbak.o splib.a; gcc -o $@ $^ $(BLASLIB) -lm
 termval: termval.o splib.a; gcc -o $@ $^ $(BLASLIB) -lm
@@ -35,6 +35,10 @@ cnvwn: cnvwn.o splib.a ; gcc -o $@ $^ $(BLASLIB) -lm
 splib.a: ulib.o cnjj.o slibgcc.o catutil.o lsqfit.o $(LBLAS)
 	ar r splib.a $^
 	ranlib splib.a
+
+spinv.a: spinv_setup.o spinv_spin_symmetry.o spinv_linalg_sort.o spinv_hamiltonian.o spinv_utils.o
+	ar r spinv.a $^
+	ranlib spinv.a
 
 calfit.o:calfit.c calpgm.h
 subfit.o:subfit.c calpgm.h
@@ -49,7 +53,11 @@ moiam.o:moiam.c calpgm.h
 ulib.o:ulib.c calpgm.h
 cnjj.o:cnjj.c cnjj.h
 slibgcc.o:slibgcc.c calpgm.h
-spinv.o:spinv.c calpgm.h spinit.h
+spinv_setup.o:spinv_setup.c calpgm.h spinit.h spinv_internal.h
+spinv_spin_symmetry.o:spinv_spin_symmetry.c calpgm.h spinit.h spinv_internal.h
+spinv_linalg_sort.o:spinv_linalg_sort.c calpgm.h spinit.h spinv_internal.h
+spinv_hamiltonian.o:spinv_hamiltonian.c calpgm.h spinit.h spinv_internal.h
+spinv_utils.o:spinv_utils.c calpgm.h spinit.h spinv_internal.h
 spinit.o:spinit.c calpgm.h spinit.h
 dpi.o:dpi.c calpgm.h
 ftran.o:ftran.c
