@@ -16,7 +16,7 @@ typedef struct str_itmix {
   /*@owned@*/ double *eigvecv;
   /*@owned@*/ short *qnv;
   /*@owned@*/ EITMIX *mix;
-  size_t nditot; 
+  size_t nditot;
   int ii, neqi, nitot;
 } ITMIX;
 
@@ -28,10 +28,8 @@ typedef struct str_itot {
   int ii, ltot, lv1, lv2, neqi;
 } SITOT;
 
-int tensor(double *z, const int *iscom, const int *jscom,
-           const int *lscom, const int *smap, int npair, int alpha);
-void getzitot(double *z, int lls, int ii, const int *lscom, 
+void getzitot(double *z, int lls, int ii, const int *lscom,
               const int *iscom, const int* jscom, int alpha, int neqi);
 void setzitot(int lv1, int lv2, int ltot, int ii, int neqi);
-/*@dependent@*/  /*@null@*/ 
+/*@dependent@*/  /*@null@*/
 ITMIX *get_itmix(const int ii, const int nitot);
