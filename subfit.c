@@ -6,7 +6,7 @@
 
 /*   Herbert M. Pickett, 20 March 1989 */
 /*   Revised version in c, 22 March 1999 */
-/*   18 Aug.  2003: code cleanup, @comment@ is for splint */ 
+/*   18 Aug.  2003: code cleanup, @comment@ is for splint */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -14,13 +14,14 @@
 #include <math.h>
 #include "calpgm.h"
 
+#define NCARD 130
+
 int getlbl(npar, idpar, parlbl, fil, idiv, lblen)
 int npar, idiv, lblen;
 bcd_t *idpar;
 char *parlbl, *fil;
 {
-#define NDEC 10
-#define NCARD 130
+
   static int ipwr[] = {0, 100, 10000};
   FILE *lu;
   size_t nlbl;
@@ -217,7 +218,7 @@ char *fbak;
   /*     FLU= input file name (.par) */
   /*     FBAK =backup file name (.bak) */
   FILE *lu, *lubak;
-  char cline[82];
+  char cline[NCARD];
 
   lu = fopenq(flu, "r");
   lubak = fopenq(fbak, "w");
@@ -625,7 +626,7 @@ int *prvblk, nblk, iblk, line;
   if (iblk > nblk)
     iblk = nblk;
   last = 0;
-  for (i = iblk; i >= 0; --i) { 
+  for (i = iblk; i >= 0; --i) {
    /* search down for non zero element of PRVBLK */
     last = prvblk[i];
     if (last != 0)

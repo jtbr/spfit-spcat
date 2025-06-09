@@ -13,16 +13,19 @@ main()
   xtra = buf + 21;
   c = 29979.2458;
   printf(" Enter list file\n");
-  gets(buf);
+  fgets(buf, sizeof(buf), stdin);
+  buf[strcspn(buf, "\n")] = '\0'; /* Remove trailing newline */
   flist = fopen(buf, "w");
   printf(" MHz units, or  wavenumbers ? (m,w) [M] ");
-  gets(line);
+  fgets(line, sizeof(line), stdin);
+  line[strcspn(line, "\n")] = '\0'; /* Remove trailing newline */
   cnvt = (line[0] == 'w');
   if (cnvt) {
     printf(" ENTER FREQUENCY LIMITS IN WAVENUMBERS \n");
     dfqlow = 0.;
     dfqhi = 10000.;
-    gets(buf);
+    fgets(buf, sizeof(buf), stdin);
+    buf[strcspn(buf, "\n")] = '\0'; /* Remove trailing newline */
     iresp = sscanf(buf, "%lf %lf", &dfqlow, &dfqhi);
     dfqlow *= c;
     dfqhi *= c;
@@ -30,7 +33,8 @@ main()
     printf(" ENTER FREQUENCY LIMITS IN GHz \n");
     dfqlow = 0.;
     dfqhi = 10000.;
-    gets(buf);
+    fgets(buf, sizeof(buf), stdin);
+    buf[strcspn(buf, "\n")] = '\0'; /* Remove trailing newline */
     iresp = sscanf(buf, "%lf %lf", &dfqlow, &dfqhi);
     dfqlow *= 1000.;
     dfqhi *= 1000.;
@@ -46,7 +50,8 @@ main()
       puts(buf);
     if (nline > 0 && strcmp(buf, fqhi) < 0) {
       printf("%s is next. OK? (y/n/a) [y] ", molnam);
-      gets(line);
+      fgets(line, sizeof(line), stdin);
+      line[strcspn(line, "\n")] = '\0'; /* Remove trailing newline */
       resp = line[0];
       if (resp == 'a')
         exit(0);

@@ -9,7 +9,7 @@ int fillbuf(FILE * finp, char *tbuf, int nlim, char **pbuf);
 int getkey(int *key, char *tbuf, char *wbuf);
 int bufcmp(const char *b1, const char *b2, const int *key);
 int memsort(int nline, const int *key, char **pbuf);
-int memfind(int ibgn, int nbuf, const int *key, const char *buf0, 
+int memfind(int ibgn, int nbuf, const int *key, const char *buf0,
             char **pbuf);
 
 static int ndline;
@@ -46,7 +46,7 @@ BOOL dokey;
     free(buf0); free(key); return 1;
   }
   ntot = strlen(buf0); ndline = ntot + 1;
-  if (ndline < 81) 
+  if (ndline < 81)
     ndline = 81;
   if (!dokey) {
     for (k = 0; k < 13; ++k)
@@ -67,7 +67,7 @@ BOOL dokey;
   if (pbuf == NULL) {
     free(buf0); free(key); return 1;
   }
-  buf = buf0 + ndline; --mxline; 
+  buf = buf0 + ndline; --mxline;
   fout = fscr = NULL;
   init = TRUE;
   do {
@@ -140,7 +140,7 @@ int nlim;
       } while (ich != '\n' && ich != EOF);      /* flush rest of line */
     }
     i += 2;
-    if (i < ndline) 
+    if (i < ndline)
       memset(&tbuf[i], 0, ndline - i);
     if (++iret == nlim)
       break;
@@ -161,7 +161,7 @@ const int *key;
       irev = 0;
     k = k >> 1;
     ib1 = b1[k] & 0x7f;
-    if ((char) ib1 == '-') { 
+    if ((char) ib1 == '-') {
       ib1 = -1; irev = 0;
     }
     ib2 = b2[k] & 0x7f;
@@ -213,7 +213,7 @@ char **pbuf;
   return 0;
 }
 
-int memfind(ibgn, nbuf, key, buf0, pbuf) 
+int memfind(ibgn, nbuf, key, buf0, pbuf)
 int ibgn, nbuf;
 const int *key;
 const char *buf0;
@@ -221,7 +221,7 @@ char **pbuf;
 {
   /* return position n such that buf0 > pbuf[k] for k = ibgn, .., (n - 1) */
   int left, right, k;
-  if (bufcmp(buf0, pbuf[ibgn], key) <= 0) 
+  if (bufcmp(buf0, pbuf[ibgn], key) <= 0)
     return ibgn;
   left = ibgn + 1; right = nbuf;
   while (left < right) {
@@ -243,7 +243,11 @@ char tbuf[], wbuf[];
   char cmp;
   printf("type numbers for key fields (1= most significant)\n%s\n", tbuf);
   fflush(stdout);
-  fgets(wbuf, ndline, stdin);
+  if (fgets(wbuf, ndline, stdin) == NULL) {
+    /* Handle error or EOF */
+    wbuf[0] = '\0';
+    return 0;
+  }
   i = 0;
   for (cmp = '1'; cmp <= '9'; ++cmp) {
     init = 1; klast = -2;

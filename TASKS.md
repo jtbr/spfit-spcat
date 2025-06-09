@@ -2,17 +2,27 @@
 
 This document outlines the prioritized tasks for modernizing the SPFIT/SPCAT software suite, focusing on enabling programmatic use, improving performance, and enhancing readability/maintainability, while ensuring quantitative results and current functionality are retained.
 
-## In Progress Tasks
+## Completed Tasks
 
-- [ ] **Task 1: Code Readability and Clarity Improvements**
+- [x] **Task 1: Code Readability and Clarity Improvements (Preliminary)**
     - **Description**: Enhance the readability and clarity of the core C code by adding comments, documenting functions, and making targeted, safe variable name changes. This is a preliminary step to facilitate subsequent refactoring.
     - **Implementation Plan**:
-        - **Target Files**: `calfit.c`, `calcat.c`, `spinv.c`, `ulib.c`, `lsqfit.c`, `dpi.c`, `spinit.c`, `slibgcc.c`.
+        - **Target Files**: `calfit.c`, `dpi.c`, `spinv.c` (split into `spinv_setup.c`, `spinv_spin_symmetry.c`, `spinv_linalg_sort.c`, `spinv_hamiltonian.c`, and `spinv_utils.c`, with common header `spinv_internal.h`).
         - **Actions**:
             - Add inline comments to non-obvious code blocks and complex logic.
             - Document function headers with their purpose, parameters, and return values.
             - Rename variables to be more descriptive, but *only* when their meaning is absolutely clear and the change is low-risk. There can be value in keeping short variable names as well.
         - **Constraint**: Only add comments or change variable names when *certain* of understanding the code in question. Limit changes as much as possible to avoid introducing bugs. DO NOT change the code logic itself.
+
+## In Progress Tasks
+
+- [ ] **Task 2: Obsolete Functions, Portability Issues, and Unused File Removal**
+    - **Description**: Address minor code quality issues identified by `cppcheck`, including replacing obsolete functions, fixing portability warnings, and removing files that are no longer used.
+    - **Implementation Plan**:
+        - **Replace Obsolete Functions**: Update calls to `gets` (e.g., in `catlist.c`) with safer alternatives like `fgets`.
+        - **Address Portability Warnings**: Review and correct pointer casting issues reported by `cppcheck` in `blas.c` and `dblas.c` to improve portability and adherence to modern C standards.
+        - **Remove Unused Code Files**: Delete files identified as unused by `cppcheck` (e.g., `dblas.c`, `blas.c`, `catread.c`, `util.c`, `fdate.c`, `calfitno.c`, `cnvir.c`, `dpix.c`, `hundscvt.c`, `iambak.c`, `iamcalc.c`, `jelim.c`, `moiam.c`, `readopt.c`, `reassign.c`, `slibgen.c`, `sortegy.c`, `sortn.c`, `sortsub.c`, `stark.c`, `termval.c`, `testi.c`, `whats.new`). *Note: This list needs to be carefully verified before deletion. It is probably valuable to keep the fallback BLAS library, for example, in case a system version is missing, even if it is currently unused.*
+    - **Constraint**: Quantitative results must remain unchanged, and current functionality must be retained.
 
 ## Future Tasks
 
@@ -73,6 +83,6 @@ The tasks will be executed sequentially, with thorough testing and verification 
 *   `TASKS.md` - This task list itself.
 *   `memory-bank/activeContext.md` - Will be updated with progress and insights.
 *   `memory-bank/progress.md` - Will be updated with overall project status.
-*   Core C files: `calfit.c`, `calcat.c`, `spinv.c`, `ulib.c`, `lsqfit.c`, `dpi.c`, `spinit.c`, `slibgcc.c` (for Task 1).
+*   Core C files: `calfit.c`, `dpi.c`, `spinv_setup.c`, `spinv_spin_symmetry.c`, `spinv_linalg_sort.c`, `spinv_hamiltonian.c`, `spinv_utils.c`, `spinv_internal.h` (related to Task 1).
 *   Files identified by `cppcheck` for issues or potential removal (for Task 2).
 *   New C++ header and source files (e.g., `spfit_api.hpp`, `spfit_api.cpp`) for Task 3.

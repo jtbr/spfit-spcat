@@ -27,7 +27,7 @@ char str[];
 const int N;
 { /* subroutine to return 24 characters with the time and date */
 #define NCTIME 24
-  char *buffer;
+  char buffer[32]; /* Temporary buffer for strftime output */
   time_t curtime;
   struct tm *loctime;
   int k, n;
@@ -36,14 +36,14 @@ const int N;
   curtime = time (NULL);
   /* Convert it to local time representation. */
   loctime = localtime (&curtime);
-  /* copy the date and time in the standard format. */
+  /* Format the date and time using strftime - format matches asctime output */
   if (loctime != NULL) {
-    buffer=asctime (loctime);
+    strftime(buffer, sizeof(buffer), "%a %b %d %H:%M:%S %Y", loctime);
     k= (int) strlen(str);
     n -= NCTIME + 2;
     while(k < n) str[k++]=' ';
     str += n;
-    memcpy(str,buffer, (size_t) 24);
+    memcpy(str, buffer, (size_t) 24);
     str[NCTIME] = '\n'; str[NCTIME + 1] = '\0';
   }
   return 0;
@@ -51,8 +51,8 @@ const int N;
 
 int caldelay(delay)
 int delay;
-{ 
-  /* if delay is different, save time and return false */  
+{
+  /* if delay is different, save time and return false */
   /* else return true if time interval >= delay */
   static time_t tcmp = 0;
   static int old_delay = -1;
@@ -75,12 +75,12 @@ void *mallocq(size_t nl)
   if (p == NULL) {
     puts("memory allocation error");
     exit(EXIT_FAILURE);
-  } 
+  }
   return p;
 }
 int maxmem(size_t *nll)
 {
-  /* On return 'nll' is the maximum double precision size that can be */ 
+  /* On return 'nll' is the maximum double precision size that can be */
   /* allocated at once. This function returns the largest dimension of */
   /* a square double-precision matrix that can be allocated */
   size_t nl, nn, nroot;
@@ -89,15 +89,15 @@ int maxmem(size_t *nll)
   nl = (size_t) 0x100 / sizeof(double) - 1;
   for (k = 1; k < n; ++k) nl = (nl << 8) + 0x0ff;
   if (nll) *nll = nl;
-  nroot =  90; 
-  for(k = 2; k < n; k += 2) nroot <<= 8; 
+  nroot =  90;
+  for(k = 2; k < n; k += 2) nroot <<= 8;
   do { /* iterative square root */
     nn = nroot; nroot = (nl /(nn + 1) + nn) >> 1;
   } while (nn != nroot);
   n = (int) sizeof(int);
   nl = 0x7fff;
   for(k = 2; k < n; ++k)  nl = (nl << 8) + 0x0ff;
-  if (nroot > nl) nroot = nl;   
+  if (nroot > nl) nroot = nl;
   return (int)nroot;
 }
 int filget(argc, argv,  nfile, cfil, cext)
@@ -163,7 +163,7 @@ const char *cext[];
       if (ext != NULL) k -= (int)strlen(ext) + 1;
       if (k <= 0) continue;
       master = (char *)malloc((size_t) k);
-      if (master == NULL) break; 
+      if (master == NULL) break;
       len = k; --k;
       memcpy(master, parg, (size_t) k);
       master[k] = '.';
@@ -175,7 +175,7 @@ const char *cext[];
     if(pstr == NULL) {
       k = (int)strlen(cext[iext]) + 1;
       pstr = (char *) malloc((size_t)(len + k));
-      if(pstr != NULL) { 
+      if(pstr != NULL) {
         memcpy(pstr, master, (size_t) len);
         memcpy(pstr + len, cext[iext], (size_t) k);
         cfil[iext] = pstr;
@@ -259,16 +259,3 @@ void brkqr(int i)
 {
     if(i != 0) brkflg = 1;
 } /* brkqr */
-
-
-
-
-
-
-
-
-
-
-
-
-
