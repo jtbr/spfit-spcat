@@ -42,7 +42,7 @@ typedef struct {
   short  inl;    /* lower state index number */
   short  bln;    /* blend flag               */
   short  qn[2*MAXQN]; /* quantum number input     */
-} SXLINE; 
+} SXLINE;
 typedef unsigned char bcd_t;
 #define NEGBCD(ivbcd) (int)(ivbcd & 0x80)
 /************** BLAS interface ******************************************/
@@ -67,7 +67,7 @@ int ordblk(const int ndm, const int nn, short *iqnsep, double *t, double *e,
             short *isblk, double *p, short *ip);
 void etswap(const int ndm,const int nsize,const int ix1,const int ix2,
             double *t,/*@null@*/double *e, /*@null@*/double *q);
-int hdiag(const int nm, const int nx, double *z, /*@out@*/ double *d, 
+int hdiag(const int nm, const int nx, double *z, /*@out@*/ double *d,
           /*@out@*/ double *e, /*@out@*/ short *iqnsep);
 int triag(const int nm, const int nx, const int nz,
           double *z, double *d, double *e);
@@ -89,14 +89,14 @@ bcd_t i2bcd(int i);
 #include "catutil.h"
 /************** SPINV or DPI interface *********************************/
 int hamx(const int iblk, const int nsiz, const int npar, const bcd_t *idpar,
-         const double *par, /*@out@*/ double *egy, /*@out@*/ double *t, 
+         const double *par, /*@out@*/ double *egy, /*@out@*/ double *t,
          /*@out@*/ double *dedp, /*@out@*/ double *pmix, const BOOL ifdump);
 int setint(FILE *lu, /*@out@*/BOOL *ifdiag, /*@out@*/int *nsav, const int ndip,
            bcd_t *idip, /*@out@*/ int *isimag);
 int intens(const int iblk, const int isiz, const int jblk, const int jsiz,
            const int ndip, const bcd_t *idip, const double *dip,
            /*@out@*/double *s);
-int getqn(const int iblk,const int indx,const int maxqn, /*@out@*/short *iqn, 
+int getqn(const int iblk,const int indx,const int maxqn, /*@out@*/short *iqn,
           /*@out@*/int *idgn);
 int setopt(FILE *lu, /*@out@*/ int *nfmt, /*@out@*/ int *itd,
            /*@out@*/ int *nbcdpar, /*@out@*/char *namfil);
@@ -115,15 +115,10 @@ void dnuadd(int npar, int nparx, int initl, int indx,
             int ifac, double *egy, double *egyder, int nsize,
             int line, double *par, double *fac);
 double dnuget(int iflg, int npar, double f, int line, double *dvec);
-int getdbk(int *link, /*@out@*/ int *iblk, /*@out@*/ int *indx, 
+int getdbk(int *link, /*@out@*/ int *iblk, /*@out@*/ int *indx,
            /*@out@*/ int *initl, /*@out@*/ int *ifac);
-int frqdat(int line, /*@out@*/ int *ibln, /*@out@*/ double *xfrq, 
+int frqdat(int line, /*@out@*/ int *ibln, /*@out@*/ double *xfrq,
         /*@out@*/ double *xwt, /*@out@*/ double *xerr, /*@out@*/ short *iqn);
 int lnlink(int *prvblk, int nblk, int iblk, int line);
 /************** SORTSUB interfaces ***********************************/
 int sortn(char *inpname, char *outname, BOOL dokey);
-
-
-
-
-

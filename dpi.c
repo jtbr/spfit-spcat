@@ -578,6 +578,7 @@ int *nsav, *isimag;
 const int ndip;
 bcd_t *idip;
 {
+  (void) lu; /* do nothing, just avoid a warning */
   bcd_t iv,jv;
   int kdip, ibcd;
   *ifdiag = TRUE;
@@ -614,6 +615,8 @@ short *iqn;
 int *idgn;
 {
   int kf, idif, tdgn, iv, ix;
+
+  (void) maxqn; /* do nothing, just avoid a warning */
 
   /* ..PACKAGE FOR DOUBLET PI */
   iv = (iblk - 1) >> 1;
@@ -702,6 +705,7 @@ char *namfil;
 int setfmt(iqnfmt, nfmt)
 int *iqnfmt, nfmt;
 {
+  (void)nfmt; /* do nothing, just avoid a warning */
   *iqnfmt = 804;
   if (iwhole == 0)
     *iqnfmt += 10;

@@ -13,7 +13,7 @@
 /*   HMP, str output now will put out component dipoles                */
 /*   HMP, large uncertainties do not inhibit output to .CAT file       */
 /*   HMP, sort cat file at end                                         */
-/*   18 Aug.  2003: code cleanup, @comment@ is for splint              */ 
+/*   18 Aug.  2003: code cleanup, @comment@ is for splint              */
 /*   19 July  2004: bug fix for multiple dipoles                       */
 /*   16 October 2020: modifications by KLKL to calculate more          */
 /*                    temperatures for partition functions             */
@@ -42,7 +42,7 @@ int qnfmt(short *iqu, int nqn, /*@out@*/char *sqn);
 int simt(int isiz, int jsiz, double *s, double *t, double *u,
                 double *wk);
 /*@dependent@*/ SBLK *ibufof(const int iblk,
-                                    const unsigned int ndel, 
+                                    const unsigned int ndel,
                                     /*@out@*/ SBLK *blk);
 SBLK *sblk_alloc(const int nstruct, const unsigned mxdm);
 
@@ -116,7 +116,7 @@ int main(int argc, char* argv[])
   /* read first two lines of .int file */
   first = (fgetstr(titl, NCARD, luint) <= 0);
   if (!first) {
-    chtime(titl, 82); 
+    chtime(titl, 82);
     fputs(titl, stdout);
     fputs(titl, luout);
     first = (fgetstr(titl, NCARD, luint) <= 0);
@@ -234,7 +234,7 @@ int main(int argc, char* argv[])
     if (fgetstr(titl, NCARD, luint) <= 0)
       break;
     jj = getbcd(titl, &idip[ibcd], NDECDIP);
-    if (jj <= 0) 
+    if (jj <= 0)
       break;
     dvec[0] = 0.;
     if (pcard(&titl[jj], dvec, 1, NULL) <= 0)
@@ -295,9 +295,9 @@ int main(int argc, char* argv[])
   memset(sqn, (int)' ', (size_t)(catqn << 1));
   iqnfmt = iqnfmtv[0];
   iposv = 0;
-  if (nfmt > 1 || ((iqnfmt / 1000) & 1) != 0) 
+  if (nfmt > 1 || ((iqnfmt / 1000) & 1) != 0)
     iposv = ((iqnfmt / 100) % 5) - 1;
-  if (iposv == 0 || maxv < 0) 
+  if (iposv == 0 || maxv < 0)
     maxv = 1000;
   globfmt = 0;
   for (i = 0; i < nfmt; ++i) {
@@ -359,7 +359,7 @@ int main(int argc, char* argv[])
       } else if (isimag[j] != isimag[k]) {
         if (isimag[k] < 0) {
           isimag[k] = isimag[j];
-        } else if (isimag[j] >= 0) {   
+        } else if (isimag[j] >= 0) {
           ++ij;
         }
       }
@@ -476,7 +476,7 @@ int main(int argc, char* argv[])
       if (ifdump)
         kbgn = i;
       getqn(iblk, i + 1, nqn, iqni, &idgn);
-      if (idgn <= 0) 
+      if (idgn <= 0)
         continue;
       iv = iqni[iposv];
       if (iv > maxv)
@@ -486,7 +486,7 @@ int main(int argc, char* argv[])
       }
       if (globfmt != 0) {
         ktsp = -1;
-        if (newfmt != 0) 
+        if (newfmt != 0)
           ktsp = iqni[nqn - 2];
         getqn(iblk, i + 1, maxqn, iqni, &idgn);
       }
@@ -525,7 +525,7 @@ int main(int argc, char* argv[])
       if (prfrq) {
         fprintf(luout, "%6d %4d %17.6f %17.6f %10.6f",
                 iblk, i + 1, egx, err, pmix[i]);
-        if (globfmt != 0) 
+        if (globfmt != 0)
           fprintf(luout, " (%3d)", ktsp);
         for (k = 0; k < maxqn; ++k) {
           fprintf(luout, "%3d", (int) iqni[k]);
@@ -535,7 +535,7 @@ int main(int argc, char* argv[])
       if (pregy) {
         fprintf(luegy, "%6d %4d %17.6f %17.6f %10.6f %4d:",
                 iblk, i + 1, egx, err, pmix[i], idgn);
-        if (globfmt != 0) 
+        if (globfmt != 0)
           fprintf(luegy, "(%3d)", ktsp);
         for (k = 0; k < maxqn; ++k) {
           fprintf(luegy, "%3d", (int) iqni[k]);
@@ -653,7 +653,7 @@ int main(int argc, char* argv[])
           for (ij = 0; ij < npdip; ++ij) {
             sij = s[ij];
             str = sij[ioff];
-            dvec[ij] = str; 
+            dvec[ij] = str;
             strr += str;
             strq += str * str;
           }
@@ -772,8 +772,8 @@ int main(int argc, char* argv[])
   free(derv);
   free(par);
   free(iqnfmtv);
-  free(idip); 
-  free(isimag); 
+  free(idip);
+  free(isimag);
   free(nvdip);
   free(dip);
   free(dvec);
@@ -1000,4 +1000,3 @@ const unsigned mxdem;
   } while (--k > 0);
   return pret;
 }
-

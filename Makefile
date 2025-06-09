@@ -1,12 +1,11 @@
 CC=gcc
-CFLAGS=-g -O3 -Wall
-#CFLAGS=-O2 -Wall
+#CFLAGS=-g -Od -Wall -Wextra  # debug
+#CFLAGS=-O3 -Wall  # optimized for distribution
+CFLAGS=-O3 -Wall -Wextra -march=native  # optimized for speed on current device (-Ofast is faster but math results may differ very slightly)
 EXEQ=spfit spcat calmrg dpfit dpcat
 EXEA=${EXEQ} moiam stark termval sortn calbak reassign sortegy iambak # iamcalc is broken
 #next line for atlas blas
 #BLASLIB=-lcblas -latlas
-#next line for fortran blas and cblas wrappers
-#BLASLIB=-lcblas -lblas
 #OpenBLAS from libopenblas-dev apt package
 BLASLIB=-lopenblas
 #next line for supplied fallback routines
