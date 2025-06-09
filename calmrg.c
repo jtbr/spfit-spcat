@@ -46,7 +46,7 @@ int lposn(const short *ikey, const int nkey, const int *k12,
           PEXPT *head, /*@out@*/ PDEXPT *ppexpt);
 void dolink(PEXPT *head, PDEXPT pexpt,
             const double xfrq, const double xerr, const short *iqn);
-void unlink(PEXPT *head, /*@notnull@*/ EXPT *pexpt, 
+void unlink(PEXPT *head, /*@notnull@*/ EXPT *pexpt,
             /*@out@*/ int *jmin,/*@out@*/ int *jmax);
 BOOL mrglin(char *line2, char *line);
 
@@ -69,7 +69,7 @@ char *argv[];
   static char line1[NDLINE], line2[NDLINE], tmpstr[NDLINE];
   static char qnstr[NDQN+NDQN+1], tagstr[8];
   short *pqn, tqn;
-  double cfrq, cfrq0, errc, xerr, st, st0, xfrq, frqdif, xwt, ratio, dtmp[3];
+  double cfrq, errc, xerr, st, xfrq, frqdif, xwt, ratio, dtmp[3];
   int j, k, nbad, nout, nline, iqfmt, jmax, nqn2, nline2, catqn, pqnlo, jx;
   int minb, k1, k2, k12[2], nqn, nmatch, nmerge, icmp, nqnlin, nqnlin2;
   int jmax0, jmin, jmin0, nmap, kcmp, nxhash;
@@ -113,7 +113,7 @@ char *argv[];
     exit(EXIT_FAILURE);
   }
   /* read options */
-  ratio = 0.; nqnlin = nqn; 
+  ratio = 0.; nqnlin = nqn;
   luopt = fopen(cfil[eopt],"r");
   if (luopt == NULL) {
     printf("enter MAX (obs-calc)/(exp. error), no. quanta for lin (%2d) "
@@ -142,16 +142,16 @@ char *argv[];
       for (k = 0; k < nmap; ++k) {
         iqmap[k] = (short)k; iqmaplin[k] = (short)k;
       }
-      iqmap[nmap] = (short)(nqn - 1); 
+      iqmap[nmap] = (short)(nqn - 1);
       iqmaplin[nmap] = (short)(nqnlin - 1);
       ++nmap;
     }
     for (k = 0; k < nmap; ++k) {
-      iqmap[k + nmap] = (short)(iqmap[k] + nqn); 
+      iqmap[k + nmap] = (short)(iqmap[k] + nqn);
       iqmaplin[k + nmap] = (short)(iqmaplin[k] + nqnlin);
     }
     nmap = nmap << 1;
-  }     
+  }
   nqnlin2 = nqnlin << 1;
   if (luopt != stdin) fclose(luopt);
   if (nqn <= 6) {
@@ -177,7 +177,7 @@ char *argv[];
     }
     if (xerr > 999.999)
       continue;
-    if (xfrq < 0.) { 
+    if (xfrq < 0.) {
       /* swap quanta so frequency is positive */
       for (k = 0; k < nqnlin; ++k) {
         tqn = iqn2[k];
@@ -187,7 +187,7 @@ char *argv[];
       xfrq = -xfrq;
     }
     /* set up HASH table */
-    j = (int)iqn2[0]; 
+    j = (int)iqn2[0];
     if (j > jmax)
       jmax = j;
     if (j < jmin)
@@ -245,7 +245,7 @@ char *argv[];
       for (k = 0; k < nqn2; ++k) {
         icmp = iqn1[k] - iqn2[k];
         if (k == kcmp) {
-          if (icmp != 0) 
+          if (icmp != 0)
             icmp = iqn1[k] + iqn2[k];
           kcmp = k2;
         }
@@ -266,10 +266,10 @@ char *argv[];
         iqn2[k2] = iqn1[k2];
       }
       k12[0] = k1;
-      ++nmerge; 
+      ++nmerge;
     } else {                    /* ready to ouput line */
       j = (int)iqn1[0];         /* test for quantum match */
-      if (j >= jmin && j <= jmax && nqn == nqnlin && 
+      if (j >= jmin && j <= jmax && nqn == nqnlin &&
           lposn(iqn1, nqn2, k12, jhash, &pexpt) == 0) {
         pcard(line1, dtmp, 3, fmtlen);
         cfrq = dtmp[0];
@@ -329,13 +329,12 @@ char *argv[];
   }
   nmatch = 0;
   lumrg = fopenq(cfil[emrg], "r");
-  cfrq0 = -999999.; st0 = -500.; 
   if (ratio < 0.001)
     nbad = 0;
   while (nbad > 0) {
     if (jmin > jmax) break;
     if (fgetstr(line1, NDLINE, lumrg) < minb) break;
-    if (strncmp(line1 + PTAG, tagstr, KTAG) == 0) 
+    if (strncmp(line1 + PTAG, tagstr, KTAG) == 0)
       continue;  /* line already assigned */
     memcpy(qnstr, line1 + PQNU, (size_t) nqn2);
     memcpy(qnstr + nqn2, line1 + pqnlo, (size_t) nqn2);
@@ -350,11 +349,11 @@ char *argv[];
           jmin0 = NHASH;
         jmax0 = jmin0;
       }
-      for (k = 0; k < nmap; ++k) 
+      for (k = 0; k < nmap; ++k)
         iqn2[k] = iqn1[iqmap[k]];
-    } 
+    }
     pcard(line1, dtmp, 3, fmtlen);
-    //    cfrq0 = cfrq; st0 = st; 
+    //    cfrq0 = cfrq; st0 = st;
     cfrq = dtmp[0];
     errc = dtmp[1];
     st = dtmp[2];
@@ -384,9 +383,9 @@ char *argv[];
               plast = pexptp; pexptp = pexptp->next;
               if (pexptp == NULL) break;
               if (fabs(xfrq - pexptp->frqx) < 0.00015) {
-                pnext = pexptp->next; 
+                pnext = pexptp->next;
                 free(plast->next);
-                plast->next = pnext; pnext = NULL; 
+                plast->next = pnext; pnext = NULL;
                 pexptp = plast;
               }
             }
@@ -394,7 +393,7 @@ char *argv[];
           pexpt->nbad += (short) 1;
           ++nmatch;
         }
-      } 
+      }
     }
   }
   if (nbad > 0) {
@@ -451,9 +450,9 @@ PDEXPT *ppexpt;
   if (jx > NHASH)
     jx = NHASH;
   now = head[jx];
-  icmp = -1; 
+  icmp = -1;
   while (now != NULL) {
-    iqnx = now->iqn; 
+    iqnx = now->iqn;
     icmp = iqnx[0] - ikey[0];
     if (icmp == 0) {
       kcmp = k12[0];
@@ -472,7 +471,7 @@ PDEXPT *ppexpt;
     last = now;
     now = now->next;
   }
-  if (icmp != 0){ 
+  if (icmp != 0){
     *ppexpt = last;
   } else {
     *ppexpt = now;
@@ -544,7 +543,7 @@ int *jmin, *jmax;
       last->next = now;
       free(pexpt);
       return;
-    } 
+    }
   } while (now != NULL);
 }
 
@@ -586,6 +585,3 @@ char *line2, *line;
   gupfmt(igup, line + PDGN);
   return TRUE;
 }                               /* mrglin */
-
-
-

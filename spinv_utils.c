@@ -451,7 +451,7 @@ double *s;
   double dd;
   long ndms;
   unsigned int ijv;
-  int ncos, ifup, isym, i, k, lv, n, icase, ibase, mkd, ibcd, nbcd, isunit;
+  int ncos, ifup, i, k, lv, n, icase, ibase, mkd, ibcd, nbcd, isunit;
   int jbase, kbgni, kbgnj, nblki, nblkj, ixtmp, iret, kd, ld, npair, ldel;
   int ix, jx, nx, si1, si2, iff, jff, nni, nnj, iwt[5], jwt[5], ndecv;
   int ivv, jvv, ixx, jxx, ifc, ksym, kl, ioff, joff, alpha, nitot, dipoff;
@@ -530,7 +530,7 @@ double *s;
         kl = pdip->flg;
         if (TEST(kl, MINOQ) && nni == nnj)
           continue;
-        isym = (int)(bijv1 & 3);
+        /* isym = (int)(bijv1 & 3); */
         si1 = (int)(idip[ibcd + 4] >> 4) & 0x0f;
         si2 = 0;
         icase = bcd2i(idip[ibcd + 5]);

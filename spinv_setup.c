@@ -163,8 +163,8 @@ bcd_t *idip;
   short *iiv1, *iiv2;
   double zfac;
   unsigned int ijv;
-  int i, icase, isym, ivdif, ii, iv1, iv2, lv1, lv2, ifac, lv, nsym;
-  int si1, ibcd, ndecv, nbcd, ipty, iflg, kd, ld, ifc, imag, ldel;
+  int i, icase, isym, ivdif, ii, iv1, iv2, lv1, lv2, ifac, lv;
+  int si1, ibcd, ndecv, nbcd, iflg, kd, ld, ifc, imag, ldel;
   int nimag[16], ioff, kmin, nmin, nn, kavg, good_case, bad_dip;
   bcd_t itmp;
   *ifdiag = (glob.idiag >= 0);
@@ -228,7 +228,6 @@ bcd_t *idip;
       --iv1;
     if (ODD(lv2))
       --iv2;
-    ipty = (lv1 ^ lv2) & 2;
     lv1 = pvib1->lvqn;
     lv2 = pvib2->lvqn;
     /* MAKE SURE VIBRATIONS ARE ORDERED */
@@ -329,7 +328,7 @@ bcd_t *idip;
       if (good_case == 0)
         break;
       imag += ld;
-      nsym = setgsym((int)pvib1->gsym);
+      /* nsym = */ setgsym((int)pvib1->gsym);
       bad_dip = 4;
       if (testwt(pvib1, pvib2, isym, 0))
         break;
@@ -1183,7 +1182,7 @@ const double *par;
   int nodd, isym, jsym, ixzt, i, k, kl, lt, n, kdiag, nvibm, neven, nsize, alpha;
   int kd, ld, ii, jj, im, kk, ni, nj, iv, jv, ivmin, ix, lv, lx, npair, ldel;
   int knnmin, ntstat, si1, si2, iff, ikq, jjt, ins, neuler, sznz, iff0;
-  int iwt, nsym, gsym, maxblk, maxsblk, itmp, nd, ifc, nf, kavg;
+  int iwt, gsym, maxblk, maxsblk, itmp, nd, ifc, nf, kavg;
   unsigned int ivsym;
   int ivwt[3], jvwt[3];
   char ctmp;
@@ -1270,7 +1269,7 @@ const double *par;
     ni = ixcom[XNVAL];
     pvinfo = &vinfo[ixcom[XVIB]];
     gsym = pvinfo->gsym;
-    nsym = setgsym(gsym);
+    /* nsym = */ setgsym(gsym);
     getwt(pvinfo, isym, kk, ivwt);
     for (jj = 0; jj < ii; ++jj)
     {

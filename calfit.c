@@ -101,7 +101,6 @@ int main(int argc, char *argv[])
   static double tiny = 1.5e-38;
   static const char *ext[NFILE] = { "par", "lin", "fit", "bak", "var" };
   enum efile {epar, elin, efit, ebak, evar};
-  /*@dependent@*/ SXLINE *linebuf;
   /*@owned@*/ bcd_t *idpar;
   /*@owned@*/ double *par, *erp, *oldpar, *erpar, *dpar, *delbgn;
   /*@owned@*/ double *fitbgn, *var, *oldfit, *fit, *teig, *pmix;
@@ -345,7 +344,7 @@ int main(int argc, char *argv[])
   oldfit[0] = fitbgn[0];
   oldpar[0] = par[0];
   dcopy(nfit, &zero, 0, delbgn, 1);
-  linebuf = lbufof(-nfit, nline);
+  lbufof(-nfit, nline);
   /* read lines */
   lulin = fopenq(fname[elin], "r");
   maxf = linein(lulin, &nline, iqnfmt);
@@ -708,7 +707,7 @@ int main(int argc, char *argv[])
 
   /************************************************************************/
 
-  linebuf = lbufof(-1, 0);      /* release storage */
+  lbufof(-1, 0);      /* release storage */
   setblk(lufit, 0, idpar, par, &nblkpf, &maxdm);        /* release storage */
   if (itr == 0) {
     puts(" output files not updated");
