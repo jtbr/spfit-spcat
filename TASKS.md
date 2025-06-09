@@ -14,27 +14,30 @@ This document outlines the prioritized tasks for modernizing the SPFIT/SPCAT sof
             - Rename variables to be more descriptive, but *only* when their meaning is absolutely clear and the change is low-risk. There can be value in keeping short variable names as well.
         - **Constraint**: Only add comments or change variable names when *certain* of understanding the code in question. Limit changes as much as possible to avoid introducing bugs. DO NOT change the code logic itself.
 
-## In Progress Tasks
-
-- [ ] **Task 2: Obsolete Functions, Portability Issues, and Unused File Removal**
-    - **Description**: Address minor code quality issues identified by `cppcheck`, including replacing obsolete functions, fixing portability warnings, and removing files that are no longer used.
+- [x] **Task 2: Fix Compiler Warnings and Remove Unused Code**
+    - **Description**: Address compiler warnings identified during the build process and remove unused functions and files.
     - **Implementation Plan**:
-        - **Replace Obsolete Functions**: Update calls to `gets` (e.g., in `catlist.c`) with safer alternatives like `fgets`.
-        - **Address Portability Warnings**: Review and correct pointer casting issues reported by `cppcheck` in `blas.c` and `dblas.c` to improve portability and adherence to modern C standards.
-        - **Remove Unused Code Files**: Delete files identified as unused by `cppcheck` (e.g., `dblas.c`, `blas.c`, `catread.c`, `util.c`, `fdate.c`, `calfitno.c`, `cnvir.c`, `dpix.c`, `hundscvt.c`, `iambak.c`, `iamcalc.c`, `jelim.c`, `moiam.c`, `readopt.c`, `reassign.c`, `slibgen.c`, `sortegy.c`, `sortn.c`, `sortsub.c`, `stark.c`, `termval.c`, `testi.c`, `whats.new`). *Note: This list needs to be carefully verified before deletion. It is probably valuable to keep the fallback BLAS library, for example, in case a system version is missing, even if it is currently unused.*
-    - **Constraint**: Quantitative results must remain unchanged, and current functionality must be retained.
+        - **Target Files**: Files with compiler warnings, including `calfit.c`, `subfit.c`, `spinv_setup.c`, `spinv_utils.c`, `ulib.c`, `sortsub.c`, and `calmrg.c`.
+        - **Actions**:
+            - Remove or properly use variables flagged as "set but not used".
+            - Address other warnings such as ignoring return values of functions.
+            - Remove unused functions and files identified by static analysis.
+        - **Constraint**: Only make minimal changes necessary to fix the warnings without altering the code's behavior.
+    - **Results**: All compiler warnings have been fixed, and the code now compiles cleanly with no warnings. Static analysis with `cppcheck` also shows no issues. Unused functions and code files have been removed.
+
+## Completed Tasks
+
+- [x] **Task 3: Obsolete Functions and Portability Issues**
+    - **Description**: Addressed remaining code quality issues identified by `cppcheck`, including replacing obsolete functions and fixing portability warnings.
+    - **Implementation Plan**:
+        - **Obsolete Functions**: All uses of `gets()` have been removed and replaced with safer alternatives like `fgets()`.
+        - **Portability Warnings**: Fixed pointer casting issues in `dblas.c` and verified that no other portability issues remain in the codebase.
+    - **Results**: The codebase now adheres to modern C standards, with no obsolete functions or unsafe pointer casts. All changes were verified by running the test suite and static analysis.
+    - **Constraint**: Quantitative results remain unchanged, and current functionality is retained.
 
 ## Future Tasks
 
-- [ ] **Task 2: Obsolete Functions, Portability Issues, and Unused File Removal**
-    - **Description**: Address minor code quality issues identified by `cppcheck`, including replacing obsolete functions, fixing portability warnings, and removing files that are no longer used.
-    - **Implementation Plan**:
-        - **Replace Obsolete Functions**: Update calls to `gets` (e.g., in `catlist.c`) with safer alternatives like `fgets`.
-        - **Address Portability Warnings**: Review and correct pointer casting issues reported by `cppcheck` in `blas.c` and `dblas.c` to improve portability and adherence to modern C standards.
-        - **Remove Unused Code Files**: Delete files identified as unused by `cppcheck` (e.g., `dblas.c`, `blas.c`, `catread.c`, `util.c`, `fdate.c`, `calfitno.c`, `cnvir.c`, `dpix.c`, `hundscvt.c`, `iambak.c`, `iamcalc.c`, `jelim.c`, `moiam.c`, `readopt.c`, `reassign.c`, `slibgen.c`, `sortegy.c`, `sortn.c`, `sortsub.c`, `stark.c`, `termval.c`, `testi.c`, `whats.new`). *Note: This list needs to be carefully verified before deletion. It is probably valuable to keep the fallback BLAS library, for example, in case a system version is missing, even if it is currently unused.*
-    - **Constraint**: Quantitative results must remain unchanged, and current functionality must be retained.
-
-- [ ] **Task 3: Modularization and Decoupling with C++ Interface**
+- [ ] **Task 4: Modularization and Decoupling with C++ Interface**
     - **Description**: Refactor the core SPFIT/SPCAT functionality to be more modular, using C structs/C++ classes for inputs/outputs, and creating a clean C++ interface layer. This is crucial for enabling programmatic use from modern software like Python.
     - **Implementation Plan**:
         - **Identify Core Calculation Logic**: Pinpoint the exact functions within SPFIT/SPCAT that perform the core scientific calculations (e.g., Hamiltonian setup, diagonalization, parameter fitting, intensity calculation).
@@ -45,7 +48,7 @@ This document outlines the prioritized tasks for modernizing the SPFIT/SPCAT sof
     - **Expected Outcome**: A highly modular codebase with a clean C++ API, enabling easy programmatic integration and future Python bindings.
     - **Constraint**: Quantitative results must remain unchanged, and current functionality must be retained.
 
-- [ ] **Task 4: Performance Optimizations**
+- [ ] **Task 5: Performance Optimizations**
     - **Description**: Speed up calculations and exploit modern hardware.
     - **Implementation Plan**:
         - **Profile Critical Sections**: Use profiling tools (e.g., `gprof` or `perf`) to identify the most time-consuming parts of the code, especially matrix operations (Hamiltonian diagonalization, least-squares fitting).
@@ -54,13 +57,13 @@ This document outlines the prioritized tasks for modernizing the SPFIT/SPCAT sof
         - **Memory Access Patterns**: Review and optimize data structures and access patterns to improve cache utilization and reduce memory access latency.
     - **Constraint**: Quantitative results must remain unchanged, and current functionality must be retained.
 
-- [ ] **Task 5: Build System Modernization**
+- [ ] **Task 6: Build System Modernization**
     - **Description**: Simplify the process of building the software and integrating it with modern development environments.
     - **Implementation Plan**:
         - **Migrate to CMake**: Convert the existing `Makefile` build system to CMake. CMake provides superior cross-platform support, robust dependency tracking, and a more flexible way to define build configurations, including generating project files for various IDEs and creating shared/static libraries.
     - **Constraint**: Quantitative results must remain unchanged, and current functionality must be retained.
 
-- [ ] **Task 6: Error Handling and Input Validation**
+- [ ] **Task 7: Error Handling and Input Validation**
     - **Description**: Improve robustness and provide better diagnostics for programmatic users.
     - **Implementation Plan**:
         - **Return Error Codes**: Modify functions to return explicit error codes or status indicators instead of calling `exit()`, allowing the calling program/script to handle errors gracefully.
@@ -68,7 +71,7 @@ This document outlines the prioritized tasks for modernizing the SPFIT/SPCAT sof
         - **Input Validation**: Add comprehensive checks at function boundaries to validate input parameters and data structures, preventing crashes due to malformed data.
     - **Constraint**: Quantitative results must remain unchanged, and current functionality must be retained.
 
-- [ ] **Task 7: Memory Management Refinement**
+- [ ] **Task 8: Memory Management Refinement**
     - **Description**: Improve memory management practices to reduce leaks and improve stability.
     - **Implementation Plan**:
         - As part of the modularization effort (Task 3), ensure clear ownership and lifecycle management of dynamically allocated memory. This might involve designing APIs where callers provide buffers, or where modules explicitly manage their internal memory and provide cleanup functions.
