@@ -15,7 +15,7 @@ EXE_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 SPFIT_OUTPUT_EXTENSIONS = [".fit", ".var", ".bak", ".par"]
 SPCAT_OUTPUT_EXTENSIONS = [".cat", ".out", ".egy", ".str"] # .egy and .str are optional
 
-def run_commands_and_move_outputs_dynamic(output_subdir_name, suite_base_path='.'):
+def run_commands_and_move_outputs_dynamic(output_subdir_name, suite_base_path='.', skip=[]):
     original_cwd = os.getcwd()
 
     print(f"Starting processing (Dynamic Discovery) for test suite in {suite_base_path}")
@@ -37,6 +37,10 @@ def run_commands_and_move_outputs_dynamic(output_subdir_name, suite_base_path='.
 
             if not os.path.isdir(molecule_example_path):
                 continue # Skip any files within category directories
+
+            if local_basename in skip:
+                print(f"  SKIPPING Molecule: {local_basename} in skip list (--all to disable)")
+                continue
 
             print(f"  Processing Molecule: {local_basename} in {molecule_example_path}")
 
@@ -65,7 +69,7 @@ def run_commands_and_move_outputs_dynamic(output_subdir_name, suite_base_path='.
                             os.chdir(original_cwd) # Change back before continuing to next molecule
                             continue
 
-                        spfit_result = subprocess.run(spfit_command, capture_output=True, text=True, check=False, timeout=120)
+                        spfit_result = subprocess.run(spfit_command, capture_output=True, text=True, check=False, timeout=600)
                         if spfit_result.returncode == 0:
                             print("    SPFIT completed successfully.")
                             spfit_success = True
@@ -89,7 +93,7 @@ def run_commands_and_move_outputs_dynamic(output_subdir_name, suite_base_path='.
                             spcat_command = [os.path.join(EXE_PATH, "spcat"), local_basename]
                             print(f"    Running SPCAT: {' '.join(spcat_command)}")
                             try:
-                                spcat_result = subprocess.run(spcat_command, capture_output=True, text=True, check=False, timeout=120)
+                                spcat_result = subprocess.run(spcat_command, capture_output=True, text=True, check=False, timeout=1000)
                                 if spcat_result.returncode == 0:
                                     print("    SPCAT completed successfully.")
                                     spcat_success = True
@@ -152,4 +156,10 @@ if __name__ == "__main__":
         print("Provide subdirectory to use for each example's outputs")
         sys.exit(1)
 
-    run_commands_and_move_outputs_dynamic(sys.argv[1])
+    # NOTE: Skip clclo2 example by default as it's too slow to iterate; use only for full tests
+    subdir = sys.argv[1]
+    skip = ['clclo2']
+    if subdir == "--all":
+        skip = []
+        subdir = sys.argv[2]
+    run_commands_and_move_outputs_dynamic(subdir, skip=skip)

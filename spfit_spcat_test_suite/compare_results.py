@@ -14,7 +14,7 @@ NUMBER_RE = re.compile(NUMBER_REGEX_STR)
 
 # Regex to find and remove common date/time stamps
 # e.g., "Thu Feb 23 16:19:27 2006" or "Mon Jan 01 12:00:00 2000"
-DATE_REGEX_STR = r"\b(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}(?:\.\d+)?\s+\d{4}\b"
+DATE_REGEX_STR = r"(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}(?:\.\d+)?\s+\d{4}\b"
 DATE_RE = re.compile(DATE_REGEX_STR)
 
 def normalize_line_text(line_text):
@@ -193,7 +193,7 @@ def main_comparison(new_output_dir_name, ref_output_dir_name):
     suite_base_path = os.getcwd() # or os.path.abspath(os.path.dirname(__file__))
     if not os.path.isdir(suite_base_path):
         print(f"Error: Suite directory '{suite_base_path}' not found.")
-        return
+        return 2
 
     print(f"Starting comparison for test suite in: {suite_base_path}")
     print(f"Comparing '{ref_output_dir_name}/' with '{new_output_dir_name}/'")
@@ -265,12 +265,13 @@ def main_comparison(new_output_dir_name, ref_output_dir_name):
     else:
         print("\nReview summary for details on differences, missing files, or errors.")
 
+    return overall_summary['differs']
+
 if __name__ == "__main__":
-    REF_OUTPUT_DIR_NAME = "reference_outputs"
-    #NEW_OUTPUT_DIR_NAME = "v2008_outputs"
+    REF_OUTPUT_DIR_NAME = "v2008_results"  # "reference_outputs"
 
     if len(sys.argv) < 2:
         print("Usage: compare_results.py <comparison_subdir> [baseline_reference_subdir]")
         sys.exit(1)
 
-    main_comparison(sys.argv[1], sys.argv[2] if len(sys.argv) > 2 else REF_OUTPUT_DIR_NAME )
+    sys.exit(main_comparison(sys.argv[1], sys.argv[2] if len(sys.argv) > 2 else REF_OUTPUT_DIR_NAME ))
