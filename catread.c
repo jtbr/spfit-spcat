@@ -239,22 +239,3 @@ C     IF INPUT SPECIES MOLEC = LAST ENTRY THEN MOLEC=0 ON RETURN
   *molec = catptr->moltag;
   return catptr->nlen;
 }
-
-int getcat(buf, pdata)
-char *buf;
-struct catdata *pdata;
-{
-  static double dval[8];
-  static int fmt[8] = { 13, 8, 8, 2, 10, 3, 7, 4 };
-  if (pcard(buf, dval, 8, fmt) < 8)
-    return -1;
-  pdata->freq = dval[0];
-  pdata->derr = dval[1];
-  pdata->str = dval[2];
-  pdata->itd = (int) dval[3];
-  pdata->elow = dval[4];
-  pdata->igup = (int) dval[5];
-  pdata->tag = (int) dval[6];
-  pdata->ifmt = (int) dval[7];
-  return (readqn(buf + 55, pdata->iqn, 12));
-}

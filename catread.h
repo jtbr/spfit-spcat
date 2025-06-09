@@ -67,5 +67,3 @@ C     IF INPUT SPECIES MOLEC = 0 THEN POSITION IS BEFORE FIRST ENTRY
 C
 C     IF INPUT SPECIES MOLEC = LAST ENTRY THEN MOLEC=0 ON RETURN
 ***********************************************************************/
-int getcat(char *buf, struct catdata *pdata);
-/* fill structure with catlog data */

@@ -3,22 +3,6 @@
 #define LF 10
 #define CR 13
 
-void getword(word, line, stop)
-char *word, *line, stop;
-{
-  int x = 0, y;
-
-  for (x = 0; ((line[x]) && (line[x] != stop)); x++)
-    word[x] = line[x];
-
-  word[x] = '\0';
-  if (line[x])
-    ++x;
-  y = 0;
-
-  while (line[y++] = line[x++]);
-}
-
 char *makeword(line, stop)
 char *line, stop;
 {
@@ -103,37 +87,6 @@ char *str;
   for (x = 0; str[x]; x++)
     if (str[x] == '+')
       str[x] = ' ';
-}
-
-int rind(s, c)
-char *s, c;
-{
-  register int x;
-  for (x = strlen(s) - 1; x != -1; x--)
-    if (s[x] == c)
-      return x;
-  return -1;
-}
-
-int getline(s, n, f)
-char *s;
-int n;
-FILE *f;
-{
-  register int i = 0;
-
-  while (1) {
-    s[i] = (char) fgetc(f);
-
-    if (s[i] == CR)
-      s[i] = fgetc(f);
-
-    if ((s[i] == 0x4) || (s[i] == LF) || (i == (n - 1))) {
-      s[i] = '\0';
-      return (feof(f) ? 1 : 0);
-    }
-    ++i;
-  }
 }
 
 send_fd(f, fd)
