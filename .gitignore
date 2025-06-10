@@ -17,5 +17,7 @@ reassign
 sortegy
 iambak
 iamcalc
+# CMake artefacts
+build/
 
 *~
