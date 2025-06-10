@@ -59,75 +59,7 @@ setint(): Initializes dipole data from the .int file.
 #include "calpgm.h"
 #include "spinit.h"
 #include "spinv_internal.h"
-
-SVIB vinfo1; /* Default/first vibrational state info */
-/*@owned@*/ SVIB *vinfo = &vinfo1; /* Pointer to array of vibrational state info */
-
-
-PSPAR spar_head[MAXVIB]; /* Array of linked list heads for parameters, one per vibrational state (iv2, the lower state in an interaction) */
-
-short sptzero[] = { 1, 0 }; /* Default spin table for a molecule with no spins: nset=1 (N only), 2*S=0 */
-
-SSP ssp_head = { NULL, sptzero, 1 , 0}; /* Head of linked list for unique spin patterns */
-
-GETQN *cgetq, cgetv[2]; /* Two cache entries, presumably for upper and lower states of a transition */
-
-
-SDIP dipinfo0; /* Default/first dipole info structure */
-/*@owned@*/ SDIP *dipinfo = &dipinfo0; /* Pointer to array of dipole info structures */
-
-double zero = 0.;    /* Static zero value */
-double zwk = 0.;     /* Static zero for work array fallback */
-double spfac[MAXII]; /* Spin factors sqrt(I(I+1)(2I+1)) for quadrupole etc. */
-double spfac2[MAXII];/* Spin factors for quadrupole, involving 1/sqrt((I-1/2)(I+3/2)) etc. */
-int zmoldv = 0;      /* Default/zero for moldv fallback */
-int zblkptr = 0;     /* Default/zero for blkptr fallback */
-int zivs = 0;        /* Default/zero for ivs fallback */
-int zipder = 0;      /* Default/zero for ipder fallback */
-int revsym[] = { 0, 3, 2, 1}; /* Symmetry reversal map (e.g., Bx <-> Bz for oblate) */
-int isoddk[] = { 0, 1, 1, 0}; /* Indicates if K is effectively odd for symmetry types A, Bx, By, Bz for direction cosines */
-int ixphase[] = {0, 1, 2, 3}; /* Scratch for phase choices, modified by glob.stdphase */
-int ipwr2[]={0,1,2,4};        /* Powers of 2 (1,2,4) used for symmetry component checking (bit masks) */
-int is_esym[MAXITOT];         /* Array indicating E-symmetry for I_tot components: 0=A/B, 1=E_a, -1=E_b */
-/* Angular momentum coupling arrays for a single operator */
-int lscom[MAXNS];  /* Tensor orders L for successive couplings in F = N+S+I1+I2... */
-int iscom[MAXNS];  /* 2*Angular momentum values for bra state (2N, 2J, 2F1...) */
-int jscom[MAXNS];  /* 2*Angular momentum values for ket state */
-int ismap[MAXNS];  /* Maps spin index to its position in iscom/jscom for tensor calculations */
-/* Common blocks for rotational/rovibrational quanta storage */
-int ixcom[NDXCOM]; /* Stores quantum numbers for the 'bra' side of a matrix element */
-int jxcom[NDXCOM]; /* Stores quantum numbers for the 'ket' side of a matrix element */
-/* Various global integer flags and counters */
-int itptr;         /* Index of I_tot in the spin coupling scheme */
-int itsym;         /* Index of the first spin summed into I_tot */
-int nspin;         /* Maximum number of spins encountered across all vibrational states */
-int nsqmax;        /* Maximum power of N(N+1) encountered for any parameter */
-int ndmx;          /* Maximum Hamiltonian matrix dimension encountered / work array size */
-int ndmax;         /* Maximum Delta N for any interaction */
-int nddip;         /* Number of dipole parameters currently allocated in dipinfo */
-/* Static short variables, often default/zero values or fallbacks for unallocated pointers */
-short szero = 0;   /* Static zero short value */
-short zidx = 0;    /* Default/zero for idx fallback */
-short zjdx = 0;    /* Default/zero for jdx fallback */
-short ziqnsep = 0; /* Default/zero for iqnsep fallback */
-short zibkptr = 0; /* Default/zero for ibkptr fallback */
-short zikmin = 0;  /* Default/zero for ikmin fallback */
-
-GLOB glob; /* Global variables structure */
-
-char sbcd[NSBCD]; /* Buffer for BCD (Binary Coded Decimal) to string conversion */
-
-/* Pointers to dynamically allocated arrays used throughout calculations */
-/*@owned@*/ int *moldv;   /* Array storing packed (Vib,Sym,SpinPattern) identifiers for each block */
-/*@owned@*/ int *blkptr;  /* Array of pointers to the start of each F-block group in moldv */
-/*@owned@*/ int *ipder;   /* Array mapping parameter index to its derivative column, or -ve for constrained */
-/*@owned@*/ int *ivs;     /* Array storing packed (Vib,Sym,SpinPattern) for each sub-block */
-/*@owned@*/ double *wk;   /* Main work array for Hamiltonian elements, direction cosines, etc. */
-/*@owned@*/ short *idx;   /* Row indices for sparse matrix elements (Hamiltonian or dipole) */
-/*@owned@*/ short *jdx;   /* Column indices for sparse matrix elements */
-/*@owned@*/ short *iqnsep;/* Array storing separation information for sorting/diagonalization, or K values for projection sort */
-/*@owned@*/ short *ibkptr;/* Array of pointers to the start of each sub-block (Wang block * spin) */
-/*@owned@*/ short *ikmin; /* Array of minimum K values for each sub-block */
+#include "SpinvContext.hpp"
 
 
 /**
@@ -147,12 +79,7 @@ char sbcd[NSBCD]; /* Buffer for BCD (Binary Coded Decimal) to string conversion 
  *                                conventions, 0 otherwise.
  * @return int Always returns 0 after processing.
  */
-int setint(lu, ifdiag, nsav, ndip, idip, isimag)
-FILE *lu;
-BOOL *ifdiag;
-const int ndip;
-int *nsav, *isimag;
-bcd_t *idip;
+int setint(struct SpinvContext* ctx, FILE *lu, BOOL *ifdiag, int *nsav, const int ndip, bcd_t *idip, int *isimag)
 { /*   subroutine to initialize intensity data */
   static char *bad_msg[] = {"\n", "(1) bad symmetry field\n",
                             "(2) vib out of range\n", "(3) unknown  dipole type\n",
@@ -167,23 +94,23 @@ bcd_t *idip;
   int si1, ibcd, ndecv, nbcd, iflg, kd, ld, ifc, imag, ldel;
   int nimag[16], ioff, kmin, nmin, nn, kavg, good_case, bad_dip;
   bcd_t itmp;
-  *ifdiag = (glob.idiag >= 0);
+  *ifdiag = (ctx->glob.idiag >= 0);
   *nsav = 1;
-  if (nddip > 0)
+  if (ctx->nddip > 0)
   {
-    free(dipinfo);
-    dipinfo = NULL;
+    free(ctx->dipinfo);
+    ctx->dipinfo = NULL;
   }
-  dipinfo = (SDIP *)mallocq((size_t)ndip * sizeof(SDIP));
-  dipinfo0.fac = 0.;
-  memcpy(dipinfo, &dipinfo0, sizeof(SDIP));
-  nddip = ndip;
+  ctx->dipinfo = (SDIP *)mallocq((size_t)ndip * sizeof(SDIP));
+  ctx->dipinfo0.fac = 0.;
+  memcpy(ctx->dipinfo, &ctx->dipinfo0, sizeof(SDIP));
+  ctx->nddip = ndip;
   for (i = 0; i < 16; ++i)
   {
     nimag[i] = 0;
   }
-  ifac = glob.vibfac + 1;
-  ndecv = glob.vibdec;
+  ifac = ctx->glob.vibfac + 1;
+  ndecv = ctx->glob.vibdec;
   nbcd = (int)idip[0] & 0x7f;
   for (i = 0, ibcd = 0; i < ndip; ++i, ibcd += nbcd)
   {
@@ -220,8 +147,8 @@ bcd_t *idip;
       iv1 = iv2;
       iv2 = ii;
     }
-    pvib1 = &vinfo[iv1];
-    pvib2 = &vinfo[iv2];
+    pvib1 = &ctx->vinfo[iv1];
+    pvib2 = &ctx->vinfo[iv2];
     lv1 = pvib1->lvupper;
     lv2 = pvib2->lvupper;
     if (ODD(lv1))
@@ -241,12 +168,12 @@ bcd_t *idip;
       if (isym > 3 || icase > MAXINT)
         break;
       bad_dip = 2;
-      if (iv1 >= glob.nvib)
+      if (iv1 >= ctx->glob.nvib)
         break;
-      if (iv2 >= glob.nvib)
+      if (iv2 >= ctx->glob.nvib)
         break;
-      if (glob.oblate == FALSE)
-        isym = revsym[isym];
+      if (ctx->glob.oblate == FALSE)
+        isym = ctx->revsym[isym];
       if (isym == 0)
       {
         ld = 0;
@@ -260,7 +187,7 @@ bcd_t *idip;
         ioff = 0;
       }
       imag = 0;
-      kd = isoddk[isym]; /* ld = 0,1; kd = 0, 1, 1, 0 */
+      kd = ctx->isoddk[isym]; /* ld = 0,1; kd = 0, 1, 1, 0 */
       good_case = 4;
       if (icase > 0)
       {
@@ -328,9 +255,9 @@ bcd_t *idip;
       if (good_case == 0)
         break;
       imag += ld;
-      /* nsym = */ setgsym((int)pvib1->gsym);
+      /* nsym = */ setgsym(ctx, (int)pvib1->gsym);
       bad_dip = 4;
-      if (testwt(pvib1, pvib2, isym, 0))
+      if (testwt(ctx, pvib1, pvib2, isym, 0))
         break;
       ldel = lv1 - lv2;
       if (ldel != 0)
@@ -345,7 +272,7 @@ bcd_t *idip;
       }
       else if (lv1 != 0)
       {
-        if (glob.newlz)
+        if (ctx->glob.newlz)
         {
           if (lv1 < 0)
           {
@@ -378,12 +305,12 @@ bcd_t *idip;
           iflg |= MIMAG;
         }
       }
-      if (glob.nitot >= 3)
+      if (ctx->glob.nitot >= 3)
       {
         bad_dip = 5;
-        if (MOD(kd - ldel, glob.nitot) != 0)
+        if (MOD(kd - ldel, ctx->glob.nitot) != 0)
           break; /* require alpha == 0 */
-        if (si1 <= itsym)
+        if (si1 <= ctx->itsym)
           iflg |= MIDEN; /* identity operator */
       }
       lv = 1;
@@ -395,13 +322,13 @@ bcd_t *idip;
           break;
         iiv1 = pvib1->spt;
         iiv2 = pvib2->spt;
-        if (checksp(TRUE, si1, 0, iiv1, iiv2, &zfac) != 0)
+        if (checksp(ctx, TRUE, si1, 0, iiv1, iiv2, &zfac) != 0)
           break;
         lv = TEST(iflg, MELEC) ? 2 : 0; /*  simple electric dipole */
       }
       if (ifc < 0)
         iflg |= MFCM;
-      if (glob.nofc && ifc != 0)
+      if (ctx->glob.nofc && ifc != 0)
       {
         if (ifc < 0)
           ifc = -1 - ifc;
@@ -413,28 +340,28 @@ bcd_t *idip;
       }
       if (ld == kd && ld < lv)
         ld -= (ld - lv) & 0x7fe; /* subtract even number */
-      dipinfo[i].fac = zfac;
-      dipinfo[i].flg = (short)iflg;
-      dipinfo[i].kd = (signed char)kd;
-      dipinfo[i].ld = (signed char)ld;
-      dipinfo[i].ldel = (signed char)ldel;
-      dipinfo[i].fc = (signed char)ifc;
-      dipinfo[i].kavg = (char)kavg;
+      ctx->dipinfo[i].fac = zfac;
+      ctx->dipinfo[i].flg = (short)iflg;
+      ctx->dipinfo[i].kd = (signed char)kd;
+      ctx->dipinfo[i].ld = (signed char)ld;
+      ctx->dipinfo[i].ldel = (signed char)ldel;
+      ctx->dipinfo[i].fc = (signed char)ifc;
+      ctx->dipinfo[i].kavg = (char)kavg;
       bad_dip = 0;
     } while (FALSE);
     if (bad_dip != 0)
     {
       if (bad_dip > 0)
       {
-        putbcd(sbcd, NSBCD, &idip[ibcd]);
+        putbcd(ctx->sbcd, NSBCD, &idip[ibcd]);
         if (bad_dip * sizeof(char *) >= sizeof(bad_msg))
           bad_dip = 0;
         fprintf(lu,
                 " WARNING: dipole %3d %s has no matrix elements, %s",
-                (i + 1), sbcd, bad_msg[bad_dip]);
+                (i + 1), ctx->sbcd, bad_msg[bad_dip]);
       }
-      memcpy(&dipinfo[i], &dipinfo0, sizeof(SDIP));
-      iv2 = iv1 = glob.vibfac;
+      memcpy(&ctx->dipinfo[i], &ctx->dipinfo0, sizeof(SDIP));
+      iv2 = iv1 = ctx->glob.vibfac;
       isym = 0;
     }
     isimag[i] = 0;
@@ -461,14 +388,14 @@ bcd_t *idip;
   imag = 0;
   for (kd = 0; kd < 8; ++kd)
   {
-    ld = kd ^ glob.stdphase;
+    ld = kd ^ ctx->glob.stdphase;
     iv1 = 0;
     iv2 = 0;
     nn = 0;
     for (isym = 1; isym <= 3; ++isym)
     {
-      i = ipwr2[isym];
-      if (TEST(glob.phasemask, i) && TEST(kd, i))
+      i = ctx->ipwr2[isym];
+      if (TEST(ctx->glob.phasemask, i) && TEST(kd, i))
         break;
       ii = isym;
       if (TEST(ld, i))
@@ -498,14 +425,14 @@ bcd_t *idip;
         break;
     }
   }
-  glob.stdphase = (kmin ^ glob.stdphase) & 7;
+  ctx->glob.stdphase = (kmin ^ ctx->glob.stdphase) & 7;
   if (kmin != 0)
   { /* update phases */
     fprintf(lu,
-            "NON-STANDARD PHASE CONVENTION IN USE, %2d\n", glob.stdphase);
+            "NON-STANDARD PHASE CONVENTION IN USE, %2d\n", ctx->glob.stdphase);
     for (isym = 1; isym <= 3; ++isym)
     {
-      ixphase[isym] = (ixphase[isym] + kmin) & 1;
+      ctx->ixphase[isym] = (ctx->ixphase[isym] + kmin) & 1;
       kmin = kmin >> 1;
     }
   }
@@ -513,11 +440,11 @@ bcd_t *idip;
   { /* fix flags */
     for (i = 0; i < ndip; ++i)
     {
-      iflg = dipinfo[i].flg;
+      iflg = ctx->dipinfo[i].flg;
       if ((iflg & MELEC) == 0)
         continue;
       iflg |= MDIPI;
-      dipinfo[i].flg = (short)iflg;
+      ctx->dipinfo[i].flg = (short)iflg;
       isimag[i] = 1;
     }
   }
@@ -525,13 +452,13 @@ bcd_t *idip;
   {
     for (i = 0; i < ndip; ++i)
     {
-      iflg = dipinfo[i].flg;
+      iflg = ctx->dipinfo[i].flg;
       if ((iflg & MIMAG) == 0)
         continue;
       isym = (int)(idip[ibcd + 1] & 3);
       if (isym == 0)
         continue;
-      ii = ixphase[isym] + isym;
+      ii = ctx->ixphase[isym] + isym;
       if (kmin != 0 && TEST(iflg, MELEC))
         ++ii;
       if (TEST(iflg, MODD))
@@ -539,13 +466,13 @@ bcd_t *idip;
       if (EVEN(ii))
         continue;
       /* set dipole to zero */
-      putbcd(sbcd, NSBCD, &idip[ibcd]);
+      putbcd(ctx->sbcd, NSBCD, &idip[ibcd]);
       fprintf(lu,
               " WARNING: dipole %3d %s has bad phase and is ignored\n",
-              (i + 1), sbcd);
-      dipinfo[i].fac = 0.;
-      dipinfo[i].flg = (short)0;
-      iv1 = glob.vibfac;
+              (i + 1), ctx->sbcd);
+      ctx->dipinfo[i].fac = 0.;
+      ctx->dipinfo[i].flg = (short)0;
+      iv1 = ctx->glob.vibfac;
       isym = 0;
       ii = iv1 * ifac + iv1;
       ijv = ((unsigned int)ii << 2) + (unsigned int)isym;
@@ -578,10 +505,7 @@ bcd_t *idip;
  * @param parameter_name_file_path_out Output: Character array to store the name of the parameter name file (e.g., "sping.nam"). Renamed namfil.
  * @return int Number of option cards read from the input file, or -1 if end-of-file is reached prematurely.
  */
-int setopt(luin, nfmt, itd, nbcd, namfil)
-FILE *luin;
-int *nfmt, *itd, *nbcd;
-char *namfil;
+int setopt(struct SpinvContext *ctx, FILE *luin, int *nfmt, int *itd, int *nbcd, char *namfil)
 {
   /* this subroutine reads in quantum quantities */
   /*     on entry: */
@@ -609,16 +533,16 @@ char *namfil;
   bcd_t bcdspin[NDECSPIN];
   char card[NCARD], ctyp;
 
-  cgetv[0].cblk = cgetv[1].cblk = 0; /* reset store for getqn */
+  ctx->cgetv[0].cblk = ctx->cgetv[1].cblk = 0; /* reset store for getqn */
   cjjini();
-  glob.lsym = TRUE;
-  glob.esym = TRUE;
-  glob.esymdec = 100;
-  glob.maxwt = 0;
-  glob.stdphase = 0;
-  glob.newlz = FALSE;
-  glob.nofc = FALSE;
-  glob.g12 = 0;
+  ctx->glob.lsym = TRUE;
+  ctx->glob.esym = TRUE;
+  ctx->glob.esymdec = 100;
+  ctx->glob.maxwt = 0;
+  ctx->glob.stdphase = 0;
+  ctx->glob.newlz = FALSE;
+  ctx->glob.nofc = FALSE;
+  ctx->glob.g12 = 0;
   rvec0[0] = 1;
   rvec0[1] = 0;
   rvec0[2] = (double)MAXN_DIRCOS;
@@ -687,20 +611,20 @@ char *namfil;
       strcpy(namfil, "sping.nam");
       if (ctyp != C0)
         namfil[4] = ctyp;
-      glob.ixz = (int)rvec[3];
-      glob.idiag = (int)rvec[9];
+      ctx->glob.ixz = (int)rvec[3];
+      ctx->glob.idiag = (int)rvec[9];
       k = (int)rvec[10];
-      glob.stdphase = MOD(k, 10);
+      ctx->glob.stdphase = MOD(k, 10);
       k = k / 10;
       if (ODD(k))
-        glob.newlz = TRUE;
+        ctx->glob.newlz = TRUE;
       if (ODD2(k))
       {
-        glob.nofc = TRUE;
+        ctx->glob.nofc = TRUE;
       }
       else if ((k & 4) != 0)
       {
-        glob.g12 = 1;
+        ctx->glob.g12 = 1;
       }
       if (ivib > 80)
       {
@@ -713,77 +637,77 @@ char *namfil;
       {
         ivib = 1;
       }
-      if (glob.nvib > 1)
+      if (ctx->glob.nvib > 1)
       {
-        free(vinfo);
-        vinfo = NULL;
+        free(ctx->vinfo);
+        ctx->vinfo = NULL;
       }
-      vinfo1.spt = sptzero;
+      ctx->vinfo1.spt = ctx->sptzero;
       if (ivib > 1)
       {
         nvibm = ivib - 1;
         nl = (size_t)ivib * sizeof(SVIB);
-        vinfo = (SVIB *)mallocq(nl);
-        memcpy(vinfo, &vinfo1, sizeof(SVIB));
+        ctx->vinfo = (SVIB *)mallocq(nl);
+        memcpy(ctx->vinfo, &(ctx->vinfo1), sizeof(SVIB));
       }
       else
       {
-        vinfo = &vinfo1;
+        ctx->vinfo = &(ctx->vinfo1);
       }
       for (k = 0; k <= 4; ++k)
-        vinfo->wt[k] = 0;
-      vinfo->ewt[0] = vinfo->ewt[1] = 0;
-      glob.nvib = ivib;
+        ctx->vinfo->wt[k] = 0;
+      ctx->vinfo->ewt[0] = ctx->vinfo->ewt[1] = 0;
+      ctx->glob.nvib = ivib;
       if (ivib <= 9)
       {
-        glob.vibfac = 9;
-        glob.vibdec = 1;
+        ctx->glob.vibfac = 9;
+        ctx->glob.vibdec = 1;
         k = 4; /* 16 */
       }
       else if (ivib <= 99)
       {
-        glob.vibfac = 99;
-        glob.vibdec = 2;
+        ctx->glob.vibfac = 99;
+        ctx->glob.vibdec = 2;
         k = 7; /* 128 */
       }
       else
       {
-        glob.vibfac = 999;
-        glob.vibdec = 3;
+        ctx->glob.vibfac = 999;
+        ctx->glob.vibdec = 3;
         k = 10; /* 1024 */
       }
-      glob.msshft = (unsigned int)(k + 2);
+      ctx->glob.msshft = (unsigned int)(k + 2);
       /* msshft = shifts needed for vib and symmetry */
-      glob.msmask = (int)(1 << (unsigned int)k) - 1;
+      ctx->glob.msmask = (int)(1 << (unsigned int)k) - 1;
       ivib = 0;
-      glob.oblate = (lopt < 0);
-      glob.nqnn = 3;
+      ctx->glob.oblate = (lopt < 0);
+      ctx->glob.nqnn = 3;
       if (spinsgn != 0)
-        glob.nqnn = 1;
+        ctx->glob.nqnn = 1;
       if (ewt0 < 0)
-        glob.esymdec = 1000;
+        ctx->glob.esymdec = 1000;
     }
-    else if (ivib >= glob.nvib)
+    else if (ivib >= ctx->glob.nvib)
     {
       /* if IVIB out of range read another card */
       continue;
     }
-    pvinfo = &vinfo[ivib];
+    pvinfo = &ctx->vinfo[ivib];
     k = iax;
     if (iax < 0)
       iax = -iax;
     if (iax > MAXIAX)
       iax = 0;
-    if (iax <= 3 && glob.oblate)
-      iax = revsym[iax];
+    if (iax <= 3 && ctx->glob.oblate)
+      iax = ctx->revsym[iax];
     isym = isymv[iax];
     iax = iaxv[iax];
     pvinfo->gsym = (short)(isym << 1);
     if (isym >= 3)
     {
       j = 2 - (isym & 1);
-      if (glob.maxwt < j)
-        glob.maxwt = j;
+      if (ctx->glob.maxwt < j)
+        ctx->glob.maxwt = j;
     }
     /*  set up minimum K values */
     pvinfo->knmax = (short)knnmax;
@@ -800,20 +724,20 @@ char *namfil;
       }
       pvinfo->gsym |= 1;
     }
-    if (knnmax != 0 && glob.nqnn == 1)
-      glob.nqnn = 2;
+    if (knnmax != 0 && ctx->glob.nqnn == 1)
+      ctx->glob.nqnn = 2;
     /* set ewt */
     if (ewt0 < 0)
       ewt0 = -ewt0;
-    if (ewt0 >= glob.esymdec)
+    if (ewt0 >= ctx->glob.esymdec)
     {
-      ewt1 = ewt0 / glob.esymdec;
-      ewt0 -= glob.esymdec * ewt1;
+      ewt1 = ewt0 / ctx->glob.esymdec;
+      ewt0 -= ctx->glob.esymdec * ewt1;
     }
     if (isym < 3)
     {
-      ewt0 = glob.esymdec - 1;
-      glob.esym = FALSE;
+      ewt0 = ctx->glob.esymdec - 1;
+      ctx->glob.esym = FALSE;
     }
     else if (isym == 4 && iax == 5)
     { /* 4-fold B entry has no E */
@@ -859,44 +783,44 @@ char *namfil;
         k += 2;
       pvinfo->knmin[i] = (short)k;
     }
-    k = getsp(bcdspin, pvinfo);
+    k = getsp(ctx, bcdspin, pvinfo);
     if (nspinqn < k)
       nspinqn = k;
     pvinfo->nqn = (short)k;
     if (ncards == 1)
     { /* fill in defaults with wt = 0 */
-      pvinfom = vinfo;
+      pvinfom = ctx->vinfo;
       for (i = 1; i <= nvibm; ++i)
       {
         ++pvinfom;
-        memcpy(pvinfom, vinfo, sizeof(SVIB));
+        memcpy(pvinfom, ctx->vinfo, sizeof(SVIB));
       }
-      ivib = -glob.nvib;
+      ivib = -ctx->glob.nvib;
     }
-    setwt(pvinfo, ivib, iax, iwtpl, iwtmn, vsym); /* set up weights */
+    setwt(ctx, pvinfo, ivib, iax, iwtpl, iwtmn, vsym); /* set up weights */
   } while (ivsym < 0); /*   end of reading */
-  setsp();
+  setsp(ctx);
   /* set up format */
-  if (glob.nqnn == 3)
+  if (ctx->glob.nqnn == 3)
     *itd = 3;
-  glob.nqn = glob.nqnn;
-  glob.vibfmt = (nvibm != 0);
-  glob.iqfmt0 = 0;
-  if (glob.vibfmt)
+  ctx->glob.nqn = ctx->glob.nqnn;
+  ctx->glob.vibfmt = (nvibm != 0);
+  ctx->glob.iqfmt0 = 0;
+  if (ctx->glob.vibfmt)
   {
-    glob.nqn += 1;
-    glob.iqfmt0 = 1000;
+    ctx->glob.nqn += 1;
+    ctx->glob.iqfmt0 = 1000;
   }
-  nt = glob.nqn;
+  nt = ctx->glob.nqn;
   k = nt + nspinqn;
-  glob.nqn = k;
+  ctx->glob.nqn = k;
   if (k > (*nfmt))
     k = nt + 2;
-  glob.maxqn = k;
-  glob.nqn0 = nt;
-  glob.iqfmt0 += 100 * nt + k;
+  ctx->glob.maxqn = k;
+  ctx->glob.nqn0 = nt;
+  ctx->glob.iqfmt0 += 100 * nt + k;
   /*     make sure +/- l values come in pairs */
-  pvinfo = pvinfom = vinfo;
+  pvinfo = pvinfom = ctx->vinfo;
   k = 0;
   for (i = 0; i <= nvibm; ++i)
   {
@@ -988,70 +912,70 @@ char *namfil;
     exit(EXIT_FAILURE);
   }
   k = 0;
-  pvinfo = vinfo;
+  pvinfo = ctx->vinfo;
   for (ivib = 0; ivib <= nvibm; ++ivib)
   {
     nt = pvinfo->nspstat;
-    ii = setgsym((int)pvinfo->gsym);
+    ii = setgsym(ctx, (int)pvinfo->gsym);
     for (isym = 0; isym < 4; ++isym)
     {
-      if (getwt(pvinfo, isym, 0, ivwt) <= 0)
+      if (getwt(ctx, pvinfo, isym, 0, ivwt) <= 0)
         continue;
       for (ii = 1; ii <= nt; ++ii)
       {
-        if (getwt(pvinfo, isym, ii, ivwt) > 0)
+        if (getwt(ctx, pvinfo, isym, ii, ivwt) > 0)
           ++k;
       }
     }
     ++pvinfo;
   }
-  if (glob.nbkpj > 0)
+  if (ctx->glob.nbkpj > 0)
   {
-    free(moldv);
-    moldv = NULL;
-    free(blkptr);
-    blkptr = NULL;
+    free(ctx->moldv);
+    ctx->moldv = NULL;
+    free(ctx->blkptr);
+    ctx->blkptr = NULL;
   }
-  glob.nbkpj = k;
+  ctx->glob.nbkpj = k;
   nl = (size_t)k * sizeof(int);
-  moldv = (int *)mallocq(nl);
-  moldv[0] = 0;
+  ctx->moldv = (int *)mallocq(nl);
+  ctx->moldv[0] = 0;
   nl += sizeof(int);
-  blkptr = (int *)mallocq(nl);
-  blkptr[0] = 0;
+  ctx->blkptr = (int *)mallocq(nl);
+  ctx->blkptr[0] = 0;
   k = 0;
-  pvinfo = vinfo;
+  pvinfo = ctx->vinfo;
   for (ivib = 0; ivib <= nvibm; ++ivib)
   {
     nt = pvinfo->nspstat;
-    ii = setgsym((int)pvinfo->gsym);
+    ii = setgsym(ctx, (int)pvinfo->gsym);
     for (isym = 0; isym < 4; ++isym)
     {
-      if (getwt(pvinfo, isym, 0, ivwt) <= 0)
+      if (getwt(ctx, pvinfo, isym, 0, ivwt) <= 0)
         continue;
       for (ii = 1; ii <= nt; ++ii)
       {
-        if (getwt(pvinfo, isym, ii, ivwt) > 0)
+        if (getwt(ctx, pvinfo, isym, ii, ivwt) > 0)
         {
-          blkptr[k] = k;
-          moldv[k] = isym + (ivib << 2) + (ii << glob.msshft);
+          ctx->blkptr[k] = k;
+          ctx->moldv[k] = isym + (ivib << 2) + (ii << ctx->glob.msshft);
           ++k;
         }
       }
     }
     ++pvinfo;
   }
-  blkptr[k] = k;
+  ctx->blkptr[k] = k;
   pvinfo = NULL;
-  *nbcd = (NDECPAR + 1) + glob.vibdec;
-  if (sizeof(int) == 2 && glob.vibdec > 2)
+  *nbcd = (NDECPAR + 1) + ctx->glob.vibdec;
+  if (sizeof(int) == 2 && ctx->glob.vibdec > 2)
   {
     puts("too many vibrations for 16-bit integer computer");
     ncards = 0;
   }
   *nfmt = 1;
   if (nspinqn != 0 && nvibm != 0)
-    *nfmt = setfmt(&k, -1);
+    *nfmt = setfmt(ctx, &k, -1);
   return ncards;
 } /* setopt */
 
@@ -1067,48 +991,47 @@ char *namfil;
  * @return int If nfmt_or_vib_limit > 0, returns glob.maxqn (total QN fields to be output).
  *             If nfmt_or_vib_limit = -1, returns 1 if all formats are same, or a value > 1 (e.g. num_vib_states_to_check) if they differ.
  */
-int setfmt(iqnfmt, nfmt)
-int *iqnfmt, nfmt;
+int setfmt(struct SpinvContext *ctx, int *iqnfmt, int nfmt)
 {
   SVIB *pvinfo;
   short *jjs;
   int iqfmtq, iqfmt0, i, j, k, iv, si2, ff, nset, nspinv, nvib;
   iqfmt0 = 0;
-  nvib = glob.nvib;
+  nvib = ctx->glob.nvib;
   if (nfmt > 0 && nfmt < nvib)
     nvib = nfmt;
-  pvinfo = vinfo;
+  pvinfo = ctx->vinfo;
   for (iv = 0; iv < nvib; ++iv)
   {
-    iqfmtq = glob.iqfmt0;
-    i = setgsym((int)pvinfo->gsym);
+    iqfmtq = ctx->glob.iqfmt0;
+    i = setgsym(ctx, (int)pvinfo->gsym);
     jjs = pvinfo->spt;
     nset = jjs[0];
     nspinv = nset - 1;
-    if (nspinv > nspin)
-      nspinv = nspin;
+    if (nspinv > ctx->nspin)
+      nspinv = ctx->nspin;
     jjs += nset;
     ff = 200 - jjs[0];
-    if ((int)pvinfo->nqn > glob.maxqn)
+    if ((int)pvinfo->nqn > ctx->glob.maxqn)
     {
       iqfmtq += 10 * (ff & 1) + 4000;
     }
     else
     {
       si2 = 0;
-      k = glob.maxqn - glob.nqn0 - 1;
+      k = ctx->glob.maxqn - ctx->glob.nqn0 - 1;
       for (i = 0; i < k; ++i)
       {
-        if (i == itsym && itsym < itptr)
+        if (i == ctx->itsym && ctx->itsym < ctx->itptr)
         {
-          i = itptr;
+          i = ctx->itptr;
           j = 0;
           si2 = si2 << 1;
         }
         if (i < nspinv)
         {
           j = jjs[i + 1];
-          if (i < itsym)
+          if (i < ctx->itsym)
             j += ff;
         }
         else
@@ -1120,9 +1043,9 @@ int *iqnfmt, nfmt;
       si2 += (ff & 1);
       if (si2 > 9)
         si2 &= 7;
-      if (itptr < nspin)
+      if (ctx->itptr < ctx->nspin)
         iqfmtq += 2000;
-      if (itsym < itptr)
+      if (ctx->itsym < ctx->itptr)
         iqfmtq += 4000;
       iqfmtq += 10 * si2;
     }
@@ -1141,7 +1064,7 @@ int *iqnfmt, nfmt;
   }
   if (nfmt <= 0)
     return 1;
-  return glob.maxqn;
+  return ctx->glob.maxqn;
 } /* setfmt */
 
 /**
@@ -1157,12 +1080,7 @@ int *iqnfmt, nfmt;
  * @return int Returns a value related to vibrational state packing (vibfac^2 related), or 0 if npar is 0.
  *         The exact meaning of the return value might be specific to the calling context.
  */
-int setblk(lu, npar, idpar, par, nbkpf, negy)
-FILE *lu;
-const int npar;
-int *nbkpf, *negy;
-bcd_t *idpar;
-const double *par;
+int setblk(struct SpinvContext *ctx, FILE *lu, const int npar, bcd_t *idpar, const double *par, int *nbkpf, int *negy)
 {
   /* this subroutine initializes  quantum quantities */
   /*     on entry: */
@@ -1187,52 +1105,52 @@ const double *par;
   int ivwt[3], jvwt[3];
   char ctmp;
 
-  cgetv[0].cblk = cgetv[1].cblk = 0; /* reset store for getqn */
-  kdiag = glob.idiag;
+  ctx->cgetv[0].cblk = ctx->cgetv[1].cblk = 0; /* reset store for getqn */
+  kdiag = ctx->glob.idiag;
   if (npar <= 0)
   {
-    if (glob.nvib > 1)
-      free(vinfo);
-    vinfo = &vinfo1;
-    glob.nvib = 0;
-    if (glob.nbkpj > 0)
+    if (ctx->glob.nvib > 1)
+      free(ctx->vinfo);
+    ctx->vinfo = &ctx->vinfo1;
+    ctx->glob.nvib = 0;
+    if (ctx->glob.nbkpj > 0)
     {
-      free(moldv);
-      moldv = &zmoldv;
-      free(blkptr);
-      blkptr = &zblkptr;
-      glob.nbkpj = 0;
+      free(ctx->moldv);
+      ctx->moldv = &ctx->zmoldv;
+      free(ctx->blkptr);
+      ctx->blkptr = &ctx->zblkptr;
+      ctx->glob.nbkpj = 0;
     }
-    if (glob.maxblk > 0)
+    if (ctx->glob.maxblk > 0)
     {
-      free(ivs);
-      ivs = &zivs;
-      free(ikmin);
-      ikmin = &zikmin;
-      free(ibkptr);
-      ibkptr = &zibkptr;
-      glob.maxblk = 0;
+      free(ctx->ivs);
+      ctx->ivs = &ctx->zivs;
+      free(ctx->ikmin);
+      ctx->ikmin = &ctx->zikmin;
+      free(ctx->ibkptr);
+      ctx->ibkptr = &ctx->zibkptr;
+      ctx->glob.maxblk = 0;
     }
-    if (ndmx > 0)
+    if (ctx->ndmx > 0)
     {
-      free(iqnsep);
-      iqnsep = &ziqnsep;
-      free(idx);
-      idx = &zidx;
-      free(jdx);
-      jdx = &zjdx;
-      free(wk);
-      wk = &zwk;
-      ndmx = 0;
+      free(ctx->iqnsep);
+      ctx->iqnsep = &ctx->ziqnsep;
+      free(ctx->idx);
+      ctx->idx = &ctx->zidx;
+      free(ctx->jdx);
+      ctx->jdx = &ctx->zjdx;
+      free(ctx->wk);
+      ctx->wk = &ctx->zwk;
+      ctx->ndmx = 0;
     }
     return 0;
   }
-  nvibm = glob.nvib - 1;
+  nvibm = ctx->glob.nvib - 1;
   n = (*nbkpf);
   if (n > 0)
   {
     iff0 = n << 1;
-    pvinfo = vinfo;
+    pvinfo = ctx->vinfo;
     for (i = 0; i <= nvibm; ++i)
     {
       jjs = pvinfo->spt;
@@ -1245,46 +1163,46 @@ const double *par;
     }
     pvinfo = NULL;
   }
-  if (pasort(lu, npar, idpar, par) == 0)
-    glob.idiag = -1;
+  if (pasort(ctx, lu, npar, idpar, par) == 0)
+    ctx->glob.idiag = -1;
   pvinfo = NULL;
   iff0 = 200;
   /*    find interactions */
-  ntstat = glob.nbkpj;
-  sznz = ndmax = 0;
+  ntstat = ctx->glob.nbkpj;
+  sznz = ctx->ndmax = 0;
   if (ntstat <= 0)
     return 0;
-  nf = nspin - 1;
+  nf = ctx->nspin - 1;
   for (ii = 0; ii < ntstat; ++ii)
   {
-    im = moldv[ii];
+    im = ctx->moldv[ii];
     iff = iff0;
-    kk = getqs(im, iff, -1, -1, ixcom, iscom, &iv);
-    if (ODD(iscom[nspin]))
+    kk = getqs(ctx, im, iff, -1, -1, ctx->ixcom, ctx->iscom, &iv);
+    if (ODD(ctx->iscom[ctx->nspin]))
     {
       /* special for odd spin multiplicity (make N integer) */
-      kk = getqs(im, --iff, 0, -1, ixcom, iscom, &iv);
+      kk = getqs(ctx, im, --iff, 0, -1, ctx->ixcom, ctx->iscom, &iv);
     }
-    isym = ixcom[XSYM];
-    ni = ixcom[XNVAL];
-    pvinfo = &vinfo[ixcom[XVIB]];
+    isym = ctx->ixcom[XSYM];
+    ni = ctx->ixcom[XNVAL];
+    pvinfo = &ctx->vinfo[ctx->ixcom[XVIB]];
     gsym = pvinfo->gsym;
-    /* nsym = */ setgsym(gsym);
-    getwt(pvinfo, isym, kk, ivwt);
+    /* nsym = */ setgsym(ctx, gsym);
+    getwt(ctx, pvinfo, isym, kk, ivwt);
     for (jj = 0; jj < ii; ++jj)
     {
-      if (blkptr[ii] == blkptr[jj])
+      if (ctx->blkptr[ii] == ctx->blkptr[jj])
         continue;
-      jjt = moldv[jj];
-      kk = getqs(jjt, iff, 0, -1, jxcom, jscom, &jv);
-      jsym = jxcom[XSYM];
-      nj = jxcom[XNVAL];
+      jjt = ctx->moldv[jj];
+      kk = getqs(ctx, jjt, iff, 0, -1, ctx->jxcom, ctx->jscom, &jv);
+      jsym = ctx->jxcom[XSYM];
+      nj = ctx->jxcom[XNVAL];
       nd = ni - nj;
-      pvinfo = &vinfo[jxcom[XVIB]];
+      pvinfo = &ctx->vinfo[ctx->jxcom[XVIB]];
       if (pvinfo->gsym != (short)gsym)
         continue;
-      getwt(pvinfo, jsym, kk, jvwt);
-      for (k = glob.maxwt; k >= 0; --k)
+      getwt(ctx, pvinfo, jsym, kk, jvwt);
+      for (k = ctx->glob.maxwt; k >= 0; --k)
       {
         if (ivwt[k] != jvwt[k])
           break;
@@ -1292,27 +1210,27 @@ const double *par;
       if (k >= 0)
         continue;
       /* check for connection restrictions on N */
-      ixzt = glob.ixz;
-      if (ODD(ixzt) && iscom[nspin] != jscom[nspin])
+      ixzt = ctx->glob.ixz;
+      if (ODD(ixzt) && ctx->iscom[ctx->nspin] != ctx->jscom[ctx->nspin])
         continue;
       for (k = 0; k < nf; ++k)
       {
-        if (k == itsym)
-          k = itptr;
+        if (k == ctx->itsym)
+          k = ctx->itptr;
         ixzt = ixzt >> 1;
         /* check for matching spin multiplicity */
-        if (ODD(iscom[k] + jscom[k]))
+        if (ODD(ctx->iscom[k] + ctx->jscom[k]))
           break;
         /* check for connection restrictions on spin */
-        if (ODD(ixzt) && iscom[k] != jscom[k])
+        if (ODD(ixzt) && ctx->iscom[k] != ctx->jscom[k])
           break;
       }
       if (k < nf)
         continue;
       ivmin = (iv < jv) ? iv : jv;
-      itmp = iv + jv + ivmin * glob.vibfac;
-      ivsym = blksym(ixcom, jxcom) + ((unsigned int)itmp << 2);
-      for (spar_now = spar_head[ivmin]; spar_now != NULL;
+      itmp = iv + jv + ivmin * ctx->glob.vibfac;
+      ivsym = blksym(ctx, ctx->ixcom, ctx->jxcom) + ((unsigned int)itmp << 2);
+      for (spar_now = ctx->spar_head[ivmin]; spar_now != NULL;
            spar_now = spar_now->next)
       {
         if (spar_now->ipsym < ivsym)
@@ -1322,42 +1240,42 @@ const double *par;
         if (TEST(spar_now->flags, MNSQ))
           continue;
         if (sznz < 0)
-          sznzfix(sznz, ni, nj, ixcom, jxcom, iscom, jscom);
-        kl = idpars(spar_now, &ikq, &neuler, &lt, &ld, &kd, &ins, &si1, &si2,
+          sznzfix(ctx, sznz, ni, nj, ctx->ixcom, ctx->jxcom, ctx->iscom, ctx->jscom);
+        kl = idpars(ctx, spar_now, &ikq, &neuler, &lt, &ld, &kd, &ins, &si1, &si2,
                     &sznz, &ifc, &alpha, &ldel, &kavg);
         if (ODD(neuler))
           continue;
         if (sznz > 0)
         {
-          sznz = sznzfix(sznz, ni, nj, ixcom, jxcom, iscom, jscom);
+          sznz = sznzfix(ctx, sznz, ni, nj, ctx->ixcom, ctx->jxcom, ctx->iscom, ctx->jscom);
         }
-        if (getmask(ixcom, jxcom, kd, ldel, kl, alpha) == 0)
+        if (getmask(ctx, ctx->ixcom, ctx->jxcom, kd, ldel, kl, alpha) == 0)
           continue;
-        npair = getll(0, ld, lt, kd, si1, si2, lscom, iscom, jscom);
+        npair = getll(ctx, 0, ld, lt, kd, si1, si2, ctx->lscom, ctx->iscom, ctx->jscom);
         if (npair < 0)
           continue;
         if (kd > 0)
-          glob.idiag = kdiag;
-        if (nd > ndmax)
-          ndmax = nd;
-        kd = blkptr[ii] - blkptr[jj];
+          ctx->glob.idiag = kdiag;
+        if (nd > ctx->ndmax)
+          ctx->ndmax = nd;
+        kd = ctx->blkptr[ii] - ctx->blkptr[jj];
         if (kd != 0)
         { /* II and JJ are coupled */
           if (kd > 0)
           { /* rename ptr II to ptr JJ */
-            kk = blkptr[ii];
+            kk = ctx->blkptr[ii];
             ix = jj;
           }
           else
           { /* rename ptr JJ to ptr II */
-            kk = blkptr[jj];
+            kk = ctx->blkptr[jj];
             ix = ii;
           }
-          glob.idiag = kdiag;
+          ctx->glob.idiag = kdiag;
           for (k = 0; k <= ii; ++k)
           {
-            if (blkptr[k] == kk)
-              blkptr[k] = blkptr[ix];
+            if (ctx->blkptr[k] == kk)
+              ctx->blkptr[k] = ctx->blkptr[ix];
           }
         }
         break;
@@ -1365,9 +1283,9 @@ const double *par;
     } /* jj loop */
   } /* ii loop */
   /*  block connections now found */
-  if (glob.idiag < 0)
-    glob.idiag = -1;
-  switch (glob.idiag)
+  if (ctx->glob.idiag < 0)
+    ctx->glob.idiag = -1;
+  switch (ctx->glob.idiag)
   {
   case -1:
     fputs("NO DIAGONALIZATION NEEDED\n", lu);
@@ -1390,15 +1308,15 @@ const double *par;
   case 5:
     fputs("ENERGY FOLLOWS FIRST ORDER WITHIN V AND SPIN SUB-BLOCKS\n", lu);
   }
-  if (glob.stdphase > 0)
-    fprintf(lu, "NON-STANDARD PHASE CONVENTION IN USE, %2d\n", glob.stdphase);
-  if (glob.newlz)
+  if (ctx->glob.stdphase > 0)
+    fprintf(lu, "NON-STANDARD PHASE CONVENTION IN USE, %2d\n", ctx->glob.stdphase);
+  if (ctx->glob.newlz)
     fputs("Lz DEFINED EXPLICITLY\n", lu);
-  if (glob.nofc)
+  if (ctx->glob.nofc)
     fputs("ALTERNATE DEFINITION OF PARAMETER FC FIELD\n", lu);
-  if (glob.g12 != 0)
+  if (ctx->glob.g12 != 0)
     fputs("G12 group alternating sign of Fourier coefficients with K  \n", lu);
-  if (glob.oblate)
+  if (ctx->glob.oblate)
   {
     fputs("OBLATE ROTOR\n", lu);
     ctmp = csym[1];
@@ -1409,16 +1327,16 @@ const double *par;
   {
     fputs("PROLATE ROTOR\n", lu);
   }
-  if (glob.nqnn == 1)
+  if (ctx->glob.nqnn == 1)
   {
     fputs("LINEAR MOLECULE QUANTA, K SUPPRESSED\n", lu);
   }
-  else if (glob.nqnn == 2)
+  else if (ctx->glob.nqnn == 2)
   {
     fputs("SYMMETRIC TOP QUANTA\n", lu);
   }
   fputs("    V KMIN KMAX WTPL WTMN ESYMWT NSYM SPINS\n", lu);
-  pvinfo = vinfo;
+  pvinfo = ctx->vinfo;
   jj = 0;
   for (iv = 0; iv <= nvibm; ++iv)
   {
@@ -1444,7 +1362,7 @@ const double *par;
       isym = -isym;
       jj = 1;
     }
-    ii = ii * glob.esymdec + pvinfo->ewt[0];
+    ii = ii * ctx->glob.esymdec + pvinfo->ewt[0];
     fprintf(lu, " %4d %4d %4d %4d %4d %6d %4d", iv, knnmin, pvinfo->knmax,
             pvinfo->wt[0], pvinfo->wt[3], ii, isym);
     jjs = pvinfo->spt;
@@ -1483,16 +1401,16 @@ const double *par;
     im = 0;
     for (i = 1; i < lx; ++i)
     {
-      if (blkptr[im] > blkptr[i] ||
-          (blkptr[im] == blkptr[i] && moldv[im] > moldv[i]))
+      if (ctx->blkptr[im] > ctx->blkptr[i] ||
+          (ctx->blkptr[im] == ctx->blkptr[i] && ctx->moldv[im] > ctx->moldv[i]))
       {
         lv = i;
-        jj = blkptr[i];
-        blkptr[i] = blkptr[im];
-        blkptr[im] = jj;
-        jj = moldv[i];
-        moldv[i] = moldv[im];
-        moldv[im] = jj;
+        jj = ctx->blkptr[i];
+        ctx->blkptr[i] = ctx->blkptr[im];
+        ctx->blkptr[im] = jj;
+        jj = ctx->moldv[i];
+        ctx->moldv[i] = ctx->moldv[im];
+        ctx->moldv[im] = jj;
       }
       im = i;
     }
@@ -1501,39 +1419,39 @@ const double *par;
   fputs("BLOCK - WT - SYM - V - TSP - N  -  other quanta  (rel. to F=0 )\n",
         lu);
   /* convert block label to pointer */
-  i = blkptr[0];
-  blkptr[0] = 0;
+  i = ctx->blkptr[0];
+  ctx->blkptr[0] = 0;
   n = nsize = neven = nodd = maxblk = maxsblk = 0;
   for (jj = 0; jj <= ntstat; ++jj)
   {
-    if (blkptr[jj] != i)
+    if (ctx->blkptr[jj] != i)
     {
-      ii = jj - blkptr[n++];
+      ii = jj - ctx->blkptr[n++];
       if (maxblk < ii)
         maxblk = ii;
-      blkptr[n] = jj;
+      ctx->blkptr[n] = jj;
       if (neven > nsize)
         nsize = neven;
       if (nodd > nsize)
         nsize = nodd;
       if (jj == ntstat)
         break;
-      i = blkptr[jj];
+      i = ctx->blkptr[jj];
       neven = 0;
       nodd = 0;
     }
-    jjt = moldv[jj];
-    jjt = getqs(jjt, 0, -1, 0, ixcom, iscom, &ii);
-    isym = ixcom[XSYM];
-    iv = ixcom[XVIB];
-    pvinfo = &vinfo[iv];
-    iwt = getwt(pvinfo, isym, jjt, ivwt);
+    jjt = ctx->moldv[jj];
+    jjt = getqs(ctx, jjt, 0, -1, 0, ctx->ixcom, ctx->iscom, &ii);
+    isym = ctx->ixcom[XSYM];
+    iv = ctx->ixcom[XVIB];
+    pvinfo = &ctx->vinfo[iv];
+    iwt = getwt(ctx, pvinfo, isym, jjt, ivwt);
     kk = pvinfo->knmin[isym];
     if (kk < 0)
     {
-      ii = ixcom[XISYM]; /* get spin symmetry */
+      ii = ctx->ixcom[XISYM]; /* get spin symmetry */
       kk = isym;
-      if (is_esym[ii] < 0)
+      if (ctx->is_esym[ii] < 0)
         kk += 2;
       kk &= 2;
     }
@@ -1547,9 +1465,9 @@ const double *par;
     kk = pvinfo->knmin[3 - isym];
     if (kk < 0)
     {
-      ii = ixcom[XISYM]; /* get spin symmetry */
+      ii = ctx->ixcom[XISYM]; /* get spin symmetry */
       kk = isym;
-      if (is_esym[ii] >= 0)
+      if (ctx->is_esym[ii] >= 0)
         kk += 2;
       kk &= 2;
     }
@@ -1562,69 +1480,69 @@ const double *par;
       maxsblk = ii;
     --jjt;
     fprintf(lu, "% 5d %4d    %c %4d %4d", n + 1, iwt, csym[isym], iv, jjt);
-    ni = nspin;
-    for (ii = 0; ii < nspin; ++ii)
+    ni = ctx->nspin;
+    for (ii = 0; ii < ctx->nspin; ++ii)
     {
-      ai = iscom[ni] * 0.5;
+      ai = ctx->iscom[ni] * 0.5;
       fprintf(lu, " %5.1f", ai);
-      if (ni == itsym && itsym < itptr)
-        ii = itptr;
+      if (ni == ctx->itsym && ctx->itsym < ctx->itptr)
+        ii = ctx->itptr;
       ni = ii;
     }
     fputc('\n', lu);
   }
   ++maxblk;
-  glob.maxblk = maxblk;
+  ctx->glob.maxblk = maxblk;
   fprintf(lu, "Maximum Dimension for Hamiltonian = %d\n", nsize);
   fflush(lu);
   *nbkpf = n;
-  glob.nbkpj = n;
+  ctx->glob.nbkpj = n;
   if (nsize < (*negy))
     *negy = nsize;
-  if (ndmx > 0)
+  if (ctx->ndmx > 0)
   {
-    free(ivs);
-    ivs = NULL;
-    free(ikmin);
-    ikmin = NULL;
-    free(ibkptr);
-    ibkptr = NULL;
-    free(iqnsep);
-    iqnsep = NULL;
-    free(idx);
-    idx = NULL;
-    free(jdx);
-    jdx = NULL;
-    free(wk);
-    wk = NULL;
-    ndmx = 0;
+    free(ctx->ivs);
+    ctx->ivs = NULL;
+    free(ctx->ikmin);
+    ctx->ikmin = NULL;
+    free(ctx->ibkptr);
+    ctx->ibkptr = NULL;
+    free(ctx->iqnsep);
+    ctx->iqnsep = NULL;
+    free(ctx->idx);
+    ctx->idx = NULL;
+    free(ctx->jdx);
+    ctx->jdx = NULL;
+    free(ctx->wk);
+    ctx->wk = NULL;
+    ctx->ndmx = 0;
   }
   ii = maxsblk + maxsblk - 1;
-  ndmx = nsize;
-  if (ndmx < ii)
-    ndmx = ii;
-  nl = (size_t)(nsize + ndmx) * sizeof(double);
-  wk = (double *)mallocq(nl);
-  wk[0] = zero;
+  ctx->ndmx = nsize;
+  if (ctx->ndmx < ii)
+    ctx->ndmx = ii;
+  nl = (size_t)(nsize + ctx->ndmx) * sizeof(double);
+  ctx->wk = (double *)mallocq(nl);
+  ctx->wk[0] = ctx->zero;
   /* allocate space for sub-block information */
-  nl = (size_t)(ndmx + 1) * sizeof(short);
-  idx = (short *)mallocq(nl);
-  idx[0] = 0;
-  jdx = (short *)mallocq(nl);
-  jdx[0] = 0;
+  nl = (size_t)(ctx->ndmx + 1) * sizeof(short);
+  ctx->idx = (short *)mallocq(nl);
+  ctx->idx[0] = 0;
+  ctx->jdx = (short *)mallocq(nl);
+  ctx->jdx[0] = 0;
   nl = nsize * sizeof(short);
-  iqnsep = (short *)mallocq(nl);
-  iqnsep[0] = 0;
+  ctx->iqnsep = (short *)mallocq(nl);
+  ctx->iqnsep[0] = 0;
   maxblk = maxblk + maxblk;
   nl = maxblk * sizeof(short);
-  ibkptr = (short *)mallocq(nl);
-  ibkptr[0] = 0;
-  ikmin = (short *)mallocq(nl);
-  ikmin[0] = 0;
+  ctx->ibkptr = (short *)mallocq(nl);
+  ctx->ibkptr[0] = 0;
+  ctx->ikmin = (short *)mallocq(nl);
+  ctx->ikmin[0] = 0;
   nl = (size_t)maxblk * sizeof(int);
-  ivs = (int *)mallocq(nl);
-  ivs[0] = 0;
-  ii = glob.vibfac + 1;
+  ctx->ivs = (int *)mallocq(nl);
+  ctx->ivs[0] = 0;
+  ii = ctx->glob.vibfac + 1;
   return (ii * ii);
 } /* setblk */
 
@@ -1641,11 +1559,7 @@ const double *par;
  * @return int Returns 1 if any diagonal K-changing operator was found (iret=1), 0 otherwise.
  *         A return of 0 might imply that glob.idiag should be set to -1 (no diagonalization).
  */
-int pasort(lu, npar, idpar, par)
-FILE *lu;
-const int npar;
-bcd_t *idpar;
-const double *par;
+int pasort(struct SpinvContext *ctx, FILE *lu, const int npar, bcd_t *idpar, const double *par)
 {
   /*     initialize spin factors and arrange operators */
   /*     on entry: */
@@ -1675,59 +1589,59 @@ const double *par;
   bcd_t *idval;
   BOOL first;
 
-  if (glob.parinit > 0)
+  if (ctx->glob.parinit > 0)
   {
-    for (i = 0; i < glob.parinit; ++i)
+    for (i = 0; i < ctx->glob.parinit; ++i)
     {
-      spar_free = spar_head[i];
+      spar_free = ctx->spar_head[i];
       while (spar_free != NULL)
       {
         spar_now = spar_free->next;
         free(spar_free);
         spar_free = spar_now;
       }
-      spar_head[i] = spar_free;
+      ctx->spar_head[i] = spar_free;
     }
     spar_free = spar_now = NULL;
-    glob.parinit = 0;
+    ctx->glob.parinit = 0;
   }
   if (npar <= 0)
   {
-    free(ipder);
-    ipder = &zipder;
+    free(ctx->ipder);
+    ctx->ipder = &ctx->zipder;
     initl = 0;
     return 0;
   }
   /*  find reduced spin matrix elements */
-  spfac[0] = 0.;
-  spfac2[0] = 0.;
-  spfac[1] = sqrt(1.5);
-  spfac2[0] = 0.;
-  nt = glob.mxspin;
+  ctx->spfac[0] = 0.;
+  ctx->spfac2[0] = 0.;
+  ctx->spfac[1] = sqrt(1.5);
+  ctx->spfac2[0] = 0.;
+  nt = ctx->glob.mxspin;
   for (i = 2; i <= nt; ++i)
   {
     dtmp = 0.5 * i; /* dtmp = I */
-    spfac[i] = sqrt(dtmp * (dtmp + 1.) * (i + 1));
-    spfac2[i] = 0.25 * sqrt((dtmp + 1.5) / (dtmp - 0.5)) / dtmp;
+    ctx->spfac[i] = sqrt(dtmp * (dtmp + 1.) * (i + 1));
+    ctx->spfac2[i] = 0.25 * sqrt((dtmp + 1.5) / (dtmp - 0.5)) / dtmp;
   }
   /* initialize SPECFC and DIRCOS */
-  specfc(0, 0, 0, 0, 0, 0, 0, &zero, &szero, &szero);
+  specfc(ctx, 0, 0, 0, 0, 0, 0, 0, &ctx->zero, &ctx->szero, &ctx->szero);
   kk = 0;
-  dircos(idmy, idmy, 0, 0, 0, &zero, &szero, &szero, 0, MODD, 0, &kk);
-  ifac = glob.vibfac + 1;
-  ndecv = glob.vibdec;
+  dircos(ctx, idmy, idmy, 0, 0, 0, &ctx->zero, &ctx->szero, &ctx->szero, 0, MODD, 0, &kk);
+  ifac = ctx->glob.vibfac + 1;
+  ndecv = ctx->glob.vibdec;
   ilim = ifac * ifac - 1;
   if (initl > 0)
   {
-    free(ipder);
-    ipder = NULL;
+    free(ctx->ipder);
+    ctx->ipder = NULL;
   }
   nl = (size_t)npar * sizeof(int);
-  ipder = (int *)mallocq(nl);
+  ctx->ipder = (int *)mallocq(nl);
   initl = npar;
   kk = 1;
   ityi = 1;
-  ipder[0] = 0;
+  ctx->ipder[0] = 0;
   ibcd = 0;
   nbcd = (int)idpar[0] & 0x7f;
   for (i = 1; i < npar; ++i)
@@ -1735,33 +1649,33 @@ const double *par;
     ibcd += nbcd;
     if (NEGBCD(idpar[ibcd]) == 0)
     {
-      ipder[i] = kk++;
+      ctx->ipder[i] = kk++;
       ityi = i + 1;
     }
     else
     {
-      ipder[i] = -ityi;
+      ctx->ipder[i] = -ityi;
     }
   }
   for (i = 0; i < 8; ++i)
     nimag[i] = 0;
-  glob.nfit = kk;
+  ctx->glob.nfit = kk;
   /* .. code parameter id  for power of N*(N+1) and equivalence */
   /* .. NJQ = POWER + 1  (first occurrance of power) */
   /* .. IPTYP= ITY + 1    (first occurrance of cosine) */
   /* ..      ITY = sequence number for hybrid operators */
   /* .. negate NJQ and IPTYP for successive occurrance */
   /* .. IP points to parameter */
-  glob.parinit = glob.nvib;
-  for (i = 0; i < glob.nvib; ++i)
+  ctx->glob.parinit = ctx->glob.nvib;
+  for (i = 0; i < ctx->glob.nvib; ++i)
   {
-    spar_head[i] = NULL;
+    ctx->spar_head[i] = NULL;
   }
-  nsqmax = ityi = iv1d = iret = iv1 = iv2 = nitot = gsym = 0;
+  ctx->nsqmax = ityi = iv1d = iret = iv1 = iv2 = nitot = gsym = 0;
   ipar = npar - 1;
   ibcd = ipar * nbcd;
   spar_free = NULL;
-  pvib1 = pvib2 = vinfo;
+  pvib1 = pvib2 = ctx->vinfo;
   while (ipar >= -1)
   {
     notused = -1;
@@ -1802,10 +1716,10 @@ const double *par;
         ivdif = 0;
         iv12 = iv1d * (ifac + 1);
       }
-      else if (iv1 >= glob.nvib)
+      else if (iv1 >= ctx->glob.nvib)
       {
         /* dummy with v1 = 99 and v2 < 99 */
-        if (iv1 == glob.vibfac)
+        if (iv1 == ctx->glob.vibfac)
           notused = 0;
         break;
       }
@@ -1816,7 +1730,7 @@ const double *par;
         {
           notused = 0;
           dtmp = par[ipar];
-          specfc(0, iv1, iv1, 0, 0, 0, 1, &dtmp, &szero, &szero);
+          specfc(ctx, 0, iv1, iv1, 0, 0, 0, 1, &dtmp, &ctx->szero, &ctx->szero);
         }
         break;
       }
@@ -1826,16 +1740,16 @@ const double *par;
         notused = 0;
         break;
       }
-      pvib1 = &vinfo[iv1];
-      pvib2 = &vinfo[iv2];
+      pvib1 = &ctx->vinfo[iv1];
+      pvib2 = &ctx->vinfo[iv2];
       gsym = pvib1->gsym;
       if ((short)gsym != pvib2->gsym)
       {
         notused = 1;
         break;
       }
-      gsym = setgsym(gsym);
-      nitot = glob.nitot;
+      gsym = setgsym(ctx, gsym);
+      nitot = ctx->glob.nitot;
       if (spar_free == NULL)
       { /* allocate more structures */
         spar_free = (SPAR *)mallocq(sizeof(SPAR));
@@ -1844,26 +1758,26 @@ const double *par;
       spar_now->flags = 0;
       spar_now->alpha = C0;
       spar_now->mldel = C0;
-      ityi = idpari(idval, ityi, spar_now);
+      ityi = idpari(ctx, idval, ityi, spar_now);
       if (ityi == 0)
         break;
       njqt = (int)spar_now->njq;
-      if (njqt > nsqmax)
-        nsqmax = njqt;
+      if (njqt > ctx->nsqmax)
+        ctx->nsqmax = njqt;
       isym = (int)spar_now->ipsym;
-      idpars(spar_now, &ikq, &neuler, &lt, &ld, &kd, &ins, &si1, &si2,
+      idpars(ctx, spar_now, &ikq, &neuler, &lt, &ld, &kd, &ins, &si1, &si2,
              &sznz, &ifc, &alpha, &ldel, &kavg);
       iiv1 = pvib1->spt;
       iiv2 = pvib2->spt;
       if (si1 > 0 &&
-          checksp(first, si1, si2, iiv1, iiv2, &spar_now->zfac) != 0)
+          checksp(ctx, first, si1, si2, iiv1, iiv2, &spar_now->zfac) != 0)
       {
         notused = 2;
         break;
       }
       if (sznz > 0)
       { /*  setup for SzNz */
-        if (checksp(first, 1, 0, iiv1, iiv2, &spar_now->zfac) != 0)
+        if (checksp(ctx, first, 1, 0, iiv1, iiv2, &spar_now->zfac) != 0)
         {
           notused = 3;
           break;
@@ -1906,7 +1820,7 @@ const double *par;
         ++imag;
         isym = 3 - isym; /* 8x type operator */
       }
-      if (glob.nofc && ifc != 0)
+      if (ctx->glob.nofc && ifc != 0)
       {
         if (ifc < 0)
           ifc = -1 - ifc;
@@ -1933,11 +1847,11 @@ const double *par;
           ldel = -ldel;
         if (ivdif < 0) /* DELTA K * DELTA L < 0 */
           ldel = -ldel;
-        glob.lsym = FALSE;
+        ctx->glob.lsym = FALSE;
       }
       else if (lv1 != 0 && (idflags & MLZ) == 0)
       {
-        if (glob.newlz)
+        if (ctx->glob.newlz)
         {
           if (lv1 < 0)
           {
@@ -1997,7 +1911,7 @@ const double *par;
         if (notused != 0)
           notused = 8;
         alpha = MOD(ldel - kd, nitot);
-        if (si1 <= itsym)
+        if (si1 <= ctx->itsym)
         {
           if (alpha != 0)
             continue;
@@ -2014,7 +1928,7 @@ const double *par;
         }
         else
         {
-          glob.esym = FALSE;
+          ctx->glob.esym = FALSE;
           spar_now->zfac *= 0.5;
         }
         notused = i;
@@ -2039,7 +1953,7 @@ const double *par;
       spar_now->alpha = (unsigned char)alpha;
       if (isym == 0 && iv1 == iv2 && kd != 0)
         iret = 1;
-      if (testwt(pvib1, pvib2, isym, alpha))
+      if (testwt(ctx, pvib1, pvib2, isym, alpha))
       {
         if (notused != 0)
           notused = 9;
@@ -2050,7 +1964,7 @@ const double *par;
       ivsym = (unsigned int)isym + ((unsigned int)iv12 << 2);
       spar_now->ipsym = ivsym;
       spar_match = spar_last = NULL;
-      for (spar_now = spar_head[iv2]; spar_now != NULL;
+      for (spar_now = ctx->spar_head[iv2]; spar_now != NULL;
            spar_now = spar_now->next)
       {
         if (spar_now->ipsym <= ivsym)
@@ -2065,7 +1979,7 @@ const double *par;
           if (spar_now->ipsym < ivsym)
             break;
           spar_last = spar_now;
-          klp = idpars(spar_now, &ikqp, &neulerp, &ltp, &ldp, &kdp, &insp,
+          klp = idpars(ctx, spar_now, &ikqp, &neulerp, &ltp, &ldp, &kdp, &insp,
                        &si1p, &si2p, &sznzp, &ifcp, &alphap, &ldelp, &kavgp);
           klp &= MMASK;
           /* check for same K dependence */
@@ -2109,8 +2023,8 @@ const double *par;
       }
       else
       {
-        spar_now->next = spar_head[iv2];
-        spar_head[iv2] = spar_now;
+        spar_now->next = ctx->spar_head[iv2];
+        ctx->spar_head[iv2] = spar_now;
       }
       spar_last = NULL;
       spar_now->ip = ipar;
@@ -2120,7 +2034,7 @@ const double *par;
     if (iv12q == ilim)
     {
       ++iv1d;
-      if (iv1d >= glob.nvib)
+      if (iv1d >= ctx->glob.nvib)
         --ipar;
     }
     else
@@ -2131,12 +2045,12 @@ const double *par;
     {
       if (notused > 0)
       {
-        putbcd(sbcd, NSBCD, &idpar[ibcd]);
+        putbcd(ctx->sbcd, NSBCD, &idpar[ibcd]);
         if (notused * sizeof(char *) >= sizeof(strej))
           notused = 0;
         fprintf(lu,
                 " WARNING: parameter %6d %s has no matrix elements: %s",
-                (i + 1), sbcd, strej[notused]);
+                (i + 1), ctx->sbcd, strej[notused]);
       }
       iv1d = 0;
       ibcd -= nbcd;
@@ -2146,53 +2060,53 @@ const double *par;
   } /* end ipar loop */
   if (spar_free != NULL)
     free(spar_free);
-  if (glob.esym)
-    glob.lsym = FALSE;
-  if (glob.stdphase != 0)
+  if (ctx->glob.esym)
+    ctx->glob.lsym = FALSE;
+  if (ctx->glob.stdphase != 0)
   { /* preset phase */
-    glob.phasemask = 7;
-    glob.stdphase &= 7;
+    ctx->glob.phasemask = 7;
+    ctx->glob.stdphase &= 7;
   }
   else
   {
-    glob.phasemask = 0;
+    ctx->glob.phasemask = 0;
     for (isym = 1; isym <= 3; ++isym)
     {
       /* check for phase change */
       if (nimag[isym] == 0 && nimag[isym + 4] == 0)
         continue;
-      i = ipwr2[isym];
-      glob.phasemask |= i;
+      i = ctx->ipwr2[isym];
+      ctx->glob.phasemask |= i;
       if (nimag[isym] > nimag[isym + 4])
       {
-        glob.stdphase ^= i;
+        ctx->glob.stdphase ^= i;
         i = nimag[isym];
         nimag[isym] = nimag[isym + 4];
         nimag[isym + 4] = i;
       }
     }
   }
-  kk = glob.stdphase;
+  kk = ctx->glob.stdphase;
   if (kk > 0)
   {
     /* update phases */
     kk = kk ^ 5;
     for (isym = 1; isym <= 3; ++isym)
     {
-      ixphase[isym] = kk & 1;
+      ctx->ixphase[isym] = kk & 1;
       kk = kk >> 1;
     }
   }
   nt = nimag[1] + nimag[2] + nimag[3];
   if (nt == 0)
     return iret;
-  for (iv2 = 0; iv2 < glob.nvib; ++iv2)
+  for (iv2 = 0; iv2 < ctx->glob.nvib; ++iv2)
   {
     spar_now = NULL;
     for (;;)
     {
       spar_last = spar_now;
-      spar_now = (spar_now == NULL) ? spar_head[iv2] : spar_now->next;
+      spar_now = (spar_now == NULL) ? ctx->spar_head[iv2] : spar_now->next;
       if (spar_now == NULL)
         break;
       isym = (int)(spar_now->ipsym & 7);
@@ -2204,21 +2118,21 @@ const double *par;
       kk = 0;
       if (TEST(idflags, MODD))
         ++kk;
-      if (TEST(glob.stdphase, ipwr2[isym]))
+      if (TEST(ctx->glob.stdphase, ctx->ipwr2[isym]))
         ++kk;
       if (ODD(kk))
       { /* bad phase */
         ipar = spar_now->ip;
         ibcd = ipar * nbcd;
-        putbcd(sbcd, NSBCD, &idpar[ibcd]);
+        putbcd(ctx->sbcd, NSBCD, &idpar[ibcd]);
         fprintf(lu,
                 " WARNING: parameter %6d %s is imaginary and will not be used\n",
-                (ipar + 1), sbcd);
+                (ipar + 1), ctx->sbcd);
         spar_free = spar_now->next;
         if (spar_last == NULL)
         {
           free(spar_now);
-          spar_head[iv2] = spar_free;
+          ctx->spar_head[iv2] = spar_free;
         }
         else
         {
@@ -2245,10 +2159,7 @@ const double *par;
  * @param vib_spin_sym_packed_out Output: Array to store packed (Vib,Sym,SpinPattern) identifier for each sub-block.
  * @return int Number of sub-blocks in this F-block. Returns 0 if block_index is invalid or no states.
  */
-int getqq(iblk, f, iwtb, sbkptr, kmin, vs)
-    const int iblk;
-int *f, *iwtb, *vs;
-short *sbkptr, *kmin;
+int getqq(struct SpinvContext *ctx, const int iblk, int *f, int *iwtb, short *sbkptr, short *kmin, int *vs)
 {
   /* subroutine to get sub-block structure and major quantum numbers */
   /*     on entry: */
@@ -2268,24 +2179,24 @@ short *sbkptr, *kmin;
   unsigned int mvs;
 
   isblk = iblk - 1;
-  if (glob.nbkpj <= 0)
+  if (ctx->glob.nbkpj <= 0)
     return 0;
-  ff = isblk / glob.nbkpj;
-  isblk -= glob.nbkpj * ff; /* form remainder */
+  ff = isblk / ctx->glob.nbkpj;
+  isblk -= ctx->glob.nbkpj * ff; /* form remainder */
   ff = ff + ff;
   /*  get information for sub-blocks */
   nsize = nsblk = nsym = 0;
-  ibgn = blkptr[isblk];
-  iend = blkptr[isblk + 1];
+  ibgn = ctx->blkptr[isblk];
+  iend = ctx->blkptr[isblk + 1];
   for (i = ibgn; i < iend; ++i)
   {
-    mvs = (unsigned int)moldv[i];
+    mvs = (unsigned int)ctx->moldv[i];
     ksym = (int)mvs & 3;
-    iv = (int)(mvs >> 2) & glob.msmask;
-    mss = (int)(mvs >> glob.msshft);
-    pvinfo = &vinfo[iv];
+    iv = (int)(mvs >> 2) & ctx->glob.msmask;
+    mss = (int)(mvs >> ctx->glob.msshft);
+    pvinfo = &ctx->vinfo[iv];
     if (i == ibgn)
-      nsym = setgsym((int)pvinfo->gsym);
+      nsym = setgsym(ctx, (int)pvinfo->gsym);
     jjs = pvinfo->spt;
     nset = jjs[0];
     jjs += nset * mss;
@@ -2298,9 +2209,9 @@ short *sbkptr, *kmin;
     k = pvinfo->knmin[ksym];
     if (k < 0)
     {
-      kk = MOD(jjs[itsym + 1] >> 2, nsym); /* get spin symmetry */
+      kk = MOD(jjs[ctx->itsym + 1] >> 2, nsym); /* get spin symmetry */
       k = ksym;
-      if (is_esym[kk] < 0)
+      if (ctx->is_esym[kk] < 0)
         k += 2;
       k &= 2;
     }
@@ -2319,8 +2230,8 @@ short *sbkptr, *kmin;
         *f = ff - (nn & 1);
         kk = -4;
         if (pvinfo->wt[4] != 0)
-          kk -= jjs[itsym + 1];
-        getwt(pvinfo, (int)(mvs & 3), kk, iwtb);
+          kk -= jjs[ctx->itsym + 1];
+        getwt(ctx, pvinfo, (int)(mvs & 3), kk, iwtb);
         iwtb[3] = pvinfo->gsym;
         iwtb[4] = pvinfo->nqn;
       }

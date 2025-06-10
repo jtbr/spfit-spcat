@@ -135,18 +135,6 @@ typedef struct
   BOOL nofc;           /* True if FC field in parameter ID specifies K_avg rather than Fourier coefficient index */
 } GLOB;
 
-/* extern variable declarations */
-
-extern SVIB vinfo1;             /* Default/first vibrational state info */
-extern /*@owned@*/ SVIB *vinfo; /* Pointer to array of vibrational state info */
-
-
-extern PSPAR spar_head[MAXVIB]; /* Array of linked list heads for parameters, one per vibrational state (iv2, the lower state in an interaction) */
-
-extern short sptzero[]; /* Default spin table for a molecule with no spins: nset=1 (N only), 2*S=0 */
-
-extern SSP ssp_head; /* Head of linked list for unique spin patterns */
-
 typedef struct {   /* Cached data for getqn function to speed up repeated calls for the same block */
   int cblk;       /* Cached block number */
   int cnblk;      /* Cached number of sub-blocks in this block */
@@ -154,132 +142,78 @@ typedef struct {   /* Cached data for getqn function to speed up repeated calls 
   int cff;        /* Cached 2*F value for this block */
   int cwt[5];     /* Cached statistical weights for this block */
 } GETQN;
-extern GETQN *cgetq, cgetv[2]; /* Two cache entries, presumably for upper and lower states of a transition */
-
-extern SDIP dipinfo0; /* Default/first dipole info structure */
-extern /*@owned@*/ SDIP *dipinfo; /* Pointer to array of dipole info structures */
-
-extern double zero;    /* zero value */
-extern double zwk;     /* zero for work array fallback */
-extern double spfac[MAXII]; /* Spin factors sqrt(I(I+1)(2I+1)) for quadrupole etc. */
-extern double spfac2[MAXII];/* Spin factors for quadrupole, involving 1/sqrt((I-1/2)(I+3/2)) etc. */
-extern int zmoldv;      /* Default/zero for moldv fallback */
-extern int zblkptr;     /* Default/zero for blkptr fallback */
-extern int zivs;        /* Default/zero for ivs fallback */
-extern int zipder;      /* Default/zero for ipder fallback */
-extern int revsym[]; /* Symmetry reversal map (e.g., Bx <-> Bz for oblate) */
-extern int isoddk[]; /* Indicates if K is effectively odd for symmetry types A, Bx, By, Bz for direction cosines */
-extern int ixphase[]; /* Scratch for phase choices, modified by glob.stdphase */
-extern int ipwr2[];        /* Powers of 2 (1,2,4) used for symmetry component checking (bit masks) */
-extern int is_esym[MAXITOT];         /* Array indicating E-symmetry for I_tot components: 0=A/B, 1=E_a, -1=E_b */
-/* Angular momentum coupling arrays for a single operator */
-extern int lscom[MAXNS];  /* Tensor orders L for successive couplings in F = N+S+I1+I2... */
-extern int iscom[MAXNS];  /* 2*Angular momentum values for bra state (2N, 2J, 2F1...) */
-extern int jscom[MAXNS];  /* 2*Angular momentum values for ket state */
-extern int ismap[MAXNS];  /* Maps spin index to its position in iscom/jscom for tensor calculations */
-/* Common blocks for rotational/rovibrational quanta storage */
-extern int ixcom[NDXCOM]; /* Stores quantum numbers for the 'bra' side of a matrix element */
-extern int jxcom[NDXCOM]; /* Stores quantum numbers for the 'ket' side of a matrix element */
-/* Various global integer flags and counters */
-extern int itptr;         /* Index of I_tot in the spin coupling scheme */
-extern int itsym;         /* Index of the first spin summed into I_tot */
-extern int nspin;         /* Maximum number of spins encountered across all vibrational states */
-extern int nsqmax;        /* Maximum power of N(N+1) encountered for any parameter */
-extern int ndmx;          /* Maximum Hamiltonian matrix dimension encountered / work array size */
-extern int ndmax;         /* Maximum Delta N for any interaction */
-extern int nddip;         /* Number of dipole parameters currently allocated in dipinfo */
-/* short variables, often default/zero values or fallbacks for unallocated pointers */
-extern short szero;   /* zero short value */
-extern short zidx;    /* Default/zero for idx fallback */
-extern short zjdx;    /* Default/zero for jdx fallback */
-extern short ziqnsep; /* Default/zero for iqnsep fallback */
-extern short zibkptr; /* Default/zero for ibkptr fallback */
-extern short zikmin;  /* Default/zero for ikmin fallback */
-
-extern GLOB glob; /* Global variables structure */
-extern char sbcd[NSBCD]; /* Buffer for BCD (Binary Coded Decimal) to string conversion */
-
-/* Pointers to dynamically allocated arrays used throughout calculations */
-extern /*@owned@*/ int *moldv;   /* Array storing packed (Vib,Sym,SpinPattern) identifiers for each block */
-extern /*@owned@*/ int *blkptr;  /* Array of pointers to the start of each F-block group in moldv */
-extern /*@owned@*/ int *ipder;   /* Array mapping parameter index to its derivative column, or -ve for constrained */
-extern /*@owned@*/ int *ivs;     /* Array storing packed (Vib,Sym,SpinPattern) for each sub-block */
-extern /*@owned@*/ double *wk;   /* Main work array for Hamiltonian elements, direction cosines, etc. */
-extern /*@owned@*/ short *idx;   /* Row indices for sparse matrix elements (Hamiltonian or dipole) */
-extern /*@owned@*/ short *jdx;   /* Column indices for sparse matrix elements */
-extern /*@owned@*/ short *iqnsep;/* Array storing separation information for sorting/diagonalization, or K values for projection sort */
-extern /*@owned@*/ short *ibkptr;/* Array of pointers to the start of each sub-block (Wang block * spin) */
-extern /*@owned@*/ short *ikmin; /* Array of minimum K values for each sub-block */
 
 
 /* Function Declarations */
+struct SpinvContext;
+
 int dclr(const int n1, const int n2, double *vec, const int ix);
-int specop(const int neuler, BOOL * newblk, int *nsqj, int *ikq,
+int specop(struct SpinvContext* ctx, const int neuler, BOOL * newblk, int *nsqj, int *ikq,
                   const int ksi, const int ksj, const int ni, const int nj,
                   const int ncos, double *wk, const short *ix,
                   const short *jx, const double par);
-int specfc(const int ifc, const int iv, const int jv,
+int specfc(struct SpinvContext* ctx, const int ifc, const int iv, const int jv,
                   const int kdel, const int ksi, const int ksj,
                   const int ncos, double *wk, const short *ix,
                   const short *jx);
-int sznzfix(const int sznz, const int ni, const int nj, int *ixcom,
+int sznzfix(struct SpinvContext* ctx, const int sznz, const int ni, const int nj, int *ixcom,
                    int *jxcom, int *iscom, int *jscom);
-int sznzop(const int ni, const int nj, const int ksi, const int ksj,
+int sznzop(struct SpinvContext* ctx, const int ni, const int nj, const int ksi, const int ksj,
                   const int *iscom, const int *jscom, const int ncos,
                   double *wk, const short *ix, const short *jx);
-unsigned int blksym(const int *ixcom, const int *jxcom);
-int ordham(const int nn, short *mask, double *egy, const short *isblk,
+unsigned int blksym(struct SpinvContext* ctx, const int *ixcom, const int *jxcom);
+int ordham(struct SpinvContext* ctx, const int nn, short *mask, double *egy, const short *isblk,
                   short *iswap);
-int fixham(const int ndm, const int nn, double *t, double *egy,
+int fixham(struct SpinvContext* ctx, const int ndm, const int nn, double *t, double *egy,
                   double *p, const short *iswap);
-BOOL kroll(const int nsizd, double *t, const int nsblk,
+BOOL kroll(struct SpinvContext* ctx, const int nsizd, double *t, const int nsblk,
                   const short *sbkptr, const short *kmin);
-int bestk(const int ndm, const int nsize, short *iqnsep, short *ibkptr,
+int bestk(struct SpinvContext* ctx, const int ndm, const int nsize, short *iqnsep, short *ibkptr,
           short *itau, short *idx, double *t, double *egy, double *pmix,
           double *wk);
-int getqs(const int mvs, const int iff, const int nsiz, const int kbgn,
+int getqs(struct SpinvContext* ctx, const int mvs, const int iff, const int nsiz, const int kbgn,
                /*@out@*/ int *ixcom, /*@out@*/ int *iscom, /*@out@*/ int *iv);
-int idpars(SPAR * pspar, /*@out@*/ int *ksq, /*@out@*/ int *itp,
+int idpars(struct SpinvContext* ctx, SPAR * pspar, /*@out@*/ int *ksq, /*@out@*/ int *itp,
                /*@out@*/ int *l, /*@out@*/ int *ld, /*@out@*/ int *kdel,
                /*@out@*/ int *ins, /*@out@*/ int *si1, /*@out@*/ int *si2,
                /*@out@*/ int *sznz, /*@out@*/ int *ifc, /*@out@*/ int *alpha,
                /*@out@*/ int *ldel,/*@out@*/ int *kavg);
-int getll(const int llf, const int ld, const int ln, const int kd, /* signature was wrong in original code */
+int getll(struct SpinvContext* ctx, const int llf, const int ld, const int ln, const int kd, /* signature was wrong in original code */
           const int si1, const int si2, int *lscom, const int *iscom,
           const int *jscom);
-int getmask(const int *xbra, const int *xket, const int kd, const int ldel,
+int getmask(struct SpinvContext* ctx, const int *xbra, const int *xket, const int kd, const int ldel,
                    const int loff, const int alpha);
-double rmatrx(const int ld, const int lv, const int *ixcom,
+double rmatrx(struct SpinvContext* ctx, const int ld, const int lv, const int *ixcom,
                      const int *jxcom);
-int symnsq(const int inq, const int ins, const int *iscom,
+int symnsq(struct SpinvContext* ctx, const int inq, const int ins, const int *iscom,
                   const int *jscom, double *z);
-int symksq(const int ikq, const int ksi, const int ksj, const int n,
+int symksq(struct SpinvContext* ctx, const int ikq, const int ksi, const int ksj, const int n,
                   double *wk, short *ix, short *jx);
-int dpmake(const int nsize, double *dp, const double *t,
+int dpmake(struct SpinvContext* ctx, const int nsize, double *dp, const double *t,
                   const int n, const double *wk, const short *ix,
                   const short *jx, const int isunit);
-int pasort(FILE * lu, const int npar, bcd_t *idpar,
+int pasort(struct SpinvContext* ctx, FILE * lu, const int npar, bcd_t *idpar,
                   const double *par);
-int idpari(bcd_t *idval, int itp, /*@out@*/ SPAR * pspar);
-int checksp(const BOOL first, int si1, int si2, const short *iiv1,
+int idpari(struct SpinvContext* ctx, bcd_t *idval, int itp, /*@out@*/ SPAR * pspar);
+int checksp(struct SpinvContext* ctx, const BOOL first, int si1, int si2, const short *iiv1,
             const short *iiv2, double *zfac);
-int tensor(double *z, const int *iscom, const int *jscom,
+int tensor(struct SpinvContext* ctx, double *z, const int *iscom, const int *jscom,
            const int *lscom, const int *smap, int npair, int alpha);
-int setwt(SVIB * pvinfo, const int ivib, const int iax,
+int setwt(struct SpinvContext* ctx, SVIB * pvinfo, const int ivib, const int iax,
                  const int iwtpl, const int iwtmn, double vsym);
-int getwt(SVIB * pvinfo, const int isym, const int iispin,
+int getwt(struct SpinvContext* ctx, SVIB * pvinfo, const int isym, const int iispin,
           /*@out@*/ int *ivwt);
-BOOL testwt(SVIB *pvib1, SVIB *pvib2, int isym, int alpha);
-int checkwt(int *iwt, int *jwt);
-int setgsym(const int gsym);
-int getsp(const bcd_t *ispnx, SVIB *pvinfo);
-void setsp(void);
-int getqq(const int iblk, /*@out@*/ int *f, /*@out@*/ int *iwtb,
+BOOL testwt(struct SpinvContext* ctx, SVIB *pvib1, SVIB *pvib2, int isym, int alpha);
+int checkwt(struct SpinvContext* ctx, int *iwt, int *jwt);
+int setgsym(struct SpinvContext* ctx, const int gsym);
+int getsp(struct SpinvContext* ctx, const bcd_t *ispnx, SVIB *pvinfo);
+void setsp(struct SpinvContext* ctx);
+int getqq(struct SpinvContext* ctx, const int iblk, /*@out@*/ int *f, /*@out@*/ int *iwtb,
                  /*@out@*/ short *sbkptr, /*@out@*/ short *kmin,
                  /*@out@*/ int *vs);
-int dircos(const int *xbra, const int *xket, const int ld,
+int dircos(struct SpinvContext* ctx, const int *xbra, const int *xket, const int ld,
                   const int kd, const int ncmax, /*@out@*/ double *direl,
                   /*@out@*/ short *ibra, /*@out@*/ short *iket,
                   const int ifup, const int loff, int mask,
                   /*@out@*/ int *isunit);
-int ffcal(const int nff, const int kff, /*@out@*/ double *ff);
+int ffcal(struct SpinvContext* ctx, const int nff, const int kff, /*@out@*/ double *ff);

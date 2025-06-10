@@ -27,6 +27,7 @@ dpmake(): Calculates derivative contributions (d<H>/dP).
 #include "calpgm.h"
 #include "spinit.h"
 #include "spinv_internal.h"
+#include "SpinvContext.hpp"
 
 /*****************************************************************************/
 /**
@@ -43,12 +44,9 @@ dpmake(): Calculates derivative contributions (d<H>/dP).
  * @param ifdump If TRUE, dump Hamiltonian matrix `t` without diagonalizing and store diagonal elements in `egy`.
  * @return int Status: 1 for success, -1 if idpar[0] is 0 (potentially indicating an issue or no parameters).
  */
-int hamx(iblk, nsize, npar, idpar, par, egy, t, dedp, pmix, ifdump)
-const int iblk, nsize, npar;
-const BOOL ifdump;
-const bcd_t *idpar;
-const double *par;
-double *egy, *t, *dedp, *pmix;
+int hamx(struct SpinvContext *ctx, const int iblk, const int nsize, const int npar,
+         const bcd_t *idpar, const double *par, double *egy, double *t, double *dedp,
+         double *pmix, BOOL ifdump)
 {
   /* .. PACKAGE FOR 98 INTERACTING VIBRATIONAL STATES WITH MULTI-SPIN */
 
@@ -72,23 +70,23 @@ double *egy, *t, *dedp, *pmix;
   BOOL oldpar, isegy0, roll, parskp, isneg, first; /* oldpar: if previous param shared cosine part; isegy0: if current operator contributes to E0; roll: if K-roll detected; parskp: skip current parameter; isneg: if oblate hamiltonian needs negation; first: first pass (calculating H) vs second pass (derivatives) */
   BOOL newblk, firstpar; /* newblk: if new vibrational pair, re-eval Euler denoms; firstpar: first parameter for a given vib pair and symmetry */
 
-  if (ndmx <= 0) { /* Check if work arrays are allocated */
+  if (ctx->ndmx <= 0) { /* Check if work arrays are allocated */
     puts("working vectors not allocated");
     exit(EXIT_FAILURE);
   }
-  dbar = &wk[ndmx]; /* dbar points to a section of the work array wk, used for accumulating derivatives for a single operator */
+  dbar = &ctx->wk[ctx->ndmx]; /* dbar points to a section of the work array wk, used for accumulating derivatives for a single operator */
   ndm = nsize;      /* Store nsize in ndm (leading dimension for matrix t) */
   ndmd = nsize + 1; /* Used for indexing diagonal elements t[i+i*ndm] as t[i*ndmd] */
-  isneg = (glob.oblate && !ifdump); /* Hamiltonian needs to be negated for oblate rotors if not just dumping */
-  cgetv[0].cblk = 0; /* Invalidate cache for getqn for state 0 */
-  cgetv[1].cblk = 0; /* Invalidate cache for getqn for state 1 */
+  isneg = (ctx->glob.oblate && !ifdump); /* Hamiltonian needs to be negated for oblate rotors if not just dumping */
+  ctx->cgetv[0].cblk = 0;                /* Invalidate cache for getqn for state 0 */
+  ctx->cgetv[1].cblk = 0;                /* Invalidate cache for getqn for state 1 */
   /*     get F and sub-block structure */
-  itau = &ikmin[glob.maxblk]; /* itau points to an area after ikmin, used to store sorting keys (tau or K values) */
-  nsblk = getqq(iblk, &iff, iiwt, ibkptr, ikmin, ivs); /* Get sub-block structure for current F block (iblk) */
+  itau = &(ctx->ikmin)[ctx->glob.maxblk]; /* itau points to an area after ikmin, used to store sorting keys (tau or K values) */
+  nsblk = getqq(ctx, iblk, &iff, iiwt, ctx->ibkptr, ctx->ikmin, ctx->ivs); /* Get sub-block structure for current F block (iblk) */
   /* zero hamiltonian matrix t */
   dclr(nsize, nsize, t, 1);
   /* zero derivative matrix dedp */
-  n_sub_block_size = glob.nfit; /* Number of parameters to fit */
+  n_sub_block_size = ctx->glob.nfit; /* Number of parameters to fit */
   dclr(nsize, n_sub_block_size, dedp, 1);
   /* set up hamiltonian */
   oldpar = parskp = roll = firstpar = FALSE; /* Initialize flags */
@@ -99,17 +97,17 @@ double *egy, *t, *dedp, *pmix;
     /* loop on wang blocks (actually, pairs of sub-blocks for interactions) */
     lastvv = 0; newblk = TRUE; egy0 = 0.; /* lastvv tracks vib pair to re-init Euler denoms if needed */
     for (ixx = 0; ixx < nsblk; ++ixx) { /* Loop over 'bra' sub-blocks (Wang blocks * spin states) */
-      ibase = ibkptr[ixx]; /* Starting row/col index for this 'bra' sub-block */
-      n_sub_block_size = ibkptr[ixx + 1] - ibase; /* Size of this 'bra' sub-block */
-      kbgni = ikmin[ixx]; /* Starting K for this 'bra' sub-block */
-      ispn = ivs[ixx];    /* Packed (Vib,Sym,SpinPattern) for 'bra' */
-      getqs(ispn, iff, n_sub_block_size, kbgni, ixcom, iscom, &ivbase); /* Get quantum numbers for 'bra' state */
-      ni = ixcom[XNVAL]; /* N quantum number for 'bra' */
+      ibase = ctx->ibkptr[ixx]; /* Starting row/col index for this 'bra' sub-block */
+      n_sub_block_size = ctx->ibkptr[ixx + 1] - ibase; /* Size of this 'bra' sub-block */
+      kbgni = ctx->ikmin[ixx]; /* Starting K for this 'bra' sub-block */
+      ispn = ctx->ivs[ixx];    /* Packed (Vib,Sym,SpinPattern) for 'bra' */
+      getqs(ctx, ispn, iff, n_sub_block_size, kbgni, ctx->ixcom, ctx->iscom, &ivbase); /* Get quantum numbers for 'bra' state */
+      ni = ctx->ixcom[XNVAL]; /* N quantum number for 'bra' */
       /* set up itau for sorting (tau = Ka-Kc like proxy, or K for projection) */
-      kd = (ni + ixcom[XSYM] + 1) & 1; /* Parity component for tau */
+      kd = (ni + ctx->ixcom[XSYM] + 1) & 1; /* Parity component for tau */
       kd += kbgni + kbgni;             /* K component for tau */
       kd = kd + kd;                    /* Scale it up */
-      if (ivbase != ixcom[XVIB]) /* Check if it's the upper state of an l-doublet pair based on how getqs returns XVIB relative to the actual state index ivbase */
+      if (ivbase != ctx->ixcom[XVIB]) /* Check if it's the upper state of an l-doublet pair based on how getqs returns XVIB relative to the actual state index ivbase */
         ++kd; /* Adjust tau for upper l-doubled state */
       itau[ixx] = (short) kd; /* Store sorting key for this sub-block */
 
@@ -118,33 +116,36 @@ double *egy, *t, *dedp, *pmix;
         dn = (double) ni;
         sqnn = dn * (ni + 1); /* N(N+1) */
         sqj[0] = 1.0; /* Zeroth power */
-        for (i = 1; i <= nsqmax; ++i) { /* Calculate higher powers */
+        for (i = 1; i <= ctx->nsqmax; ++i)
+        { /* Calculate higher powers */
           sqj[i] = sqj[i - 1] * sqnn;
         }
       }
       for (jxx = 0; jxx <= ixx; ++jxx) { /* Loop over 'ket' sub-blocks (only jxx <= ixx for lower triangle + diagonal) */
         ijd = ixx - jxx; /* Difference in sub-block indices */
-        jbase = ibkptr[jxx]; /* Starting row/col index for this 'ket' sub-block */
-        n_sub_block_size = ibkptr[jxx + 1] - jbase; /* Size of this 'ket' sub-block */
-        kbgnj = ikmin[jxx]; /* Starting K for this 'ket' sub-block */
-        jspn = ivs[jxx];    /* Packed (Vib,Sym,SpinPattern) for 'ket' */
-        getqs(jspn, iff, n_sub_block_size, kbgnj, jxcom, jscom, &jvbase); /* Get quantum numbers for 'ket' state */
-        nj = jxcom[XNVAL]; /* N quantum number for 'ket' */
+        jbase = ctx->ibkptr[jxx]; /* Starting row/col index for this 'ket' sub-block */
+        n_sub_block_size = ctx->ibkptr[jxx + 1] - jbase; /* Size of this 'ket' sub-block */
+        kbgnj = ctx->ikmin[jxx];                         /* Starting K for this 'ket' sub-block */
+        jspn = ctx->ivs[jxx];    /* Packed (Vib,Sym,SpinPattern) for 'ket' */
+        getqs(ctx, jspn, iff, n_sub_block_size, kbgnj, ctx->jxcom, ctx->jscom, &jvbase); /* Get quantum numbers for 'ket' state */
+        nj = ctx->jxcom[XNVAL];                                                     /* N quantum number for 'ket' */
         nd = ni - nj;      /* Delta N */
-        if (nd > ndmax && ndmax >=0) continue; /* Skip if Delta N too large (ndmax < 0 allows all Delta N) */
+        if (nd > ctx->ndmax && ctx->ndmax >= 0)
+          continue; /* Skip if Delta N too large (ndmax < 0 allows all Delta N) */
 
         ivmin = (ivbase < jvbase) ? ivbase : jvbase; /* Minimum of the two vibrational indices */
         /* Create a packed identifier for the vibrational pair and overall block symmetry */
-        ivsym = (unsigned int) (ivbase + jvbase + ivmin * glob.vibfac) << 2;
+        ivsym = (unsigned int) (ivbase + jvbase + ivmin * ctx->glob.vibfac) << 2;
         ivcmp = ivsym + 3; /* Upper bound for checking Euler parameters which might be only vv' specific */
-        ivsym += blksym(ixcom, jxcom); /* Add block symmetry (A,Bx,By,Bz) */
+        ivsym += blksym(ctx, ctx->ixcom, ctx->jxcom); /* Add block symmetry (A,Bx,By,Bz) */
 
         if (lastvv != ivcmp) { /* If vibrational pair changed, Euler denominators might need re-init */
           newblk = TRUE; lastvv = ivcmp;
         }
         isegy0 = FALSE; firstpar = TRUE; /* isegy0: current op contributes to E0; firstpar: first param for this (v,v',sym) */
 
-        for (spar_now = spar_head[ivmin]; TRUE; spar_now = spar_now->next) { /* Loop over parameters relevant to this vibrational pair */
+        for (spar_now = ctx->spar_head[ivmin]; TRUE; spar_now = spar_now->next)
+        { /* Loop over parameters relevant to this vibrational pair */
           idflags = 0;
           if (spar_now != NULL) { /* Check if current parameter matches current ivsym/ivcmp */
             ivcmp = spar_now->ipsym;
@@ -169,8 +170,8 @@ double *egy, *t, *dedp, *pmix;
                 if (isneg) /* Negate for oblate rotor representation */
                   pbar = -pbar;
                 if (isunit != 0) { /* If operator is unit matrix type (K-independent part is 1) */
-                  iz = idx[0]; /* Only one set of indices for unit matrix */
-                  jz = jdx[0];
+                  iz = ctx->idx[0]; /* Only one set of indices for unit matrix */
+                  jz = ctx->jdx[0];
                   pt = &t[jz * ndm]; /* Pointer to start of column jz */
                   for (i = 0; i < ncos; ++i) { /* ncos is actual # elements for unit matrix */
                     pt[iz] += pbar; /* Add to H[iz, jz] (actually H[row_idx[i], col_idx[i]])*/
@@ -179,9 +180,9 @@ double *egy, *t, *dedp, *pmix;
                   }
                 } else { /* Operator has K-dependent part stored in wk array */
                   for (i = 0; i < ncos; ++i) {
-                    iz = idx[i]; /* Row index for this element */
-                    jz = jdx[i]; /* Column index for this element */
-                    t[iz + jz * ndm] += pbar * wk[i]; /* Add PBAR * K_dependent_factor */
+                    iz = ctx->idx[i]; /* Row index for this element */
+                    jz = ctx->jdx[i]; /* Column index for this element */
+                    t[iz + jz * ndm] += pbar * ctx->wk[i]; /* Add PBAR * K_dependent_factor */
                   }
                 }
               }
@@ -202,27 +203,27 @@ double *egy, *t, *dedp, *pmix;
           } else { /* New type of operator, or one not differing by just N(N+1) */
             parskp = TRUE; /* Assume initially this new operator type might be zero */
             if (sznz < 0) /* If SzNz type needs finalization (from previous param processing) */
-              sznzfix(sznz, ni, nj, ixcom, jxcom, iscom, jscom); /* Reset N values in ixcom/jxcom if changed by SzNz */
+              sznzfix(ctx, sznz, ni, nj, ctx->ixcom, ctx->jxcom, ctx->iscom, ctx->jscom); /* Reset N values in ixcom/jxcom if changed by SzNz */
             /* Parse the BCD parameter ID into its components */
-            kl = idpars(spar_now, &ikq, &neuler, &lt, &ld, &kd, &ins,
+            kl = idpars(ctx, spar_now, &ikq, &neuler, &lt, &ld, &kd, &ins,
                         &si1, &si2, &sznz, &ifc, &alpha, &ldel, &kavg);
             if (sznz > 0) { /* If this is an SzNz type operator */
-              sznz = sznzfix(sznz, ni, nj, ixcom, jxcom, iscom, jscom); /* Modify N in ixcom/jxcom, returns new sznz state */
+              sznz = sznzfix(ctx, sznz, ni, nj, ctx->ixcom, ctx->jxcom, ctx->iscom, ctx->jscom); /* Modify N in ixcom/jxcom, returns new sznz state */
               if (sznz == 0) continue;    /* Operator invalid for these N values, get next parameter */
             }
             if (kavg > 0 && kavg > ni && kavg > nj) continue; /* If specific K_avg is outside range of N_bra, N_ket */
 
-            mkd = getmask(ixcom, jxcom, kd, ldel, kl, alpha); /* Get selection mask for dircos based on symmetry */
+            mkd = getmask(ctx, ctx->ixcom, ctx->jxcom, kd, ldel, kl, alpha); /* Get selection mask for dircos based on symmetry */
             if (mkd == 0) continue; /* Operator forbidden by symmetry/selection */
 
-            npair = getll(0, ld, lt, kd, si1, si2, lscom, iscom, jscom); /* Get spin coupling tensor orders */
+            npair = getll(ctx, 0, ld, lt, kd, si1, si2, ctx->lscom, ctx->iscom, ctx->jscom); /* Get spin coupling tensor orders */
             if (npair < 0) continue; /* Tensor coupling rules violated */
 
             if (ncos < 0) { /* If K-dependent part needs recalculation */
               isunit = kavg; /* kavg might indicate a unit matrix type if > 0 and nofc=1 */
               /* Calculate direction cosine matrix elements (K-dependent part) */
-              ncos = dircos(ixcom, jxcom, ld, kd, ndmx, wk, idx, jdx,
-                            ijd, kl, mkd, &isunit);
+              ncos = dircos(ctx, ctx->ixcom, ctx->jxcom, ld, kd, ctx->ndmx, ctx->wk, ctx->idx,
+                            ctx->jdx, ijd, kl, mkd, &isunit);
               if (ncos <= 0) {
                 if (ncos == 0) continue; /* No non-zero elements, get next parameter */
                 printf("DIRCOS WORKING VECTOR TOO SHORT IN HAMX BY %d\n", -ncos); /* Error if ncos is negative */
@@ -231,31 +232,35 @@ double *egy, *t, *dedp, *pmix;
               if (TEST(idflags, MNOUNIT)) /* If flag says it's not a unit matrix, ensure isunit is 0 */
                 isunit = 0;
               isgn = 1;
-              if (isunit != 0 && wk[0] < 0.) /* For unit matrix type, if scaling factor is negative */
+              if (isunit != 0 && ctx->wk[0] < 0.) /* For unit matrix type, if scaling factor is negative */
                 isgn = -1;
 
               if (neuler != 0) { /* If Euler series operator */
-                /* Apply Euler series transformation to wk, idx, jdx */
+                /* Apply Euler series transformation to ctx->wk, idx, jdx */
                 /* par[ipar] is the Euler denominator 'a' or 'b' for this specific neuler type */
-                ncos = specop(neuler, &newblk, &nsqj, &ikq, kbgni, kbgnj,
-                              ni, nj, ncos, wk, idx, jdx, par[ipar]);
+                ncos = specop(ctx, neuler, &newblk, &nsqj, &ikq, kbgni, kbgnj,
+                              ni, nj, ncos, ctx->wk, ctx->idx, ctx->jdx, par[ipar]);
                 if (ncos == 0) continue; /* Euler op became zero */
               }
               if (ifc != 0) /* If Fourier coefficient operator */
-                specfc(ifc, ivbase, jvbase, kd, kbgni, kbgnj, ncos,
-                       wk, idx, jdx); /* Apply Fourier scaling to wk */
+                specfc(ctx, ifc, ivbase, jvbase, kd, kbgni, kbgnj, ncos,
+                       ctx->wk, ctx->idx, ctx->jdx); /* Apply Fourier scaling to wk */
               if (sznz != 0) /* If SzNz type operator */
-                sznzop(ni, nj, kbgni, kbgnj, iscom, jscom, ncos, wk, idx, jdx); /* Apply SzNz scaling to wk */
+                sznzop(ctx, ni, nj, kbgni, kbgnj, ctx->iscom, ctx->jscom, ncos, ctx->wk, ctx->idx, ctx->jdx); /* Apply SzNz scaling to wk */
               if (ikq > 0) { /* If K^2 dependent operator */
-                ncos = symksq(ikq, kbgni, kbgnj, ncos, wk, idx, jdx); /* Apply K^2 scaling */
+                ncos = symksq(ctx, ikq, kbgni, kbgnj, ncos, ctx->wk, ctx->idx, ctx->jdx); /* Apply K^2 scaling */
                 if (ncos == 0) continue;
               }
               /* Adjust indices if not in the first sub-block of the matrix */
               if (ibase != 0) {
-                for (i = 0; i < ncos; ++i) idx[i] = (short) (idx[i] + ibase);
+                for (i = 0; i < ncos; ++i) {
+                  ctx->idx[i] = (short)(ctx->idx[i] + ibase);
+                }
               }
               if (jbase != 0) {
-                for (i = 0; i < ncos; ++i) jdx[i] = (short) (jdx[i] + jbase);
+                for (i = 0; i < ncos; ++i) {
+                  ctx->jdx[i] = (short)(ctx->jdx[i] + jbase);
+                }
               }
 
               if (first) { /* First pass (Hamiltonian construction) */
@@ -275,20 +280,20 @@ double *egy, *t, *dedp, *pmix;
                 if (ipar < 0) continue;
                 /* Calculate <psi| (dH_op / dP_current) |psi> using current eigenvectors t */
                 /* dbar stores this for each state, effectively (d H_matrix_element / dP) transformed by eigenvectors */
-                dpmake(nsize, dbar, t, ncos, wk, idx, jdx, isunit);
+                dpmake(ctx, nsize, dbar, t, ncos, ctx->wk, ctx->idx, ctx->jdx, isunit);
               }
             } /* End K-dependent part calculation (if ncos < 0) */
 
             if (si2 < 0 && nd == 0 && ni ==0) continue;  /* Avoids issues with commutator with N*N when N=0 */
 
             /* Calculate K-independent part of operator matrix element */
-            zpar = rmatrx(ld, lt, ixcom, jxcom); /* N-dependent corrections for reduced matrix elements */
-            tensor(&zpar, iscom, jscom, lscom, ismap, npair, alpha); /* Spin-dependent part (Clebsch-Gordan etc.) */
+            zpar = rmatrx(ctx, ld, lt, ctx->ixcom, ctx->jxcom); /* N-dependent corrections for reduced matrix elements */
+            tensor(ctx, &zpar, ctx->iscom, ctx->jscom, ctx->lscom, ctx->ismap, npair, alpha); /* Spin-dependent part (Clebsch-Gordan etc.) */
 
             if (sznz < 0) /* If SzNz type needs finalization from idpars */
-              sznz = sznzfix(sznz, ni, nj, ixcom, jxcom, iscom, jscom); /* Reset N in ixcom/jxcom if changed */
+              sznz = sznzfix(ctx, sznz, ni, nj, ctx->ixcom, ctx->jxcom, ctx->iscom, ctx->jscom); /* Reset N in ixcom/jxcom if changed */
 
-            symnsq(nsqj, ins, iscom, jscom, &zpar); /* N(N+1) and N.S dependence */
+            symnsq(ctx, nsqj, ins, ctx->iscom, ctx->jscom, &zpar); /* N(N+1) and N.S dependence */
             parskp = (fabs(zpar) < 1e-30); /* If K-independent part is effectively zero */
             if (parskp) continue; /* Skip this parameter */
 
@@ -315,10 +320,11 @@ double *egy, *t, *dedp, *pmix;
           if (isgn < 0) /* Apply overall sign factor */
             ele = -ele;
 
-          i = ipder[ipar]; ipbase = ipar; /* Get derivative index for this parameter */
+          i = ctx->ipder[ipar]; /* Get derivative index for this parameter */
+          ipbase = ipar;
           if (i < 0) { /* If parameter is constrained (i < 0 points to main parameter) */
             ipbase = -1 - i; /* Index of the parameter it's constrained to */
-            i = ipder[ipbase]; /* Derivative index of the main parameter */
+            i = ctx->ipder[ipbase]; /* Derivative index of the main parameter */
             ele *= par[ipar]; /* Multiply by the value of the constrained parameter (ratio) */
           }
 
@@ -345,20 +351,20 @@ double *egy, *t, *dedp, *pmix;
         }
         return 0; /* Successfully dumped */
       }
-      if (glob.idiag < 0 || nsize <= 1) { /* If no diagonalization requested or trivial 1x1 block */
+      if (ctx->glob.idiag < 0 || nsize <= 1) { /* If no diagonalization requested or trivial 1x1 block */
         nd = nsize + 1;
         dcopy(nsize, t, nd, egy, 1); /* Copy diagonal elements of H to egy */
         for (i = 0; i < nsize; ++i) { /* Create identity eigenvector matrix */
           pt = &t[i * ndm];
-          dcopy(nsize, &zero, 0, pt, 1); /* Zero out column */
+          dcopy(nsize, &ctx->zero, 0, pt, 1); /* Zero out column */
           pmix[i] = pt[i] = 1.;          /* Eigenvector is unit vector, pmix=1 */
         }
-        if (glob.idiag == 4 && nsize == 1) /* Special case for K-sort of 1x1 */
+        if (ctx->glob.idiag == 4 && nsize == 1) /* Special case for K-sort of 1x1 */
           pmix[0] = (double) kbgni; /* pmix stores K value */
       } else { /* Diagonalization is requested and nsize > 1 */
-        if (glob.idiag == 0) { /* Standard energy sort, check for K-roll before diagonalization */
-          roll = kroll(nsize, t, nsblk, ibkptr, ikmin); /* Modifies t if roll-over found */
-        } else if (glob.idiag == 2 || glob.idiag == 5) { /* Sort by input H diagonal order */
+        if (ctx->glob.idiag == 0) { /* Standard energy sort, check for K-roll before diagonalization */
+          roll = kroll(ctx, nsize, t, nsblk, ctx->ibkptr, ctx->ikmin);  /* Modifies t if roll-over found */
+        } else if (ctx->glob.idiag == 2 || ctx->glob.idiag == 5) { /* Sort by input H diagonal order */
           nd = nsize + 1;
           dcopy (nsize, t, nd, dbar, 1); /* Save original diagonal of H in dbar for later sorting */
         }
@@ -370,7 +376,7 @@ double *egy, *t, *dedp, *pmix;
         if (nd > 0) pscr[0] = t[0]; /* To use pscr if nd > 0 */
         dcopy(nd, t, 1, pscr, 1); /* Save original H */
 #endif
-        nqnsep = hdiag(nsize, nsize, t, egy, pmix, iqnsep); /* Diagonalize */
+        nqnsep = hdiag(nsize, nsize, t, egy, pmix, ctx->iqnsep); /* Diagonalize */
 #if HAM_DEBUG /* Debug block to check T E T_dagger = H_diag and T T_dagger = I */
         if (pscr != NULL) { /* Check pscr was allocated */
           ele = 0.;
@@ -395,69 +401,69 @@ double *egy, *t, *dedp, *pmix;
                  nqnsep, iblk, nsize);
           exit(EXIT_FAILURE);
         }
-      	switch (glob.idiag) { /* Sorting options for eigenvalues/vectors */
+      	switch (ctx->glob.idiag) { /* Sorting options for eigenvalues/vectors */
       	default:  /* idiag = 0: energy sort of subblock (Wang sub-blocks are sorted internally) */
-      	  ordblk(nsize, nsize, iqnsep, t, egy, ibkptr, pmix, idx); /* idx is scratch */
-	        break;
+          ordblk(nsize, nsize, ctx->iqnsep, t, egy, ctx->ibkptr, pmix, ctx->idx); /* idx is scratch */
+          break;
         case 1:  /* projection sort of full block (sort by <K> or similar from pmix) */
           for (i = 0; i <= nsize; ++i) { /* Create identity permutation for full block sort */
-            jdx[i] = (short) i;
+            ctx->jdx[i] = (short)i;
           }
-          ordblk(nsize, nsize, iqnsep, t, egy, jdx, pmix, idx); /* idx is scratch */
+          ordblk(nsize, nsize, ctx->iqnsep, t, egy, ctx->jdx, pmix, ctx->idx); /* idx is scratch */
           break;
         case 2: /* Energy sort within Wang sub-blocks, but ensure it follows original H diagonal order if energies are close */
-          i = ordblk(nsize, nsize, iqnsep, t, egy, ibkptr, pmix, idx); /* Initial sort by energy within sub-blocks */
+          i = ordblk(nsize, nsize, ctx->iqnsep, t, egy, ctx->ibkptr, pmix, ctx->idx); /* Initial sort by energy within sub-blocks */
           if (ODD2(i)) { /* ODD2(i) might mean some degeneracy or near-degeneracy was handled by ordblk */
-            ordham(nsize, iqnsep, dbar, ibkptr, jdx); /* Get permutation jdx based on original H diagonal (dbar) */
-            fixham(nsize, nsize, t, egy, pmix, jdx); /* Apply this permutation */
+            ordham(ctx, nsize, ctx->iqnsep, dbar, ctx->ibkptr, ctx->jdx); /* Get permutation jdx based on original H diagonal (dbar) */
+            fixham(ctx, nsize, nsize, t, egy, pmix, ctx->jdx);       /* Apply this permutation */
           }
           break;
         case 3: /* Sort by tau = Ka-Kc like proxy, within vibrational and spin sub-blocks */
         case 4: /* Sort by K (projection of K^2), within vibrational and spin sub-blocks */
         case 5: /* Sort by original H diagonal, within vibrational and spin sub-blocks */
-          vbkptr = &ibkptr[glob.maxblk]; /* Use area after ibkptr for vibrational sub-block pointers */
+          vbkptr = &(ctx->ibkptr)[ctx->glob.maxblk]; /* Use area after ibkptr for vibrational sub-block pointers */
           nd = 0;
           ivbase = -1; /* Current vibrational state index being processed */
           for (i = 0; i < nsblk; ++i) { /* Determine boundaries of vibrational sub-blocks */
-            ixx = ibkptr[i]; /* Start of current (Wang*spin) sub-block */
+            ixx = ctx->ibkptr[i]; /* Start of current (Wang*spin) sub-block */
             /* Group sub-blocks by common vibrational state (and l-doublet component) */
-            jvbase = (int) ((unsigned) ivs[i] >> 2) - (itau[i] & 1); /* Effective vib index for grouping l-doublets */
+            jvbase = (int) ((unsigned) ctx->ivs[i] >> 2) - (itau[i] & 1); /* Effective vib index for grouping l-doublets */
             if (ivbase != jvbase) { /* If new vibrational group starts */
               vbkptr[nd++] = (short) ixx; /* Store start index of this new group */
               ivbase = jvbase;
             }
           }
           vbkptr[nd] = (short) nsize; /* Mark end of last vibrational group */
-          i = ordblk(nsize, nsize, iqnsep, t, egy, vbkptr, pmix, idx); /* Initial energy sort within these vib groups */
+          i = ordblk(nsize, nsize, ctx->iqnsep, t, egy, vbkptr, pmix, ctx->idx); /* Initial energy sort within these vib groups */
           if ((i & 2) == 0 /* TODO INCLUDE?: && glob.idiag != 4 */) /* If no issues from ordblk, and not K-sort, we might be done */
             break;                            /* For idiag=4 (bestk), always proceed */
-          if (glob.idiag == 5){ /* Sort by original H diagonal within vib groups */
-            ordham(nsize, iqnsep, dbar, vbkptr, idx); /* Get permutation based on H_diag (dbar) within vib groups */
-            fixham(nsize, nsize, t, egy, pmix, idx); /* Apply permutation */
+          if (ctx->glob.idiag == 5){ /* Sort by original H diagonal within vib groups */
+            ordham(ctx, nsize, ctx->iqnsep, dbar, vbkptr, ctx->idx); /* Get permutation based on H_diag (dbar) within vib groups */
+            fixham(ctx, nsize, nsize, t, egy, pmix, ctx->idx);       /* Apply permutation */
             break;
           }
           /* For idiag=3 (tau) or idiag=4 (K) */
           for (i = 0; i < nsblk; ++i) { /* Fill idx with sorting keys (tau values stored in itau earlier) */
             ixx = itau[i];
-            iz = ibkptr[i + 1];
-            for (ii = ibkptr[i]; ii < iz; ++ii) {
-              idx[ii] = (short) ixx; /* Assign sorting key for each basis state */
+            iz = ctx->ibkptr[i + 1];
+            for (ii = ctx->ibkptr[i]; ii < iz; ++ii) {
+              ctx->idx[ii] = (short)ixx; /* Assign sorting key for each basis state */
               ixx += 8; /* Increment key for next basis state in sub-block, arbitrary large step */
             }
           }
-          if (glob.idiag == 4) { /* Sort by K values */
+          if (ctx->glob.idiag == 4) { /* Sort by K values */
             /* bestk calculates K expectation values into wk, gets permutation jdx, applies to t, egy, pmix */
-            bestk(nsize, nsize, iqnsep, vbkptr, idx, jdx, t, egy, pmix, wk);
-            dcopy(nsize, wk, 1, pmix, 1); /* Store K expectation values in pmix */
-            fixham(nsize, nsize, t, egy, pmix, jdx); /* Apply final permutation for K sort */
+            bestk(ctx, nsize, nsize, ctx->iqnsep, vbkptr, ctx->idx, ctx->jdx, t, egy, pmix, ctx->wk);
+            dcopy(nsize, ctx->wk, 1, pmix, 1);       /* Store K expectation values in pmix */
+            fixham(ctx, nsize, nsize, t, egy, pmix, ctx->jdx); /* Apply final permutation for K sort */
             break;
           }
           /* idiag == 3 (tau sort) */
           for (i = 0; i < nsize; ++i) { /* Copy tau keys from idx to wk (double) */
-            wk[i] = (double) idx[i];
+            ctx->wk[i] = (double)ctx->idx[i];
           }
-          ordham(nsize, iqnsep, wk, vbkptr, idx); /* Get permutation based on tau values (in wk) */
-          fixham(nsize, nsize, t, egy, pmix, idx); /* Apply permutation */
+          ordham(ctx, nsize, ctx->iqnsep, ctx->wk, vbkptr, ctx->idx); /* Get permutation based on tau values (in wk) */
+          fixham(ctx, nsize, nsize, t, egy, pmix, ctx->idx);     /* Apply permutation */
           break;
         } /* end switch (glob.idiag) */
       } /* end else (diagonalization requested) */
@@ -476,10 +482,10 @@ double *egy, *t, *dedp, *pmix;
                   /* More likely, this sums P * (d<H>/dP) if eigenvectors are identity (no diagonalization case). */
                   /* If roll=TRUE, it means KROLL modified the H matrix. The derivatives d(H_modified)/dP are being used. */
                   /* This will effectively give the expectation value of H_modified if par are the parameters. */
-      	dcopy(nsize, &zero, 0, egy, 1); /* Zero out energy array */
+      	dcopy(nsize, &ctx->zero, 0, egy, 1); /* Zero out energy array */
 	      for (ipar = npar - 1; ipar >= 0; --ipar) { /* Loop over all parameters */
-	        i = ipder[ipar]; /* Get derivative index */
-	        if (i >= 0) { /* If not a constrained parameter */
+          i = ctx->ipder[ipar];                    /* Get derivative index */
+          if (i >= 0) { /* If not a constrained parameter */
 	          ele = par[ipar]; /* Parameter value */
 	          daxpy(nsize, ele, &dedp[i * ndm], 1, egy, 1); /* egy[k] += par[ipar] * dedp(k, ipar) */
                                                             /* This accumulates Sum_p (P * dE/dP) into egy. If dE/dP are correct first-order derivatives, this would be E. */
@@ -513,13 +519,9 @@ double *egy, *t, *dedp, *pmix;
  * @param par Parameter value (aden or bden if neuler is odd).
  * @return int Number of non-zero elements after transformation (ncos), or 0 if transformation results in zero.
  */
-int specop(neuler, newblk, nsqj, ikq, ksi, ksj, ni, nj, ncos, wk, ix, jx, par)
-const int neuler, ksi, ksj, ni, nj, ncos;
-int *nsqj, *ikq;
-BOOL *newblk;
-double *wk;
-const double par;
-const short *ix, *jx;
+int specop(struct SpinvContext *ctx, const int neuler, BOOL *newblk, int *nsqj, int *ikq,
+           const int ksi, const int ksj, const int ni, const int nj, const int ncos,
+           double *wk, const short *ix, const short *jx, const double par)
 {
 #define NSPOP 5 /* Number of Euler series denominators (a_n, b_n up to n=4, since ist = (neuler-2)/2) */
   static double aden[NSPOP], bden[NSPOP]; /* Denominators 'a' and 'b' for Euler series */
@@ -528,7 +530,8 @@ const short *ix, *jx;
   int i_elem, nkq, nkq0, nnq, nnq0, ki, kj, ist; /* i_elem: loop counter; nkq,nkq0: K^2 power current,original; nnq,nnq0: N(N+1) power current,original; ki,kj: K_bra,K_ket for current element; ist: Euler series index (0 to NSPOP-1) */
   unsigned int ipwr; /* Loop counter for applying powers */
 
-  if (*newblk) { /* If new vibrational block, reset denominators */
+  if (*newblk)
+  { /* If new vibrational block, reset denominators */
     for (i_elem = 0; i_elem < NSPOP; ++i_elem) {
       aden[i_elem] = 0.;
       bden[i_elem] = 0.;
@@ -649,10 +652,9 @@ const short *ix, *jx;
  * @param jx Array of column indices (relative to sub-block start).
  * @return int Always 0.
  */
-int specfc(ifc, iv, jv, kdel, ksi, ksj, ncos, wk, ix, jx)
-const int ifc, iv, jv, kdel, ksi, ksj, ncos;
-double *wk;
-const short *ix, *jx;
+int specfc(struct SpinvContext *ctx, const int ifc, const int iv, const int jv,
+           const int kdel, const int ksi, const int ksj, const int ncos,
+           double *wk, const short *ix, const short *jx)
 {
   static double pfac[MAXVIB];  /* Stores rho_v * pi/3 for each vibrational state v */
   static short ipfac[MAXVIB]; /* Stores sign flag for rho_v (1 if original rho_v was negative) */
@@ -679,7 +681,7 @@ const short *ix, *jx;
   if (fourier_order_n < 0) /* Negative ifc indicates sine series */
     fourier_order_n = -1 - fourier_order_n; /* Map to positive index for series order, e.g. -1 -> 0, -2 -> 1 */
 
-  is_g12_term_active = glob.g12 & fourier_order_n; /* Check if G12 symmetry term (-1)^K is active for this Fourier order */
+  is_g12_term_active = ctx->glob.g12 & fourier_order_n; /* Check if G12 symmetry term (-1)^K is active for this Fourier order */
                                                /* glob.g12 is likely 1 if G12 option active, 0 otherwise. */
                                                /* This makes is_g12_term_active = 1 if G12 active AND fourier_order_n is odd, else 0. */
                                                /* However, the doc says "if K is odd", not if fourier_order_n is odd. This might be a simplified check. */
@@ -745,17 +747,15 @@ const short *ix, *jx;
  * @return int 0 if N values were reset, or -sznz if N values were changed for an operation.
  *         Returns 0 (and does nothing) if the operation is invalid (e.g., N becomes <0).
  */
-int sznzfix(sznz, ni, nj, ixcom, jxcom, iscom, jscom)
-const int sznz; /* sznz_operator_type_flag */
-const int ni, nj; /* N_bra, N_ket (original, before modification by this call) */
-int *ixcom, *jxcom, *iscom, *jscom;
+int sznzfix(struct SpinvContext *ctx, const int sznz, const int ni, const int nj,
+            int *ixcom, int *jxcom, int *iscom, int *jscom)
 {
   if (sznz <= 0) { /* Negative or zero sznz means reset N to original values */
     if (sznz <= -4) { /* Reset ket side (nj) */
-      jscom[nspin] = nj << 1; /* jscom[nspin] stores 2*N_ket */
+      jscom[ctx->nspin] = nj << 1; /* jscom[nspin] stores 2*N_ket */
       jxcom[XNVAL] = nj;
     } else { /* Reset bra side (ni) or both if sznz == 0 (no-op but resets state) */
-      iscom[nspin] = ni << 1; /* iscom[nspin] stores 2*N_bra */
+      iscom[ctx->nspin] = ni << 1; /* iscom[nspin] stores 2*N_bra */
       ixcom[XNVAL] = ni;
     }
     return 0; /* Return 0 to indicate reset */
@@ -768,25 +768,25 @@ int *ixcom, *jxcom, *iscom, *jscom;
     case 2: /* Operator like N_-, changes N_bra to N_bra-1 */
       if (ni <= 0) /* N_bra cannot be 0 or less to decrease */ /* Original check ni <=1, N=0 means N_z is usually 0 */
         return 0;
-      iscom[nspin] -= 2; /* iscom[nspin] is 2*N_bra, so decrement by 2*(1) */
+      iscom[ctx->nspin] -= 2; /* iscom[nspin] is 2*N_bra, so decrement by 2*(1) */
       --ixcom[XNVAL];    /* Decrement N_bra in quantum block */
       break;
     case 3: /* Operator like N_+, changes N_bra to N_bra+1 */
       if (ni < 0) /* N_bra cannot be negative */ /* Original check ni <=0, but N=0 can be raised */
         return 0;
-      iscom[nspin] += 2;
+      iscom[ctx->nspin] += 2;
       ++ixcom[XNVAL];
       break;
     case 4: /* Operator like N_-, changes N_ket to N_ket-1 (from ket perspective) */
       if (nj <= 0) /* N_ket cannot be 0 or less to decrease */ /* Original check nj <=1 */
         return 0;
-      jscom[nspin] -= 2;
+      jscom[ctx->nspin] -= 2;
       --jxcom[XNVAL];
       break;
     case 5: /* Operator like N_+, changes N_ket to N_ket+1 (from ket perspective) */
       if (nj < 0) /* N_ket cannot be negative */ /* Original check nj <= 0 */
         return 0;
-      jscom[nspin] += 2;
+      jscom[ctx->nspin] += 2;
       ++jxcom[XNVAL];
       break;
     default: /* Unknown sznz type */
@@ -810,11 +810,9 @@ int *ixcom, *jxcom, *iscom, *jscom;
  * @param jx Array of column indices (relative to sub-block start).
  * @return int Always 0.
  */
-int sznzop(ni, nj, ksi, ksj, iscom, jscom, ncos, wk, ix, jx)
-const int ni, nj, ksi, ksj, ncos;
-const int *iscom, *jscom;
-double *wk;
-const short *ix, *jx;
+int sznzop(struct SpinvContext *ctx, const int ni, const int nj, const int ksi,
+           const int ksj, const int *iscom, const int *jscom, const int ncos,
+           double *wk, const short *ix, const short *jx)
 {
   int iflg_n_change_type, i_elem, k_val, kk_val, n_bra_times_2, n_ket_times_2, n_bra_orig_times_2, n_ket_orig_times_2, j_qn_times_2, spin_qn_times_2; /* Renamed iflg, i, k, kk, nni, nnj, nni0, nnj0, jj, iis */
   double val_bra, val_ket, current_wk_element, sum_contrib; /* Renamed vali, valj, twk, sum */
@@ -823,11 +821,11 @@ const short *ix, *jx;
     return 0;
 
   n_bra_times_2 = ni << 1; /* Current 2*N_bra (possibly modified by sznzfix) */
-  n_bra_orig_times_2 = iscom[nspin]; /* Original 2*N_bra from spin table */
+  n_bra_orig_times_2 = iscom[ctx->nspin];      /* Original 2*N_bra from spin table */
   val_bra = (double) (n_bra_orig_times_2 + 1); /* Factor related to (2N_orig+1) */
 
   n_ket_times_2 = nj << 1; /* Current 2*N_ket */
-  n_ket_orig_times_2 = jscom[nspin]; /* Original 2*N_ket */
+  n_ket_orig_times_2 = jscom[ctx->nspin];      /* Original 2*N_ket */
   val_ket = (double) (n_ket_orig_times_2 + 1); /* Factor related to (2N_orig_ket+1) */
 
   if (n_bra_times_2 != n_bra_orig_times_2) { /* If N_bra was changed by sznzfix (e.g. N -> N-1) */
@@ -843,7 +841,7 @@ const short *ix, *jx;
   /* Calculate ket-side Wigner coefficient part (if N_ket is involved or N_bra is not changed) */
   if (iflg_n_change_type <= 0) {
     j_qn_times_2 = jscom[0];         /* 2*J_ket */
-    spin_qn_times_2 = jscom[nspin + 1]; /* 2*S_ket (first spin) */
+    spin_qn_times_2 = jscom[ctx->nspin + 1]; /* 2*S_ket (first spin) */
     /* Phase factor related to K_ket and angular momenta values */
     k_val = ksj + ksj + n_ket_orig_times_2 + n_ket_times_2 + j_qn_times_2 + spin_qn_times_2;
     if ((k_val & 3) != 0) /* Check parity of sum of (2K_ket + 2N_orig_ket + 2N_final_ket + 2J_ket + 2S_ket), effectively a phase */
@@ -854,7 +852,7 @@ const short *ix, *jx;
   /* Calculate bra-side Wigner coefficient part (if N_bra is involved or N_ket is not changed) */
   if (iflg_n_change_type >= 0) {
     j_qn_times_2 = iscom[0];         /* 2*J_bra */
-    spin_qn_times_2 = iscom[nspin + 1]; /* 2*S_bra */
+    spin_qn_times_2 = iscom[ctx->nspin + 1]; /* 2*S_bra */
     k_val = ksi + ksi + n_bra_orig_times_2 + n_bra_times_2 + j_qn_times_2 + spin_qn_times_2;
     if ((k_val & 3) != 0)
       val_bra = -val_bra;
@@ -889,9 +887,8 @@ const short *ix, *jx;
  * @param jxcom_ket Quantum number block for the ket state.
  * @return double The N-dependent correction factor. Returns 0 if selection rules violated.
  */
-double rmatrx(dir_cos_order, vib_tensor_order, ixcom_bra, jxcom_ket) /* Renamed ld, lv, ixcom, jxcom */
-const int dir_cos_order, vib_tensor_order;             /* Renamed ld, lv */
-const int *ixcom_bra, *jxcom_ket; /* Renamed ixcom, jxcom */
+double rmatrx(struct SpinvContext *ctx, const int dir_cos_order, const int vib_tensor_order,
+              const int *ixcom_bra, const int *jxcom_ket) /* Renamed ld, lv, ixcom, jxcom */
 {
   double delta_N_sq, n_sum_sq, N_val_as_double, n_sum_plus_1_as_double, factor;            /* Renamed dlsq, dnsq, dn, del, tmp */
   int n_sum_val, n_diff_val, N_bra_val, N_ket_val, min_tensor_order, current_tensor_order; /* Renamed nsum, ndif, ni, nj, lmin, lt */
@@ -960,16 +957,15 @@ const int *ixcom_bra, *jxcom_ket; /* Renamed ixcom, jxcom */
  * @param matrix_element_factor Pointer to the matrix element factor to be modified. Renamed zval.
  * @return int Always 0.
  */
-int symnsq(n_sq_power, n_s_power, iscom_bra_qns, jscom_ket_qns, matrix_element_factor) /* Renamed parameters */
-const int n_sq_power, n_s_power, *iscom_bra_qns, *jscom_ket_qns; /* Renamed inq, ins, iscom, jscom */
-double *matrix_element_factor;                 /* Renamed zval */
+int symnsq(struct SpinvContext *ctx, const int n_sq_power, const int *n_s_power,
+           const int *iscom_bra_qns, const int *jscom_ket_qns, double *matrix_element_factor) /* Renamed parameters */
 {
   double n_n_plus_1_power_factor, dot_N_S_bra, dot_N_S_ket, factor_bra_side, factor_ket_side;          /* Renamed x, dotns, dotnsp, zr, zl */
   int delta_2N, first_spin_qn_bra_times_2, N_bra_times_2, N_ket_times_2, J_bra_times_2, J_ket_times_2; /* Renamed modf, ispn, nni, nnj, j */
   unsigned int current_power;                                                                          /* Renamed ipwr */
 
-  N_bra_times_2 = iscom_bra_qns[nspin];
-  N_ket_times_2 = jscom_ket_qns[nspin];
+  N_bra_times_2 = iscom_bra_qns[ctx->nspin];
+  N_ket_times_2 = jscom_ket_qns[ctx->nspin];
   delta_2N = N_bra_times_2 - N_ket_times_2; /* 2*(N_bra - N_ket) */
   if (n_sq_power <= 0)                      /* If no N(N+1) power, delta_2N is effectively 0 for N(N+1) part */
     delta_2N = 0;
@@ -1005,14 +1001,14 @@ double *matrix_element_factor;                 /* Renamed zval */
   if (n_s_power > 0)
   {                                                                                                                                  /* If N.S term is present */
     J_bra_times_2 = iscom_bra_qns[0];                                                                                                /* 2*J_bra */
-    first_spin_qn_bra_times_2 = iscom_bra_qns[nspin + 1];                                                                            /* 2*S_bra */
+    first_spin_qn_bra_times_2 = iscom_bra_qns[ctx->nspin + 1];                                                                       /* 2*S_bra */
     n_n_plus_1_power_factor = (double)(first_spin_qn_bra_times_2 * (first_spin_qn_bra_times_2 + 2));                                 /* 4*S(S+1) for bra */
     dot_N_S_bra = 0.125 * ((J_bra_times_2 - N_bra_times_2) * (double)(J_bra_times_2 + N_bra_times_2 + 2) - n_n_plus_1_power_factor); /* (J(J+1) - N(N+1) - S(S+1))/2 for bra, times 1/4 from 2J etc. */
                                                                                                                                      /* Actual formula: (J(J+1) - N(N+1) -S(S+1))/2. Here terms are 2X, so ( (2J)(2J+2)/4 - (2N)(2N+2)/4 - (2S)(2S+2)/4 )/2 */
                                                                                                                                      /* = ( J(J+1) - N(N+1) - S(S+1) ) / 2. The 0.125 factor comes from (2X)(2X+2) = 4X(X+1). So (4J(J+1) - 4N(N+1) - 4S(S+1))/8. */
 
     J_ket_times_2 = jscom_ket_qns[0];                                                                /* 2*J_ket */
-    first_spin_qn_bra_times_2 = jscom_ket_qns[nspin + 1];                                            /* 2*S_ket (reused variable name is for S_ket here) */
+    first_spin_qn_bra_times_2 = jscom_ket_qns[ctx->nspin + 1];                                       /* 2*S_ket (reused variable name is for S_ket here) */
     n_n_plus_1_power_factor = (double)(first_spin_qn_bra_times_2 * (first_spin_qn_bra_times_2 + 2)); /* 4*S(S+1) for ket */
     dot_N_S_ket = 0.125 * ((J_ket_times_2 - N_ket_times_2) * (double)(J_ket_times_2 + N_ket_times_2 + 2) - n_n_plus_1_power_factor);
 
@@ -1045,10 +1041,9 @@ double *matrix_element_factor;                 /* Renamed zval */
  * @param col_indices Array of column indices (relative to sub-block start). Renamed jx.
  * @return int Number of non-zero elements (num_elements if any K values are non-zero, 0 otherwise if all K=0).
  */
-int symksq(k_sq_power, K_bra_start, K_ket_start, num_elements, work_array_elements, row_indices, col_indices) /* Renamed parameters */
-const int k_sq_power, K_bra_start, K_ket_start, num_elements; /* Renamed ikq, ksi, ksj, n */
-double *work_array_elements;                /* Renamed wk */
-short *row_indices, *col_indices;           /* Renamed ix, jx */
+int symksq(struct SpinvContext *ctx, const int k_sq_power, const int K_bra_start,
+           const int K_ket_start, const int num_elements, double *work_array_elements,
+           short *row_indices, short *col_indices) /* Renamed parameters */
 {
   double k_sq_bra_factor, k_sq_ket_factor, element_bra_part, element_ket_part; /* Renamed akisq, akjsq, xi, xj */
   int i_elem, K_bra_element, K_ket_element, non_zero_found_flag;               /* Renamed i, ki, kj, zflg */
@@ -1121,12 +1116,8 @@ short *row_indices, *col_indices;           /* Renamed ix, jx */
  *                   0 if Op is general sparse.
  * @return int Always 0.
  */
-int dpmake(nsize, dp, t, n, wk, idx, jdx, isunit)
-    const int nsize,
-    n, isunit;
-double *dp;
-const double *t, *wk;
-const short *idx, *jdx;
+int dpmake(struct SpinvContext *ctx, const int nsize, double *dp, const double *t,
+           const int n, const double *wk, const short *idx, const short *jdx, const int isunit)
 { /*  find derivative contribution from sub-diagonal */
   const double *pt;
   double ele, tz;
@@ -1157,7 +1148,7 @@ const short *idx, *jdx;
   }
   else
   {
-    dcopy(nsize, &zero, 0, dp, 1);
+    dcopy(nsize, &ctx->zero, 0, dp, 1);
     for (i = 0; i < n; ++i)
     {
       iz = idx[i];

@@ -25,6 +25,7 @@ getqn(): Gets the full list of quantum numbers for a specific final state index.
 #include "calpgm.h"
 #include "spinit.h"
 #include "spinv_internal.h"
+#include "SpinvContext.hpp"
 
 /**
  * @brief Parses the non-vibrational part of a BCD parameter identifier into a SPAR structure.
@@ -38,10 +39,7 @@ getqn(): Gets the full list of quantum numbers for a specific final state index.
  * @return int The next itp_subtype_in value to use for further calls (if more sub-operators exist for this ID),
  *             or 0 if no more sub-operators for this BCD ID or if an invalid combination is encountered.
  */
-int idpari(idval, itp, pspar)
-bcd_t *idval;
-int itp;
-SPAR *pspar;
+int idpari(struct SpinvContext *ctx, bcd_t *idval, int itp, SPAR *pspar)
 {
   /* subroutine to parse parameter identifier for complex parameter type */
   /*     on entry: */
@@ -87,9 +85,9 @@ SPAR *pspar;
   ibtmp = idval[2];
   ins = (int)(ibtmp & 0x0f);
   si1 = (int)(ibtmp >> 4);
-  if (ins > 0 && nspin == 0)
+  if (ins > 0 && ctx->nspin == 0)
     return 0;
-  if (ins >= 5 && itsym == 0)
+  if (ins >= 5 && ctx->itsym == 0)
     return 0;
   ibtmp = idval[3];
   si2 = (int)(ibtmp & 0x0f);
@@ -103,7 +101,7 @@ SPAR *pspar;
     if (si2 == 0)
       si2 = -1;
   }
-  if (si1 > nspin)
+  if (si1 > ctx->nspin)
     return 0;
   if (ity > 90)
   {
@@ -154,14 +152,14 @@ SPAR *pspar;
     {
       if (ins >= 5)
         iphaz -= 1;
-      else if (glob.nitot >= 3)
+      else if (ctx->glob.nitot >= 3)
         iphaz -= 5;
     }
     else
     {
       if (ins >= 5)
         iphaz = 4; /* iphaz = 4,3,2,1,0 */
-      if (glob.nitot >= 3)
+      if (ctx->glob.nitot >= 3)
         iphaz += 15;
     }
     if (ity == 0)
@@ -171,8 +169,8 @@ SPAR *pspar;
     else if (ity <= 3)
     {
       itp = ity;
-      if (glob.oblate)
-        itp = revsym[itp];
+      if (ctx->glob.oblate)
+        itp = ctx->revsym[itp];
       itp += 2;
       /*  ITP=3,4,5 for A,B,C */
       if (itp == 3 && si1 == 0)
@@ -196,13 +194,13 @@ SPAR *pspar;
   }
   else if (isy > 0)
   {
-    if (glob.oblate)
+    if (ctx->glob.oblate)
     {
-      itysav += (revsym[isy] - isy) * 200;
+      itysav += (ctx->revsym[isy] - isy) * 200;
     }
     else
     {
-      isy = revsym[isy];
+      isy = ctx->revsym[isy];
     }
   }
   pspar->ipsym = (unsigned int)isy;
@@ -338,39 +336,39 @@ SPAR *pspar;
  * @param k_avg_out Output: K_avg value if applicable. Renamed kavg.
  * @return int Flags from the pspar structure.
  */
-int idpars(pspar, ksq_out, itp_out, tensor_order_N_out, dir_cos_order_out, k_delta_out, n_dot_s_power_out, spin1_idx_out, spin2_idx_out, sznz_type_out,
-  fourier_coeff_idx_out, alpha_sym_out, l_delta_out, k_avg_out) /* Renamed parameters for clarity */
-SPAR *pspar;
-int *ksq_out, *itp_out, *tensor_order_N_out, *dir_cos_order_out, *k_delta_out, *n_dot_s_power_out, *spin1_idx_out, *spin2_idx_out, *sznz_type_out; /* Renamed parameters */
-int *fourier_coeff_idx_out, *alpha_sym_out, *l_delta_out, *k_avg_out; /* Renamed parameters */
+int idpars(struct SpinvContext *ctx, SPAR *pspar, int *ksq_out, int *itp_out,
+           int *tensor_order_N_out, int *dir_cos_order_out, int *k_delta_out,
+           int *n_dot_s_power_out, int *spin1_idx_out, int *spin2_idx_out,
+           int *sznz_type_out, int *fourier_coeff_idx_out, int *alpha_sym_out,
+           int *l_delta_out, int *k_avg_out) /* Renamed parameters for clarity */
 {
-/*     subroutine to parse parameter identifiers to subfields */ /* Original comment */
-/*     on entry: */ /* Original comment */
-/*         IDPAR= 10*( parameter ID/1000) + ITP */ /* Original comment - this refers to an older BCD packing, now fields are directly in pspar */
-/*     on return: */ /* Original comment */
-/*         KSQ= power of K*K */ /* Original comment */
-/*         ITP= parameter subtype */ /* Original comment - now pspar->euler is primary type, itp_out is that */
-/*         LN= tensor order */ /* Original comment */
-/*         LD= order of direction cosine ( L <= LD ) */ /* Original comment */
-/*         KDEL= change in K */ /* Original comment */
-/*         INS=power of N.S */ /* Original comment */
-/*         SI1,SI2=spin identifiers */ /* Original comment */
-int flags_return; /* Renamed iret */
-*ksq_out = (int) pspar->ksq;
-*itp_out = (int) pspar->euler; /* This is the primary Euler type/flag now */
-*tensor_order_N_out = (int) pspar->mln;
-*dir_cos_order_out = (int) pspar->mld;
-*k_delta_out = (int) pspar->mkdel;
-*n_dot_s_power_out = (int) pspar->mins;
-*spin1_idx_out = (int) pspar->msi1;
-*spin2_idx_out = (int) pspar->msi2;
-*sznz_type_out = (int) pspar->msznz;
-*fourier_coeff_idx_out = (int) pspar->fc;
-*alpha_sym_out = (int)pspar->alpha;
-*l_delta_out = (int)pspar->mldel;
-*k_avg_out = (int)pspar->kavg;
-flags_return = (int)pspar->flags;
-return flags_return;
+  /*     subroutine to parse parameter identifiers to subfields */ /* Original comment */
+  /*     on entry: */ /* Original comment */
+  /*         IDPAR= 10*( parameter ID/1000) + ITP */ /* Original comment - this refers to an older BCD packing, now fields are directly in pspar */
+  /*     on return: */ /* Original comment */
+  /*         KSQ= power of K*K */ /* Original comment */
+  /*         ITP= parameter subtype */ /* Original comment - now pspar->euler is primary type, itp_out is that */
+  /*         LN= tensor order */ /* Original comment */
+  /*         LD= order of direction cosine ( L <= LD ) */ /* Original comment */
+  /*         KDEL= change in K */ /* Original comment */
+  /*         INS=power of N.S */ /* Original comment */
+  /*         SI1,SI2=spin identifiers */ /* Original comment */
+  int flags_return; /* Renamed iret */
+  *ksq_out = (int) pspar->ksq;
+  *itp_out = (int) pspar->euler; /* This is the primary Euler type/flag now */
+  *tensor_order_N_out = (int) pspar->mln;
+  *dir_cos_order_out = (int) pspar->mld;
+  *k_delta_out = (int) pspar->mkdel;
+  *n_dot_s_power_out = (int) pspar->mins;
+  *spin1_idx_out = (int) pspar->msi1;
+  *spin2_idx_out = (int) pspar->msi2;
+  *sznz_type_out = (int) pspar->msznz;
+  *fourier_coeff_idx_out = (int) pspar->fc;
+  *alpha_sym_out = (int)pspar->alpha;
+  *l_delta_out = (int)pspar->mldel;
+  *k_avg_out = (int)pspar->kavg;
+  flags_return = (int)pspar->flags;
+  return flags_return;
 } /* idpars */
 
 /**
@@ -382,10 +380,7 @@ return flags_return;
  * @param output_factors_array Output: Array to store the calculated factors ff[K] = sqrt(N(N+1)-K(K-1)).
  * @return int Always 0.
  */
-int ffcal(nff, kff, ff)
-    const int nff,
-    kff;
-double *ff;
+int ffcal(struct SpinvContext *ctx, const int nff, const int kff, double *ff)
 {
   static int nlast = -1;
   static int klast = 0;
@@ -430,12 +425,8 @@ double *ff;
  * @return int (2*F_upper + 1) if transitions are allowed and calculated, 0 otherwise.
  *         Effectively, the degeneracy of the upper F state.
  */
-int intens(iblk, isiz, jblk, jsiz, ndip, idip, dip, s)
-    const int iblk,
-    isiz, jblk, jsiz, ndip;
-const bcd_t *idip;
-const double *dip;
-double *s;
+int intens(struct SpinvContext *ctx, const int iblk, const int isiz, const int jblk,
+           const int jsiz, const int ndip, const bcd_t *idip, const double *dip, double *s)
 {
   /*  function to calculate intensities */
   /*     on entry: */
@@ -457,22 +448,22 @@ double *s;
   int ivv, jvv, ixx, jxx, ifc, ksym, kl, ioff, joff, alpha, nitot, dipoff;
   bcd_t bijv1, bijv2, bijv3;
 
-  if (ndmx <= 0)
+  if (ctx->ndmx <= 0)
   {
     puts("working vectors not allocated");
     exit(EXIT_FAILURE);
   }
   dipoff = idipoff;
-  if (dipoff >= nddip)
+  if (dipoff >= ctx->nddip)
     dipoff = 0;
   idipoff = dipoff + ndip;
   iret = 0;
-  cgetv[0].cblk = 0;
-  cgetv[1].cblk = 0;
+  ctx->cgetv[0].cblk = 0;
+  ctx->cgetv[1].cblk = 0;
   /*     get quantum information */
-  nblki = getqq(iblk, &iff, iwt, ibkptr, ikmin, ivs);
-  ioff = glob.maxblk;
-  nblkj = getqq(jblk, &jff, jwt, &ibkptr[ioff], &ikmin[ioff], &ivs[ioff]);
+  nblki = getqq(ctx, iblk, &iff, iwt, ctx->ibkptr, ctx->ikmin, ctx->ivs);
+  ioff = ctx->glob.maxblk;
+  nblkj = getqq(ctx, jblk, &jff, jwt, &(ctx->ibkptr)[ioff], &(ctx->ikmin)[ioff], &(ctx->ivs)[ioff]);
   ixx = iff - jff;
   if (ixx < -2 || ixx > 2)
     return 0;
@@ -481,38 +472,38 @@ double *s;
     return 0;
   if (iwt[3] != jwt[3])
     return 0;
-  if (checkwt(iwt, jwt) != 0)
+  if (checkwt(ctx, iwt, jwt) != 0)
     return 0;
-  nitot = glob.nitot;
+  nitot = ctx->glob.nitot;
   alpha = 0;
   bijv3 = (bcd_t)0;
   /* clear dipole matrix */
   dclr(isiz, jsiz, s, 1);
   /* loop over sub-blocks */
   ndms = isiz;
-  ndecv = glob.vibdec;
+  ndecv = ctx->glob.vibdec;
   nbcd = (int)idip[0] & 0x7f;
   for (ixx = 0; ixx < nblki; ++ixx)
   {
-    ibase = ibkptr[ixx];
-    n = ibkptr[ixx + 1] - ibase;
-    kbgni = ikmin[ixx];
-    ixtmp = ivs[ixx];
-    getqs(ixtmp, iff, n, kbgni, ixcom, iscom, &ivv);
-    nni = iscom[0];
+    ibase = ctx->ibkptr[ixx];
+    n = ctx->ibkptr[ixx + 1] - ibase;
+    kbgni = ctx->ikmin[ixx];
+    ixtmp = ctx->ivs[ixx];
+    getqs(ctx, ixtmp, iff, n, kbgni, ctx->ixcom, ctx->iscom, &ivv);
+    nni = ctx->iscom[0];
     for (jxx = 0; jxx < nblkj; ++jxx)
     {
       joff = jxx + ioff;
-      jbase = ibkptr[joff];
-      n = ibkptr[joff + 1] - jbase;
-      kbgnj = ikmin[joff];
-      ixtmp = ivs[joff];
-      getqs(ixtmp, jff, n, kbgnj, jxcom, jscom, &jvv);
-      nnj = jscom[0];
+      jbase = ctx->ibkptr[joff];
+      n = ctx->ibkptr[joff + 1] - jbase;
+      kbgnj = ctx->ikmin[joff];
+      ixtmp = ctx->ivs[joff];
+      getqs(ctx, ixtmp, jff, n, kbgnj, ctx->jxcom, ctx->jscom, &jvv);
+      nnj = ctx->jscom[0];
       nx = ((nni > nnj) ? nni : nnj) >> 1;
       i = (ivv < jvv) ? ivv : jvv;
-      ijv = (unsigned int)(ivv + jvv + i * glob.vibfac);
-      ijv = (ijv << 2) + blksym(ixcom, jxcom);
+      ijv = (unsigned int)(ivv + jvv + i * ctx->glob.vibfac);
+      ijv = (ijv << 2) + blksym(ctx, ctx->ixcom, ctx->jxcom);
       bijv1 = (bcd_t)ijv;
       bijv2 = (bcd_t)(ijv >> 8);
       if (ndecv == 3)
@@ -526,7 +517,7 @@ double *s;
           continue;
         if (bijv3 != idip[ibcd + 3])
           continue;
-        pdip = &dipinfo[dipoff + i];
+        pdip = &(ctx->dipinfo)[dipoff + i];
         kl = pdip->flg;
         if (TEST(kl, MINOQ) && nni == nnj)
           continue;
@@ -554,17 +545,17 @@ double *s;
             alpha = 0;
           }
           /*  find matrix elements */
-          mkd = getmask(ixcom, jxcom, kd, ldel, kl, alpha);
+          mkd = getmask(ctx, ctx->ixcom, ctx->jxcom, kd, ldel, kl, alpha);
           if (mkd == 0)
             continue;
-          npair = getll(2, ld, lv, kd, si1, si2, lscom, iscom, jscom);
+          npair = getll(ctx, 2, ld, lv, kd, si1, si2, ctx->lscom, ctx->iscom, ctx->jscom);
           if (npair < 0)
             continue;
           ifup = TEST(kl, MDIPI) ? -1 : 1;
           isunit = (int)pdip->kavg;
           if (isunit > nx)
             continue;
-          ncos = dircos(ixcom, jxcom, ld, kd, ndmx, wk, idx, jdx,
+          ncos = dircos(ctx, ctx->ixcom, ctx->jxcom, ld, kd, ctx->ndmx, ctx->wk, ctx->idx, ctx->jdx,
                         ifup, kl, mkd, &isunit);
           if (ncos == 0)
             continue;
@@ -589,7 +580,7 @@ double *s;
             dd *= k;
             break;
           case 4:
-            symksq(1, kbgni, kbgnj, ncos, wk, idx, jdx);
+            symksq(ctx, 1, kbgni, kbgnj, ncos, ctx->wk, ctx->idx, ctx->jdx);
             break;
           case 5:
           case 11:
@@ -618,19 +609,19 @@ double *s;
           case 7:
           case 8:
           case 12:
-            specfc(ifc, ivv, jvv, kd, kbgni, kbgnj, ncos, wk, idx, jdx);
+            specfc(ctx, ifc, ivv, jvv, kd, kbgni, kbgnj, ncos, ctx->wk, ctx->idx, ctx->jdx);
             break;
           }
           /*  correct for reduced matrix of N */
           if (ld != lv)
-            dd *= rmatrx(ld, lv, ixcom, jxcom);
+            dd *= rmatrx(ctx, ld, lv, ctx->ixcom, ctx->jxcom);
           /*  couple dipoles through the spins */
-          tensor(&dd, iscom, jscom, lscom, ismap, npair, alpha);
+          tensor(ctx, &dd, ctx->iscom, ctx->jscom, ctx->lscom, ctx->ismap, npair, alpha);
           for (k = 0; k < ncos; ++k)
           {
-            ix = idx[k] + ibase;
-            jx = jdx[k] + jbase;
-            s[ix + jx * ndms] += dd * wk[k];
+            ix = ctx->idx[k] + ibase;
+            jx = ctx->jdx[k] + jbase;
+            s[ix + jx * ndms] += dd * ctx->wk[k];
           }
           iret = iff + 1;
         } while (--ksym >= 0);
@@ -659,15 +650,9 @@ double *s;
  *                                Output is 1 if operator is effectively a unit matrix (K-independent), 0 otherwise.
  * @return int Number of non-zero direction cosine elements calculated. Returns negative of deficit if max_elements_out is too small.
  */
-int dircos(xbra, xket, ld, kd, ncmax, direl, ibra, iket, ifup, loff, mask,
-           isunit)
-    const int *xbra,
-    *xket;
-const int ld, kd, ncmax, ifup, loff;
-int mask;
-double *direl;
-short *ibra, *iket;
-int *isunit;
+int dircos(struct SpinvContext *ctx, const int *xbra, const int *xket, const int ld, const int kd,
+           const int ncmax, double *direl, short *ibra, short *iket, const int ifup, const int loff,
+           int mask, int *isunit)
 { /*  SUBROUTINE TO  CALCULATE DIRECTION COSINE ELEMENTS */
 /* XBRA,XKET INTEGER VECTORS CONTAINING: */
 /*           0: DIMENSION OF SUB-BLOCK */
@@ -746,7 +731,7 @@ int *isunit;
   /****** set up state phases, isum is power of i */
   isrev = isym >> 1;
   /* isym is odd if operator is imaginary */
-  isum = ixphase[isket] - ixphase[isbra] + (isym & 1);
+  isum = ctx->ixphase[isket] - ctx->ixphase[isbra] + (isym & 1);
   if (ifup < 0) /* correct to make dipoles real */
     ++isum;
   if (ODD(isum) && xbra[XVIB] < xket[XVIB])
@@ -847,7 +832,7 @@ int *isunit;
   else
   {
     k = kbra0 + ikdel + ((nsbra - 1) << 1);
-    ffcal(nbra, k, ff);
+    ffcal(ctx, nbra, k, ff);
     kkdel = ld;
   }
   kdel2 = kkdel + kkdel;
@@ -1136,10 +1121,8 @@ int *isunit;
  * @param vib_idx_out Output vibrational state index. Renamed iv.
  * @return int Spin pattern index (ispx) for this state.
  */
-int getqs(im, iff, nsiz, kbgn, ixcom, iscom, iv)
-    const int im,
-    iff, nsiz, kbgn;
-int *ixcom, *iscom, *iv;
+int getqs(struct SpinvContext *ctx, const int im, const int iff, const int nsiz,
+          const int kbgn, int *ixcom, int *iscom, int *iv)
 {
   /*     subroutine to get quanta corresponding to sub-block */
   /*     on entry: */
@@ -1168,9 +1151,9 @@ int *ixcom, *iscom, *iv;
   unsigned int mvs;
 
   mvs = (unsigned int)im;
-  ispx = (int)(mvs >> glob.msshft);
-  iiv = (int)(mvs >> 2) & glob.msmask;
-  pvinfo = &vinfo[iiv];
+  ispx = (int)(mvs >> ctx->glob.msshft);
+  iiv = (int)(mvs >> 2) & ctx->glob.msmask;
+  pvinfo = &(ctx->vinfo)[iiv];
   iis = pvinfo->spt;
   nset = iis[0];
   jjs = &iis[nset * ispx];
@@ -1180,7 +1163,7 @@ int *ixcom, *iscom, *iv;
   ixcom[XDIM] = nsiz;
   ixcom[XSYM] = i; /* find symmetry */
   if (nsiz < 0)
-    setgsym((int)pvinfo->gsym);
+    setgsym(ctx, (int)pvinfo->gsym);
   k = kbgn;
   if (k < 0)
   {
@@ -1203,12 +1186,12 @@ int *ixcom, *iscom, *iv;
   if (i != 0 || k != 0)
     i = 1;
   ixcom[XIQN] = i;
-  if (nspin == 0)
+  if (ctx->nspin == 0)
     return 1;
   nspinv = nset - 1;
-  if (nspinv > nspin)
-    nspinv = nspin;
-  isscom = &iscom[nspin];
+  if (nspinv > ctx->nspin)
+    nspinv = ctx->nspin;
+  isscom = &iscom[ctx->nspin];
   isscom[0] = iscom[0];
   for (i = 1; i < nspinv; ++i)
   {
@@ -1217,33 +1200,33 @@ int *ixcom, *iscom, *iv;
   }
   iscom[i - 1] = iff;
   isscom[i] = iis[i];
-  while (i < nspin)
+  while (i < ctx->nspin)
   {
     ++i;
     iscom[i - 1] = iff;
     isscom[i] = 0;
   }
-  if (glob.nitot > 0)
+  if (ctx->glob.nitot > 0)
   {
-    if (glob.nitot >= 3)
+    if (ctx->glob.nitot >= 3)
     {
-      if (itsym < nspinv)
+      if (ctx->itsym < nspinv)
       {
-        i = jjs[itsym + 1];
-        iscom[itsym] = i;
-        k = MOD(i >> 2, glob.nitot);
+        i = jjs[ctx->itsym + 1];
+        iscom[ctx->itsym] = i;
+        k = MOD(i >> 2, ctx->glob.nitot);
         i -= k << 2;
-        if (is_esym[k] != 0)
+        if (ctx->is_esym[k] != 0)
           ++i;
         ixcom[XISYM] = k;
         ixcom[XIQN] |= i;
       }
       else
       {
-        iscom[itsym] = 0;
+        iscom[ctx->itsym] = 0;
       }
     }
-    iscom[itptr] = jjs[itptr + 1];
+    iscom[ctx->itptr] = jjs[ctx->itptr + 1];
   }
   return ispx;
 } /* getqs */
@@ -1259,11 +1242,7 @@ int *ixcom, *iscom, *iv;
  *             Positive for one K-parity, negative for the other, for asymmetric tops.
  *             1 for symmetric top / linear K=0, or if K-parity not distinguished.
  */
-int getqn(iblk, indx, maxqn, iqn, idgn)
-    const int iblk,
-    indx, maxqn;
-short *iqn;
-int *idgn;
+int getqn(struct SpinvContext *ctx, const int iblk, const int indx, const int maxqn, short *iqn, int *idgn)
 {
   /*   subroutine to get quantum numbers */
   /*     on entry: */
@@ -1280,101 +1259,101 @@ int *idgn;
 
   /*  get sub-block info from store or GETQQ */
   /*     look at last used then oldest */
-  if (iblk == cgetv[0].cblk)
+  if (iblk == ctx->cgetv[0].cblk)
   {
-    cgetq = cgetv;
+    ctx->cgetq = ctx->cgetv;
     last = 0;
     ioff = 0;
-    nsblk = cgetq->cnblk;
+    nsblk = ctx->cgetq->cnblk;
   }
-  else if (iblk == cgetv[1].cblk)
+  else if (iblk == ctx->cgetv[1].cblk)
   {
-    cgetq = &cgetv[1];
+    ctx->cgetq = &(ctx->cgetv)[1];
     last = 1;
-    ioff = glob.maxblk;
-    nsblk = cgetq->cnblk;
+    ioff = ctx->glob.maxblk;
+    nsblk = ctx->cgetq->cnblk;
   }
   else if (last != 0)
   {
-    cgetq = cgetv;
-    nsblk = getqq(iblk, &cgetq->cff, cgetq->cwt, ibkptr, ikmin, ivs);
+    ctx->cgetq = ctx->cgetv;
+    nsblk = getqq(ctx, iblk, &(ctx->cgetq->cff), ctx->cgetq->cwt, ctx->ibkptr, ctx->ikmin, ctx->ivs);
     if (nsblk == 0)
     {
       *idgn = 0;
-      return glob.nqn;
+      return ctx->glob.nqn;
     }
     last = 0;
     ioff = 0;
-    cgetq->cnblk = nsblk;
-    cgetq->cblk = iblk;
-    cgetq->csblk = 0;
+    ctx->cgetq->cnblk = nsblk;
+    ctx->cgetq->cblk = iblk;
+    ctx->cgetq->csblk = 0;
   }
   else
   {
-    cgetq = &cgetv[1];
-    ioff = glob.maxblk;
-    nsblk = getqq(iblk, &cgetq->cff, cgetq->cwt, &ibkptr[ioff],
-                  &ikmin[ioff], &ivs[ioff]);
+    ctx->cgetq = &(ctx->cgetv)[1];
+    ioff = ctx->glob.maxblk;
+    nsblk = getqq(ctx, iblk, &ctx->cgetq->cff, ctx->cgetq->cwt, &(ctx->ibkptr)[ioff],
+                  &(ctx->ikmin)[ioff], &(ctx->ivs)[ioff]);
     if (nsblk == 0)
     {
       *idgn = 0;
-      return glob.nqn;
+      return ctx->glob.nqn;
     }
     last = 1;
-    cgetq->cnblk = nsblk;
-    cgetq->cblk = iblk;
-    cgetq->csblk = ioff;
+    ctx->cgetq->cnblk = nsblk;
+    ctx->cgetq->cblk = iblk;
+    ctx->cgetq->csblk = ioff;
   }
   /*  check for request of size */
   if (indx <= 0)
   {
-    *idgn = ibkptr[nsblk + ioff];
-    return glob.nqn;
+    *idgn = ctx->ibkptr[nsblk + ioff];
+    return ctx->glob.nqn;
   }
   /*  search for sub-block */
   ix = indx - 1;
-  ibgn = cgetq->csblk;
+  ibgn = ctx->cgetq->csblk;
   iend = nsblk + ioff;
-  if (ix < ibkptr[ibgn])
+  if (ix < ctx->ibkptr[ibgn])
     ibgn = ioff;
   for (i = ibgn + 1; i < iend; ++i)
   {
-    if (ix < ibkptr[i])
+    if (ix < ctx->ibkptr[i])
       break;
   }
-  cgetq->csblk = ibgn = i - 1;
+  ctx->cgetq->csblk = ibgn = i - 1;
   /*  assemble quanta */
-  ncod = ibkptr[i] - ibkptr[ibgn];
-  ldgn = cgetq->cwt[0];
-  ngsym = (short)setgsym(cgetq->cwt[3]);
-  iqf = cgetq->cff;
-  iqsp = getqs(ivs[ibgn], iqf, 0, 0, ixcom, iscom, &ivbase) - 1;
-  iv = ixcom[XVIB];
-  isym = ixcom[XSYM];
-  n = ixcom[XNVAL];
-  k = ix - ibkptr[ibgn];
-  kq = ikmin[ibgn] + (k << 1);
+  ncod = ctx->ibkptr[i] - ctx->ibkptr[ibgn];
+  ldgn = ctx->cgetq->cwt[0];
+  ngsym = (short)setgsym(ctx, ctx->cgetq->cwt[3]);
+  iqf = ctx->cgetq->cff;
+  iqsp = getqs(ctx, ctx->ivs[ibgn], iqf, 0, 0, ctx->ixcom, ctx->iscom, &ivbase) - 1;
+  iv = ctx->ixcom[XVIB];
+  isym = ctx->ixcom[XSYM];
+  n = ctx->ixcom[XNVAL];
+  k = ix - ctx->ibkptr[ibgn];
+  kq = ctx->ikmin[ibgn] + (k << 1);
   if (ngsym >= 3)
   {
-    mgsym = (short)MOD(kq - ixcom[XLVAL] + ixcom[XISYM] + ngsym, ngsym);
+    mgsym = (short)MOD(kq - ctx->ixcom[XLVAL] + ctx->ixcom[XISYM] + ngsym, ngsym);
     if (mgsym != 0)
     {
       if ((mgsym + mgsym) == ngsym)
       { /* B symmetry */
-        ldgn = cgetq->cwt[2];
+        ldgn = ctx->cgetq->cwt[2];
       }
       else
       { /* E symmetry */
-        if (glob.esym)
+        if (ctx->glob.esym)
           isym = 4;
-        ldgn = cgetq->cwt[1];
+        ldgn = ctx->cgetq->cwt[1];
       }
     }
   }
-  lv = ixcom[XLVAL];
+  lv = ctx->ixcom[XLVAL];
   if (lv != 0)
   { /* l-doubled state */
-    if (glob.lsym)
+    if (ctx->glob.lsym)
       isym = 4;
     ncod = 1;
     if (kq == 0 && isym == 3)
@@ -1385,7 +1364,7 @@ int *idgn;
         --iv;
     }
   }
-  if (glob.nqnn == 2)
+  if (ctx->glob.nqnn == 2)
   {
     if (ODD(isym))
       kq = -kq;
@@ -1397,7 +1376,7 @@ int *idgn;
       lower = (n + isym) & 1;
     else /* degenerate state */
       lower = (lv > 0) ? 1 : 0;
-    if (glob.oblate)
+    if (ctx->glob.oblate)
     {
       iqn[2] = (short)kq;
       kq = n - kq + lower;
@@ -1410,10 +1389,10 @@ int *idgn;
   }
   iqn[0] = (short)n;
   iqn[1] = (short)kq;
-  k = glob.nqnn;
-  if (glob.vibfmt)
+  k = ctx->glob.nqnn;
+  if (ctx->glob.vibfmt)
     iqn[k++] = (short)iv;
-  if (cgetq->cwt[4] > maxqn)
+  if (ctx->cgetq->cwt[4] > maxqn)
   {
     iqn[k++] = (short)iqsp;
     iqn[k] = (short)((iqf + 1) >> 1);
@@ -1422,8 +1401,8 @@ int *idgn;
   {
     for (i = 0; k < maxqn; ++i)
     {
-      iqn[k++] = (short)((iscom[i] + 1) >> 1);
-      if (i == itsym && ngsym > 3)
+      iqn[k++] = (short)((ctx->iscom[i] + 1) >> 1);
+      if (i == ctx->itsym && ngsym > 3)
         i += ngsym - 3;
     }
   }

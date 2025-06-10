@@ -29,6 +29,7 @@ getmask(): Creates a selection mask for dircos based on K, L, and I<sub>tot</sub
 #include "calpgm.h"
 #include "spinit.h"
 #include "spinv_internal.h"
+#include "SpinvContext.hpp"
 
 /**
  * @brief Parses BCD encoded spin quantum numbers and associates them with a vibrational state.
@@ -40,9 +41,7 @@ getmask(): Creates a selection mask for dircos based on K, L, and I<sub>tot</sub
  * @return int Number of actual spin quantum numbers defined for this state (excluding N),
  *             adjusted for I_tot symmetry if applicable.
  */
-int getsp(ispnx, pvinfo)
-    const bcd_t *ispnx;
-SVIB *pvinfo;
+int getsp(struct SpinvContext *ctx, const bcd_t *ispnx, SVIB *pvinfo)
 {
   /*  subroutine to set up spin structure                        */
   /*     on entry:                                               */
@@ -104,12 +103,12 @@ SVIB *pvinfo;
     nl *= (size_t)ii;
     --ii;
     iis[i] = (short)ii;
-    if (ii > glob.mxspin)
-      glob.mxspin = ii;
+    if (ii > ctx->glob.mxspin)
+      ctx->glob.mxspin = ii;
   }
   nsstat = (int)nl;
-  i = (int)(nsstat << glob.msshft);
-  if (i < 0 || (size_t)(i >> glob.msshft) != nl)
+  i = (int)(nsstat << ctx->glob.msshft);
+  if (i < 0 || (size_t)(i >> ctx->glob.msshft) != nl)
   {
     puts("spin problem too big");
     exit(EXIT_FAILURE);
@@ -137,7 +136,7 @@ SVIB *pvinfo;
   pvinfo->nspstat = nsstat;
   nset = nspinv + 1;
   iis[0] = (short)nset;
-  ssp_now = &ssp_head;
+  ssp_now = &(ctx->ssp_head);
   do
   { /*  check previous combinations for match */
     icmp = 0;
@@ -162,8 +161,8 @@ SVIB *pvinfo;
   jjs = (short *)mallocq(nl);
   nl = sizeof(SSP);
   ssp_now = (SSP *)mallocq(nl);
-  ssp_now->next = ssp_head.next;
-  ssp_head.next = ssp_now;
+  ssp_now->next = ctx->ssp_head.next;
+  ctx->ssp_head.next = ssp_now;
   ssp_now->sspt = jjs;
   ssp_now->ssize = nsstat;
   ssp_now->nitot = nitot;
@@ -184,7 +183,7 @@ SVIB *pvinfo;
  *        - I_tot symmetry components if applicable.
  *        This pre-computation is used by getqs to quickly retrieve quantum numbers.
  */
-void setsp(void)
+void setsp(struct SpinvContext *ctx)
 {
   /*  subroutine to set up spin structure                        */
   /*   let: jjs = array of spin combinations in struct ssp.sspt  */
@@ -201,29 +200,29 @@ void setsp(void)
   int minf0, minft, jj, ival, ibase, i, itmp, knt, nlim, nitot, ii;
   int itsym0, itptr0;
   short *iis, *jjs, *jjs0;
-  nspin = 0;
-  ssp_now = &ssp_head; /* head has no spins */
+  ctx->nspin = 0;
+  ssp_now = &ctx->ssp_head; /* head has no spins */
   while ((ssp_now = ssp_now->next) != NULL)
   { /* loop over spin sets */
     iis = ssp_now->sspt;
     nspinv = iis[0] - 1;
-    for (iv = nspinv; iv > nspin; --iv)
+    for (iv = nspinv; iv > ctx->nspin; --iv)
     {
       if (iis[0] > 0)
       {
-        nspin = iv;
+        ctx->nspin = iv;
         break;
       }
     }
   }
-  ssp_now = &ssp_head; /* head has no spins */
+  ssp_now = &ctx->ssp_head; /* head has no spins */
   while ((ssp_now = ssp_now->next) != NULL)
   { /* loop over spin sets */
     iis = ssp_now->sspt;
     nset = iis[0];
     nspinv = nset - 1;
-    if (nspinv > nspin)
-      nspinv = nspin;
+    if (nspinv > ctx->nspin)
+      nspinv = ctx->nspin;
     ispsum = 0;
     for (iv = 1; iv <= nspinv; ++iv)
     {
@@ -240,12 +239,12 @@ void setsp(void)
     {
       nlim = nspinv;
       ibgn = iend;
-      itsym0 = itptr0 = nspin + nspin + 1;
+      itsym0 = itptr0 = ctx->nspin + ctx->nspin + 1;
     }
     else
     { /* Itot coupling */
-      itptr0 = nspin - 2;
-      itsym0 = nspin - nitot;
+      itptr0 = ctx->nspin - 2;
+      itsym0 = ctx->nspin - nitot;
       nlim = itsym0 + 1;
       ii = iend;
       for (i = nlim; i < nspinv; ++i)
@@ -254,7 +253,7 @@ void setsp(void)
           break;
         ns *= ival;
       }
-      if (i < nspin)
+      if (i < ctx->nspin)
       {
         puts("spins under Itot should be the same");
         exit(EXIT_FAILURE);
@@ -351,8 +350,8 @@ void setsp(void)
  * @param matrix_element_factor_ptr Pointer to the matrix element factor, which will be multiplied by spin-related prefactors. Renamed zfac.
  * @return int 0 if spin selection rules are satisfied, otherwise a non-zero error code (2-6, or 1 for I_tot related issue).
  */
-int checksp(const BOOL first, int si1, int si2, const short *iiv1,
-  const short *iiv2, double *zfac)
+int checksp(struct SpinvContext *ctx, const BOOL first, int si1, int si2, const short *iiv1,
+            const short *iiv2, double *zfac)
 {
 int ii, iip;
 ii = iip = 0;
@@ -370,15 +369,15 @@ if (si2 == si1)
 {
 if (ii < 2)
 return 3;
-*zfac *= spfac2[ii];
+*zfac *= ctx->spfac2[ii];
 }
-*zfac *= spfac[ii];
+*zfac *= ctx->spfac[ii];
 }
 else
 { /* ii != iip */
 if (ODD(ii + iip))
 return 4; /* check multiplicity */
-if (si2 > itsym)
+if (si2 > ctx->itsym)
 return 4;
 }
 }
@@ -393,39 +392,39 @@ if (ii == iip)
 {
 if (ii == 0)
 return 5;
-*zfac *= spfac[ii];
+*zfac *= ctx->spfac[ii];
 }
 else
 { /* ii != iip */
 if (ODD(ii + iip))
 return 6; /* check multiplicity */
-if (si1 > itsym)
+if (si1 > ctx->itsym)
 return 6;
 }
 }
-if (first && si1 > itsym)
+if (first && si1 > ctx->itsym)
 {
 iip = 0;
-if (glob.nitot >= 3)
-iip = si1 - itsym;
+if (ctx->glob.nitot >= 3)
+iip = si1 - ctx->itsym;
 if (si1 == si2)
 {
 if (iip > 1)
 return 1;
-setzitot(2, 0, 2, ii, glob.nitot); /* quadrupole */
+setzitot(2, 0, 2, ii, ctx->glob.nitot); /* quadrupole */
 }
-else if (si2 > itsym)
+else if (si2 > ctx->itsym)
 {
 if (iip > 2)
 return 1;
-setzitot(1, 1, 0, ii, glob.nitot); /* 2-spin product */
-setzitot(1, 1, 2, ii, glob.nitot);
+setzitot(1, 1, 0, ii, ctx->glob.nitot); /* 2-spin product */
+setzitot(1, 1, 2, ii, ctx->glob.nitot);
 }
 else
 {
 if (iip > 1)
 return 1;
-setzitot(1, 0, 1, ii, glob.nitot); /* 1-spin vector */
+setzitot(1, 0, 1, ii, ctx->glob.nitot); /* 1-spin vector */
 }
 }
 return 0;
@@ -442,10 +441,8 @@ return 0;
  * @param alpha_sym_component I_tot alpha symmetry component. Renamed alpha.
  * @return int Always 0.
  */
-int tensor(zval, iscom, jscom, lscom, imap, npair, alpha)
-double *zval;
-const int iscom[], jscom[], lscom[], imap[];
-int npair, alpha;
+int tensor(struct SpinvContext *ctx, double *zval, const int iscom[], const int jscom[],
+           const int lscom[], const int imap[], int npair, int alpha)
 {
   /*     subroutine to find spherical tensor spin coupling coefficients */
   /*     on entry: */
@@ -474,12 +471,12 @@ int npair, alpha;
     lls = lscom[ix];
     ssi = iscom[ix];
     ssf = jscom[ix];
-    if (alpha >= 0 && ix == itptr)
+    if (alpha >= 0 && ix == ctx->itptr)
     {
-      ix = itsym + nspin + 1;
+      ix = ctx->itsym + ctx->nspin + 1;
       getzitot(&z, lls, iscom[ix], &lscom[ix],
-               &iscom[itsym], &jscom[itsym], alpha, glob.nitot);
-      i = nspin - 1;
+               &iscom[ctx->itsym], &jscom[ctx->itsym], alpha, ctx->glob.nitot);
+      i = ctx->nspin - 1;
     }
     llj = lscom[i];
     jji = iscom[i];
@@ -545,11 +542,9 @@ int npair, alpha;
  * @param jscom_ket_qns Array of 2*angular momentum values for the ket state.
  * @return int Maximum spin index involved in the operator (up to nspin), or -1 if any triangle rule is violated.
  */
-int getll(llf_total_tensor_order, dir_cos_order, n_tensor_order, k_delta_op, spin1_idx, spin2_idx, lscom_tensor_orders_out, iscom_bra_qns, jscom_ket_qns)
-const int llf_total_tensor_order,
-dir_cos_order, n_tensor_order, k_delta_op, spin1_idx, spin2_idx;     /* Renamed llf, ld, ln, kd, si1, si2 */
-int lscom_tensor_orders_out[];                                       /* Renamed lscom */
-const int iscom_bra_qns[], jscom_ket_qns[];                          /* Renamed iscom, jscom */
+int getll(struct SpinvContext *ctx, const int llf_total_tensor_order, const int dir_cos_order,
+          const int n_tensor_order, const int k_delta_op, const int spin1_idx, const int spin2_idx,
+          int lscom_tensor_orders_out[], const int iscom_bra_qns[], const int jscom_ket_qns[])
 {
   int *l_individual_spin_tensors_ptr;                                                                                                                                                                             /* Renamed lsscom */
   int i_spin_level, current_intermediate_L_times_2, ll_dir_cos_times_2, ll_n_tensor_times_2, max_L_N_operator_times_2, delta_2N_val, sum_2N_val, max_involved_spin_idx, error_return_flag, num_spins_minus_2_val; /* Renamed i, llj, lld, lln, llmax, jdif, jsum, maxspin, ierr, nm2 */
@@ -558,7 +553,7 @@ const int iscom_bra_qns[], jscom_ket_qns[];                          /* Renamed 
   max_L_N_operator_times_2 = 0;
   ll_dir_cos_times_2 = dir_cos_order << 1;
   ll_n_tensor_times_2 = n_tensor_order << 1;
-  delta_2N_val = iscom_bra_qns[nspin] - jscom_ket_qns[nspin];
+  delta_2N_val = iscom_bra_qns[ctx->nspin] - jscom_ket_qns[ctx->nspin];
   if (delta_2N_val < 0)
     delta_2N_val = -delta_2N_val;
 
@@ -578,23 +573,23 @@ const int iscom_bra_qns[], jscom_ket_qns[];                          /* Renamed 
     if (max_L_N_operator_times_2 < ll_n_tensor_times_2)
       max_L_N_operator_times_2 = ll_n_tensor_times_2;
   }
-  sum_2N_val = iscom_bra_qns[nspin] + jscom_ket_qns[nspin];
+  sum_2N_val = iscom_bra_qns[ctx->nspin] + jscom_ket_qns[ctx->nspin];
   if (max_L_N_operator_times_2 > sum_2N_val)
     return error_return_flag;
 
-  if (nspin == 0)
+  if (ctx->nspin == 0)
   {
     lscom_tensor_orders_out[0] = ll_n_tensor_times_2;
     return 0;
   }
 
   max_involved_spin_idx = spin1_idx;
-  if (spin1_idx > itsym && itsym < nspin)
-    max_involved_spin_idx = nspin;
+  if (spin1_idx > ctx->itsym && ctx->itsym < ctx->nspin)
+    max_involved_spin_idx = ctx->nspin;
 
-  l_individual_spin_tensors_ptr = &lscom_tensor_orders_out[nspin];
+  l_individual_spin_tensors_ptr = &lscom_tensor_orders_out[ctx->nspin];
   l_individual_spin_tensors_ptr[0] = ll_n_tensor_times_2;
-  for (i_spin_level = 1; i_spin_level <= nspin; ++i_spin_level)
+  for (i_spin_level = 1; i_spin_level <= ctx->nspin; ++i_spin_level)
   {
     l_individual_spin_tensors_ptr[i_spin_level] = 0;
   }
@@ -606,16 +601,16 @@ const int iscom_bra_qns[], jscom_ket_qns[];                          /* Renamed 
   }
 
   current_intermediate_L_times_2 = l_individual_spin_tensors_ptr[0];
-  num_spins_minus_2_val = nspin - 2;
+  num_spins_minus_2_val = ctx->nspin - 2;
   for (i_spin_level = 0; i_spin_level <= num_spins_minus_2_val; ++i_spin_level)
   {
-    if (i_spin_level == itsym)
+    if (i_spin_level == ctx->itsym)
     {
-      if (spin1_idx <= itsym)
+      if (spin1_idx <= ctx->itsym)
       {
         current_intermediate_L_times_2 = 0;
       }
-      else if (spin2_idx <= itsym || spin1_idx == spin2_idx)
+      else if (spin2_idx <= ctx->itsym || spin1_idx == spin2_idx)
       {
         current_intermediate_L_times_2 = l_individual_spin_tensors_ptr[spin1_idx];
       }
@@ -641,9 +636,9 @@ const int iscom_bra_qns[], jscom_ket_qns[];                          /* Renamed 
     if (current_intermediate_L_times_2 > sum_2N_val)
       return error_return_flag;
   }
-  lscom_tensor_orders_out[nspin - 1] = llf_total_tensor_order;
+  lscom_tensor_orders_out[ctx->nspin - 1] = llf_total_tensor_order;
   if (llf_total_tensor_order != 0)
-    max_involved_spin_idx = nspin;
+    max_involved_spin_idx = ctx->nspin;
 
   return max_involved_spin_idx;
 } /* getll */
@@ -655,7 +650,7 @@ const int iscom_bra_qns[], jscom_ket_qns[];                          /* Renamed 
  *                            Magnitude >> 1 gives n-foldness.
  * @return int The n-foldness of the symmetry group.
  */
-int setgsym(const int gsym)
+int setgsym(struct SpinvContext *ctx, const int gsym)
 {
   static int oldgsym = -1;
   static int nsym;
@@ -664,40 +659,40 @@ int setgsym(const int gsym)
     return nsym;
   oldgsym = gsym;
   nsym = gsym >> 1;
-  is_esym[0] = 0;
+  ctx->is_esym[0] = 0;
   for (k = 1, kk = nsym - 1; k < kk; ++k, --kk)
   {
-    is_esym[k] = 1;
-    is_esym[kk] = -1;
+    ctx->is_esym[k] = 1;
+    ctx->is_esym[kk] = -1;
   }
   if (k == kk)
-    is_esym[k] = 0;
+    ctx->is_esym[k] = 0;
   if (ODD(gsym))
   {
-    itptr = nspin - 2;
-    itsym = nspin - nsym;
-    glob.nitot = nsym;
+    ctx->itptr = ctx->nspin - 2;
+    ctx->itsym = ctx->nspin - nsym;
+    ctx->glob.nitot = nsym;
   }
   else
   {
-    itptr = itsym = nspin + nspin + 1;
-    glob.nitot = 0;
+    ctx->itptr = ctx->itsym = ctx->nspin + ctx->nspin + 1;
+    ctx->glob.nitot = 0;
   }
   /* set up nominal spin coupling map */
-  for (k = 0; k < nspin; ++k)
+  for (k = 0; k < ctx->nspin; ++k)
   {
-    ismap[k + k] = k - 1; /* last N,J,F1 .. */
-    if (k < itsym)
+    ctx->ismap[k + k] = k - 1; /* last N,J,F1 .. */
+    if (k < ctx->itsym)
     {
-      ismap[k + k + 1] = k + nspin + 1; /* S,I1,I2 .. */
+      ctx->ismap[k + k + 1] = k + ctx->nspin + 1; /* S,I1,I2 .. */
     }
     else
     {
-      ismap[k + k + 1] = itptr; /* Itot */
+      ctx->ismap[k + k + 1] = ctx->itptr; /* Itot */
       break;
     }
   }
-  ismap[0] = nspin; /* fix up position of N */
+  ctx->ismap[0] = ctx->nspin; /* fix up position of N */
   return nsym;
 } /* setgsym */
 
@@ -714,10 +709,8 @@ int setgsym(const int gsym)
  *                                       or indicates if current state's weights should be swapped if positive.
  * @return int Always 0.
  */
-int setwt(pvinfov, ivib, iax, iwtpl, iwtmn, vsym)
-SVIB *pvinfov;
-const int ivib, iax, iwtpl, iwtmn;
-double vsym;
+int setwt(struct SpinvContext *ctx, SVIB *pvinfov, const int ivib, const int iax,
+          const int iwtpl, const int iwtmn, double vsym)
 {
   /*  set weights */
   /*     on entry: */
@@ -813,10 +806,7 @@ double vsym;
  * @return int The primary statistical weight (weights_out[0]), or sum of weights if I_tot basis and multiple components allowed.
  *             Returns <=0 if no states/weight for this symmetry/spin.
  */
-int getwt(pvinfo, isym, iispin, ivwt)
-SVIB *pvinfo;
-const int isym, iispin;
-int *ivwt;
+int getwt(struct SpinvContext *ctx, SVIB *pvinfo, const int isym, const int iispin, int *ivwt)
 {
   int iwt, jsym, nset, k, msym, nsym;
   short *jjs;
@@ -838,7 +828,7 @@ int *ivwt;
     {
       jjs = pvinfo->spt;
       nset = jjs[0];
-      k = jjs[iispin * nset + itsym + 1];
+      k = jjs[iispin * nset + ctx->itsym + 1];
     }
     else
     {
@@ -858,7 +848,7 @@ int *ivwt;
   }
   else
   { /* nsym = 4, 6 */
-    msym = isoddk[jsym] - (int)(pvinfo->lvqn);
+    msym = ctx->isoddk[jsym] - (int)(pvinfo->lvqn);
     if (iwt != 0)
       msym += k >> 2;
     if (ODD(msym))
@@ -895,9 +885,7 @@ int *ivwt;
  * @param operator_alpha_symmetry I_tot alpha symmetry component of the operator.
  * @return BOOL TRUE if the connection is forbidden by weight/symmetry rules, FALSE otherwise.
  */
-BOOL testwt(pvib1, pvib2, isym, alpha)
-SVIB *pvib1, *pvib2;
-int isym, alpha;
+BOOL testwt(struct SpinvContext *ctx, SVIB *pvib1, SVIB *pvib2, int isym, int alpha)
 { /* return true if all weight sets do not match */
   int ii, jj, kk, ix, jx, iwt4, iwt[3], jwt[3];
   if (pvib1->gsym != pvib2->gsym)
@@ -911,10 +899,10 @@ int isym, alpha;
   {
     for (ii = 0; ii < 4; ++ii)
     {
-      getwt(pvib1, ii, ix, iwt);
+      getwt(ctx, pvib1, ii, ix, iwt);
       jj = ii ^ isym;
-      getwt(pvib2, jj, jx, jwt);
-      if (checkwt(iwt, jwt) == 0)
+      getwt(ctx, pvib2, jj, jx, jwt);
+      if (checkwt(ctx, iwt, jwt) == 0)
         return FALSE;
     }
     if (iwt4 <= 0)
@@ -931,12 +919,11 @@ int isym, alpha;
  * @param weights_ket Array of 3 weights for the ket state.
  * @return int 0 if any pair of corresponding positive weights are equal, 1 otherwise.
  */
-int checkwt(iwt, jwt)
-int *iwt, *jwt;
+int checkwt(struct SpinvContext *ctx, int *iwt, int *jwt)
 {
   /* return 0 if any pair of weights are equal */
   int ii, jj, nn;
-  nn = glob.maxwt;
+  nn = ctx->glob.maxwt;
   if (nn == 0)
     return (iwt[0] - jwt[0]);
   for (ii = nn; ii >= 0; --ii)
@@ -959,9 +946,7 @@ int *iwt, *jwt;
  * @return unsigned int The symmetry of the interaction (0=A, 1=Bx, 2=By, 3=Bz in D2),
  *                      result of XORing bra and ket state symmetries.
  */
-unsigned int blksym(ixcom, jxcom)
-    const int *ixcom,
-    *jxcom;
+unsigned int blksym(struct SpinvContext *ctx, const int *ixcom, const int *jxcom)
 { /* get block symmetry from state symmetry */            /* Original comment */
   return (unsigned int)(3 & (ixcom[XSYM] ^ jxcom[XSYM])); /* XOR symmetries and mask to 2 bits */
 } /* blksym */
@@ -977,14 +962,15 @@ unsigned int blksym(ixcom, jxcom)
  * @return int Mask value: bit 0 for (K'=K+DK, L'=L+DL), bit 1 for (K'=DK-K, L'=DL-L), bit 2 for (K'=K-DK, L'=L-DL).
  *         Returns 0 if no transitions are allowed.
  */
-int getmask(const int *xbra, const int *xket, const int kd, const int ldel,
+int getmask(struct SpinvContext *ctx, const int *xbra, const int *xket,
+            const int kd, const int ldel,
             const int loff, const int alpha)
 {
   /* CREATE MASK FOR DIRCOS */
   /* KD IS TOTAL K QUANTIUM CHANGE */
   int ldif, lbra, lket, mask, kbra, kket, nitot, kk, ksbra, ksket;
   mask = 7;
-  nitot = glob.nitot;
+  nitot = ctx->glob.nitot;
   if (nitot >= 3)
   { /* check Itot symmetry */
     ksbra = xbra[XISYM];
@@ -1004,7 +990,7 @@ int getmask(const int *xbra, const int *xket, const int kd, const int ldel,
     { /* kk is ODD */
       if (TEST(loff, MSYM2))
         return 0; /* <A2| I_alpha |E> */
-      if (is_esym[ksbra] == 0 && is_esym[ksket] == 0)
+      if (ctx->is_esym[ksbra] == 0 && ctx->is_esym[ksket] == 0)
         return 0; /*  <A1 |I_alpha| A2> == 0 */
     }
     mask = 0;
