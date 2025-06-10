@@ -353,81 +353,81 @@ void setsp(struct SpinvContext *ctx)
 int checksp(struct SpinvContext *ctx, const BOOL first, int si1, int si2, const short *iiv1,
             const short *iiv2, double *zfac)
 {
-int ii, iip;
-ii = iip = 0;
-if (si2 > 0)
-{
-if ((short)si2 < iiv1[0])
-ii = iiv1[si2];
-if ((short)si2 < iiv2[0])
-iip = iiv2[si2];
-if (ii == iip)
-{
-if (ii == 0)
-return 2;
-if (si2 == si1)
-{
-if (ii < 2)
-return 3;
-*zfac *= ctx->spfac2[ii];
-}
-*zfac *= ctx->spfac[ii];
-}
-else
-{ /* ii != iip */
-if (ODD(ii + iip))
-return 4; /* check multiplicity */
-if (si2 > ctx->itsym)
-return 4;
-}
-}
-if (si2 != si1)
-{
-ii = iip = 0;
-if ((short)si1 < iiv1[0])
-ii = iiv1[si1];
-if ((short)si1 < iiv2[0])
-iip = iiv2[si1];
-if (ii == iip)
-{
-if (ii == 0)
-return 5;
-*zfac *= ctx->spfac[ii];
-}
-else
-{ /* ii != iip */
-if (ODD(ii + iip))
-return 6; /* check multiplicity */
-if (si1 > ctx->itsym)
-return 6;
-}
-}
-if (first && si1 > ctx->itsym)
-{
-iip = 0;
-if (ctx->glob.nitot >= 3)
-iip = si1 - ctx->itsym;
-if (si1 == si2)
-{
-if (iip > 1)
-return 1;
-setzitot(2, 0, 2, ii, ctx->glob.nitot); /* quadrupole */
-}
-else if (si2 > ctx->itsym)
-{
-if (iip > 2)
-return 1;
-setzitot(1, 1, 0, ii, ctx->glob.nitot); /* 2-spin product */
-setzitot(1, 1, 2, ii, ctx->glob.nitot);
-}
-else
-{
-if (iip > 1)
-return 1;
-setzitot(1, 0, 1, ii, ctx->glob.nitot); /* 1-spin vector */
-}
-}
-return 0;
+  int ii, iip;
+  ii = iip = 0;
+  if (si2 > 0)
+  {
+    if ((short)si2 < iiv1[0])
+      ii = iiv1[si2];
+    if ((short)si2 < iiv2[0])
+      iip = iiv2[si2];
+    if (ii == iip)
+    {
+      if (ii == 0)
+        return 2;
+      if (si2 == si1)
+      {
+        if (ii < 2)
+          return 3;
+        *zfac *= ctx->spfac2[ii];
+      }
+      *zfac *= ctx->spfac[ii];
+    }
+    else
+    { /* ii != iip */
+      if (ODD(ii + iip))
+        return 4; /* check multiplicity */
+      if (si2 > ctx->itsym)
+        return 4;
+    }
+  }
+  if (si2 != si1)
+  {
+    ii = iip = 0;
+    if ((short)si1 < iiv1[0])
+      ii = iiv1[si1];
+    if ((short)si1 < iiv2[0])
+      iip = iiv2[si1];
+    if (ii == iip)
+    {
+      if (ii == 0)
+        return 5;
+      *zfac *= ctx->spfac[ii];
+    }
+    else
+    { /* ii != iip */
+      if (ODD(ii + iip))
+        return 6; /* check multiplicity */
+      if (si1 > ctx->itsym)
+        return 6;
+    }
+  }
+  if (first && si1 > ctx->itsym)
+  {
+    iip = 0;
+    if (ctx->glob.nitot >= 3)
+      iip = si1 - ctx->itsym;
+    if (si1 == si2)
+    {
+      if (iip > 1)
+        return 1;
+      setzitot(ctx, 2, 0, 2, ii, ctx->glob.nitot); /* quadrupole */
+    }
+    else if (si2 > ctx->itsym)
+    {
+      if (iip > 2)
+        return 1;
+      setzitot(ctx, 1, 1, 0, ii, ctx->glob.nitot); /* 2-spin product */
+      setzitot(ctx, 1, 1, 2, ii, ctx->glob.nitot);
+    }
+    else
+    {
+      if (iip > 1)
+        return 1;
+      setzitot(ctx, 1, 0, 1, ii, ctx->glob.nitot); /* 1-spin vector */
+    }
+  }
+  return 0;
 } /* checksp */
 
 /**

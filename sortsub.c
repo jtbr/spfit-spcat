@@ -4,7 +4,7 @@
 #include "calpgm.h"
 #define NDILINE 130
 
-int sortn(char *inpname, char *outname, int dokey);
+int sortn(char *inpname, char *outname, BOOL dokey);
 int fillbuf(FILE * finp, char *tbuf, int nlim, char **pbuf);
 int getkey(int *key, char *tbuf, char *wbuf);
 int bufcmp(const char *b1, const char *b2, const int *key);

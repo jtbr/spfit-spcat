@@ -84,10 +84,10 @@ int hamx(struct SpinvContext *ctx, const int iblk, const int nsize, const int np
   itau = &(ctx->ikmin)[ctx->glob.maxblk]; /* itau points to an area after ikmin, used to store sorting keys (tau or K values) */
   nsblk = getqq(ctx, iblk, &iff, iiwt, ctx->ibkptr, ctx->ikmin, ctx->ivs); /* Get sub-block structure for current F block (iblk) */
   /* zero hamiltonian matrix t */
-  dclr(nsize, nsize, t, 1);
+  dclr(ctx, nsize, nsize, t, 1);
   /* zero derivative matrix dedp */
   n_sub_block_size = ctx->glob.nfit; /* Number of parameters to fit */
-  dclr(nsize, n_sub_block_size, dedp, 1);
+  dclr(ctx, nsize, n_sub_block_size, dedp, 1);
   /* set up hamiltonian */
   oldpar = parskp = roll = firstpar = FALSE; /* Initialize flags */
   ncos = sznz = 0; isgn = 1; isunit = 0; kbgni = 0; /* Initialize operator properties */
@@ -957,7 +957,7 @@ double rmatrx(struct SpinvContext *ctx, const int dir_cos_order, const int vib_t
  * @param matrix_element_factor Pointer to the matrix element factor to be modified. Renamed zval.
  * @return int Always 0.
  */
-int symnsq(struct SpinvContext *ctx, const int n_sq_power, const int *n_s_power,
+int symnsq(struct SpinvContext *ctx, const int n_sq_power, const int n_s_power,
            const int *iscom_bra_qns, const int *jscom_ket_qns, double *matrix_element_factor) /* Renamed parameters */
 {
   double n_n_plus_1_power_factor, dot_N_S_bra, dot_N_S_ket, factor_bra_side, factor_ket_side;          /* Renamed x, dotns, dotnsp, zr, zl */

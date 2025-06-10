@@ -478,7 +478,7 @@ int intens(struct SpinvContext *ctx, const int iblk, const int isiz, const int j
   alpha = 0;
   bijv3 = (bcd_t)0;
   /* clear dipole matrix */
-  dclr(isiz, jsiz, s, 1);
+  dclr(ctx, isiz, jsiz, s, 1);
   /* loop over sub-blocks */
   ndms = isiz;
   ndecv = ctx->glob.vibdec;

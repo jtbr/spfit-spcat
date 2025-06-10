@@ -1,7 +1,17 @@
 #include "SpinvEngine.hpp"
+#include "spinv_internal.h"
 #include <cstdlib>
 
-SpinvEngine::SpinvEngine() {
+SpinvEngine::SpinvEngine() :
+  m_context {
+    .sptzero = {1, 0},
+    .ssp_head = {NULL, NULL, 1, 0},
+    .revsym = {0, 3, 2, 1},
+    .isoddk = {0, 1, 1, 0},
+    .ixphase = {0, 1, 2, 3},
+    .ipwr2 = {0, 1, 2, 4}
+  }
+{
     // Initialize the context with default values
     // Pointers
     m_context.vinfo = &m_context.vinfo1;

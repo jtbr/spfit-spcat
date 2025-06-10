@@ -27,8 +27,10 @@
 #include <string.h>
 #include <math.h>
 #include <stdlib.h>
-#include "calpgm.h"
+//#include "calpgm.h"
 #include "lsqfit.h"
+#include "SpinvEngine.hpp"
+
 #define NDCARD 130
 #define PR_DELAY 6    /* seconds delay between informational messages */
 /************** CALFIT interfaces ***********************************/
@@ -132,8 +134,10 @@ int main(int argc, char *argv[])
   marqflg = 0;
   nsize_p = maxmem(&nl);
 
-  /*     open read and write files */
+  /* initialize SpinvEngine */
+  SpinvEngine spinv;
 
+  /*     open read and write files */
   filget(argc, argv, NFILE, fname, ext);
   filbak(fname[epar], fname[ebak]);
   lubak = fopenq(fname[ebak], "r");
@@ -193,12 +197,12 @@ int main(int argc, char *argv[])
   }
   /*  read in option card(s) */
   iqnfmt = 0; nfmt = catqn;
-  noptn = setopt(lubak, &nfmt, &itd, &ndbcd, namfil);
+  noptn = spinv.setopt(lubak, &nfmt, &itd, &ndbcd, namfil);
   if (noptn <= 0) {
     puts("Error reading option lines");
     exit(EXIT_FAILURE);
   }
-  nqn = setfmt(&iqnfmt, 1);
+  nqn = spinv.setfmt(&iqnfmt, 1);
   if (nqn > MAXCAT) catqn = nqn;
   nqn = nqn + nqn;
   printf(       "LINES REQUESTED=%5d NUMBER OF PARAMETERS=%3d", limlin, npar);
@@ -359,7 +363,7 @@ int main(int argc, char *argv[])
   /* initialize block structure */
   nblkpf = maxf;
   maxdm = nsize_p;
-  k = setblk(lufit, npar, idpar, par, &nblkpf, &maxdm);
+  k = spinv.setblk(lufit, npar, idpar, par, &nblkpf, &maxdm);
   /* set parameter labels */
   getlbl(npar, idpar, parlbl, namfil, k, LBLEN);
   /* convert lines */
@@ -405,7 +409,7 @@ int main(int argc, char *argv[])
       if (iblk != lblk) {       /*  get size of block */
         if (rqexit(0) != 0)
           break;                /*  check operator interrupt */
-        getqn(iblk, 0, 0, qnum, &nsize);
+        spinv.getqn(iblk, 0, 0, qnum, &nsize);
         if (nsize == 0)
           continue;
         lblk = iblk;
@@ -424,8 +428,7 @@ int main(int argc, char *argv[])
         /*  get energies and derivatives */
         egy = pmix + nsize;
         egyder = egy + nsize;
-        hamx(iblk, nsize, npar, idpar, par, egy, teig, egyder, pmix,
-             FALSE);
+        spinv.hamx(iblk, nsize, npar, idpar, par, egy, teig, egyder, pmix, FALSE);
       }
       /* save energies and derivatives for lines in this block */
       dnuadd(nfit, nxfit, initl, indx, ifac, egy, egyder, nsize, line,
@@ -708,7 +711,7 @@ int main(int argc, char *argv[])
   /************************************************************************/
 
   lbufof(-1, 0);      /* release storage */
-  setblk(lufit, 0, idpar, par, &nblkpf, &maxdm);        /* release storage */
+  spinv.setblk(lufit, 0, idpar, par, &nblkpf, &maxdm); /* release storage */
   if (itr == 0) {
     puts(" output files not updated");
     exit(0);
@@ -846,9 +849,7 @@ int qnfmt2(int nqn, short *qnum, char *aqnum)
  * @param ptmp Output string buffer for formatted parameter
  * @return int Always returns 0
  */
-int parer(par, errx, dif, ptmp)
-double par, errx, dif;
-char *ptmp;
+int parer(double par, double errx, double dif, char *ptmp)
 {
   static int czero = (int) '0';  /* ASCII code for '0' character */
   char *pfmt;                    /* Pointer for building format string */
@@ -953,10 +954,7 @@ char *ptmp;
  * @param iqnfmt Quantum number format for line input
  * @return int Largest quantum number encountered
  */
-int linein(luin, nline, iqnfmt)
-FILE *luin;
-int *nline;
-int iqnfmt;
+int linein(FILE *luin, int *nline, int iqnfmt)
 {
   /* Local variables */
   SXLINE *xline;                /* Pointer to line data structure */
@@ -1075,9 +1073,7 @@ int iqnfmt;
  * @param iqnfmt Quantum number format for line input
  * @return int Number of bad lines
  */
-int lineix(lu, flg, nline, nblkpf, iqnfmt)
-FILE *lu;
-int flg, nline, nblkpf, iqnfmt;
+int lineix(FILE *lu, int flg, int nline, int nblkpf, int iqnfmt)
 {  /*   get lines from input and store them */
   /*     LU = unit for printout of lines ( if > 0 ) */
   /*     NLINE = number of lines */

@@ -4,9 +4,17 @@
 
 /*   Herbert M. Pickett, 20 March 1989 */
 /*   Revised version in c, 22 March 1999 */
+#ifndef _CALPGM_H_
+#define _CALPGM_H_
+
+// This #ifdef block is the key
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stdio.h>
+#include <stdbool.h>
 #ifndef BOOL
-typedef int bool;
 #define BOOL bool
 #endif
 #ifndef TRUE
@@ -21,6 +29,7 @@ typedef int bool;
 #ifndef EXIT_FAILURE
 #define EXIT_FAILURE 1
 #endif
+
 /**********common structures*********************************************/
 #define NDHEAPF 1200000L /* suggested length of store for heap (calfit)*/
 #define NDHEAPC 1200000L /* suggested length of store for heap (calcat)*/
@@ -28,7 +37,7 @@ typedef int bool;
 #define MAXQN 10  /* maximum number of quanta */
 #define NDECDIP 6 /* number of digit pairs + 1 for idip */
 
-typedef struct {
+typedef struct SXLINE_S {
   double cfrq;   /* calc. frequency   */
   double xfrq;   /* expt. frequency   */
   /*@dependent@*/ double *dnudp; /* freq. derivatives */
@@ -43,8 +52,10 @@ typedef struct {
   short  bln;    /* blend flag               */
   short  qn[2*MAXQN]; /* quantum number input     */
 } SXLINE;
+typedef struct SXLINE_S SXLINE;
 typedef unsigned char bcd_t;
 #define NEGBCD(ivbcd) (int)(ivbcd & 0x80)
+
 /************** BLAS interface ******************************************/
 #include "cblas.h"
 #define idamax cblas_idamax
@@ -87,22 +98,24 @@ int putbcd(/*@out@*/ char *line, int nlen, const bcd_t *ivbcd);
 int bcd2i(bcd_t btmp);
 bcd_t i2bcd(int i);
 #include "catutil.h"
+
 /************** SPINV or DPI interface *********************************/
-int hamx(const int iblk, const int nsiz, const int npar, const bcd_t *idpar,
-         const double *par, /*@out@*/ double *egy, /*@out@*/ double *t,
-         /*@out@*/ double *dedp, /*@out@*/ double *pmix, const BOOL ifdump);
-int setint(FILE *lu, /*@out@*/BOOL *ifdiag, /*@out@*/int *nsav, const int ndip,
-           bcd_t *idip, /*@out@*/ int *isimag);
-int intens(const int iblk, const int isiz, const int jblk, const int jsiz,
-           const int ndip, const bcd_t *idip, const double *dip,
-           /*@out@*/double *s);
-int getqn(const int iblk,const int indx,const int maxqn, /*@out@*/short *iqn,
-          /*@out@*/int *idgn);
-int setopt(FILE *lu, /*@out@*/ int *nfmt, /*@out@*/ int *itd,
-           /*@out@*/ int *nbcdpar, /*@out@*/char *namfil);
-int setfmt(/*@out@*/ int *iqnfmt, int nfmt);
-int setblk(FILE *lu, const int npar, bcd_t *idpar, const double *par,
-           int *nblkpf, int *negy);
+// int hamx(const int iblk, const int nsiz, const int npar, const bcd_t *idpar,
+//          const double *par, /*@out@*/ double *egy, /*@out@*/ double *t,
+//          /*@out@*/ double *dedp, /*@out@*/ double *pmix, const BOOL ifdump);
+// int setint(FILE *lu, /*@out@*/BOOL *ifdiag, /*@out@*/int *nsav, const int ndip,
+//            bcd_t *idip, /*@out@*/ int *isimag);
+// int intens(const int iblk, const int isiz, const int jblk, const int jsiz,
+//            const int ndip, const bcd_t *idip, const double *dip,
+//            /*@out@*/double *s);
+// int getqn(const int iblk,const int indx,const int maxqn, /*@out@*/short *iqn,
+//           /*@out@*/int *idgn);
+// int setopt(FILE *lu, /*@out@*/ int *nfmt, /*@out@*/ int *itd,
+//            /*@out@*/ int *nbcdpar, /*@out@*/char *namfil);
+// int setfmt(/*@out@*/ int *iqnfmt, int nfmt);
+// int setblk(FILE *lu, const int npar, bcd_t *idpar, const double *par,
+//            int *nblkpf, int *negy);
+
 /************** SUBFIT interfaces ***********************************/
 int getlbl(int npar, bcd_t *idpar, /*@out@*/ char *parlbl, char *fil, int idiv,
            int len);
@@ -110,7 +123,7 @@ int getblk(/*@out@*/ int *iblk, /*@out@*/ int *indx, short *iqnum,
            int nblkpf, int ipos, int nqn);
 int filbak(char *flu, char *fbak);
 int prcorr(FILE *lufit, int npar, double *cor, int ndcor, double *err);
-/*@dependent@*/ SXLINE *lbufof(int iflg, int ipos);
+SXLINE * lbufof(int iflg, int ipos);
 void dnuadd(int npar, int nparx, int initl, int indx,
             int ifac, double *egy, double *egyder, int nsize,
             int line, double *par, double *fac);
@@ -120,5 +133,12 @@ int getdbk(int *link, /*@out@*/ int *iblk, /*@out@*/ int *indx,
 int frqdat(int line, /*@out@*/ int *ibln, /*@out@*/ double *xfrq,
         /*@out@*/ double *xwt, /*@out@*/ double *xerr, /*@out@*/ short *iqn);
 int lnlink(int *prvblk, int nblk, int iblk, int line);
+
 /************** SORTSUB interfaces ***********************************/
 int sortn(char *inpname, char *outname, BOOL dokey);
+
+#ifdef __cplusplus
+} // end extern "C"
+#endif
+
+#endif /* _CALPGM_H_ */

@@ -3,6 +3,14 @@
 /*   NASA Contract NAS7-918 is acknowledged. */
 
 /*   Herbert M. Pickett, 20 March 1989 */
+#ifndef _SPINIT_H_
+#define _SPINIT_H_
+
+// This #ifdef block is the key
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define MAXITOT 6
 typedef struct {
   /*@dependent@*/ double *eigvec;
@@ -28,8 +36,15 @@ typedef struct str_itot {
   int ii, ltot, lv1, lv2, neqi;
 } SITOT;
 
+struct SpinvContext;
 void getzitot(double *z, int lls, int ii, const int *lscom,
               const int *iscom, const int* jscom, int alpha, int neqi);
-void setzitot(int lv1, int lv2, int ltot, int ii, int neqi);
+void setzitot(struct SpinvContext *ctx, int lv1, int lv2, int ltot, int ii, int neqi);
 /*@dependent@*/  /*@null@*/
 ITMIX *get_itmix(const int ii, const int nitot);
+
+#ifdef __cplusplus
+} // end extern "C"
+#endif
+
+#endif /* _SPINIT_H_ */

@@ -1,4 +1,11 @@
 /* shared internal header file for spinv functionality */
+#ifndef _SPINV_INTERNAL_H_
+#define _SPINV_INTERNAL_H_
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <ctype.h>
 
 #define ODD(i)  (((int)(i) & 1) != 0) /* Check if integer i is odd */
@@ -143,11 +150,29 @@ typedef struct {   /* Cached data for getqn function to speed up repeated calls 
   int cwt[5];     /* Cached statistical weights for this block */
 } GETQN;
 
-
 /* Function Declarations */
 struct SpinvContext;
 
-int dclr(const int n1, const int n2, double *vec, const int ix);
+/* Public interface functions, formerly in calpgm.h, now encapsulated in SpinvEngine */
+int hamx(struct SpinvContext *ctx, const int iblk, const int nsiz, const int npar, const bcd_t *idpar,
+         const double *par, /*@out@*/ double *egy, /*@out@*/ double *t,
+         /*@out@*/ double *dedp, /*@out@*/ double *pmix, const BOOL ifdump);
+int setint(struct SpinvContext *ctx, FILE *lu, /*@out@*/ BOOL *ifdiag, /*@out@*/ int *nsav, const int ndip,
+           bcd_t *idip, /*@out@*/ int *isimag);
+int intens(struct SpinvContext *ctx, const int iblk, const int isiz, const int jblk, const int jsiz,
+           const int ndip, const bcd_t *idip, const double *dip,
+           /*@out@*/ double *s);
+int getqn(struct SpinvContext *ctx, const int iblk, const int indx, const int maxqn, /*@out@*/ short *iqn,
+          /*@out@*/ int *idgn);
+int setopt(struct SpinvContext *ctx, FILE *lu, /*@out@*/ int *nfmt, /*@out@*/ int *itd,
+           /*@out@*/ int *nbcdpar, /*@out@*/ char *namfil);
+int setfmt(struct SpinvContext *ctx, /*@out@*/ int *iqnfmt, int nfmt);
+int setblk(struct SpinvContext *ctx, FILE *lu, const int npar, bcd_t *idpar, const double *par,
+           int *nblkpf, int *negy);
+
+/* internal functions */
+
+int dclr(struct SpinvContext *ctx, const int n1, const int n2, double *vec, const int ix);
 int specop(struct SpinvContext* ctx, const int neuler, BOOL * newblk, int *nsqj, int *ikq,
                   const int ksi, const int ksj, const int ni, const int nj,
                   const int ncos, double *wk, const short *ix,
@@ -217,3 +242,9 @@ int dircos(struct SpinvContext* ctx, const int *xbra, const int *xket, const int
                   const int ifup, const int loff, int mask,
                   /*@out@*/ int *isunit);
 int ffcal(struct SpinvContext* ctx, const int nff, const int kff, /*@out@*/ double *ff);
+
+#ifdef __cplusplus
+} // end extern "C"
+#endif
+
+#endif /* _SPINV_INTERNAL_H_ */

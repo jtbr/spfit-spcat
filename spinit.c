@@ -12,11 +12,14 @@
 #include "calpgm.h"
 #include "spinit.h"
 #include "spinv_internal.h"
+#include "SpinvContext.hpp"
 
 /*@null@*/ static ITMIX *itmix_head = NULL;
 /*@null@*/ static SITOT *ithead = NULL;
 static int fc_neqi;
 static double zrfc[MAXITOT], zifc[MAXITOT];
+
+static double zero = 0.; // TODO REMOVE
 
 /* spin coupling pairs, npair = (neqi - 1)
        value >= npair is spin_n with n = (value - npair) = 0,.., npair
@@ -122,7 +125,7 @@ void getzitot(double *zfac, int ltot, int ii, const int *lscomv,
   *zfac *= val;
 } /* getzitot */
 
-void setzitot(int lv1, int lv2, int lvt, int ii, int neqi)
+void setzitot(struct SpinvContext *ctx, int lv1, int lv2, int lvt, int ii, int neqi)
 { /* calculate reduced matrix elements of nuclear spins */
   /* used by getzitot */
   /* lv1 = tensor order of first spin */
@@ -268,7 +271,7 @@ void setzitot(int lv1, int lv2, int lvt, int ii, int neqi)
 	  }
 	  if (k == nm2) {
 	    iscomv[k] = qni[k]; val = tfac;
-	    tensor(&val, iscomv, jscomv, lscomv, itpair, nm1, -1);
+	    tensor(ctx, &val, iscomv, jscomv, lscomv, itpair, nm1, -1);
 	    vec[i] += val;
 	  }
 	}
