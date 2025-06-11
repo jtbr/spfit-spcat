@@ -7,7 +7,6 @@
 #ifndef _CALPGM_H_
 #define _CALPGM_H_
 
-// This #ifdef block is the key
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -119,8 +118,8 @@ bcd_t i2bcd(int i);
 /************** SUBFIT interfaces ***********************************/
 int getlbl(int npar, bcd_t *idpar, /*@out@*/ char *parlbl, char *fil, int idiv,
            int len);
-int getblk(/*@out@*/ int *iblk, /*@out@*/ int *indx, short *iqnum,
-           int nblkpf, int ipos, int nqn);
+//int getblk(/*@out@*/ int *iblk, /*@out@*/ int *indx, short *iqnum,
+//           int nblkpf, int ipos, int nqn);
 int filbak(char *flu, char *fbak);
 int prcorr(FILE *lufit, int npar, double *cor, int ndcor, double *err);
 SXLINE * lbufof(int iflg, int ipos);

@@ -1,6 +1,10 @@
 #ifndef SPINV_CONTEXT_HPP
 #define SPINV_CONTEXT_HPP
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "calpgm.h"
 #include "spinit.h"
 #include "spinv_internal.h"
@@ -74,5 +78,9 @@ struct SpinvContext {
   short *ibkptr;  /* Array of pointers to the start of each sub-block (Wang block * spin) */
   short *ikmin;   /* Array of minimum K values for each sub-block */
 };
+
+#ifdef __cplusplus
+} // extern "C"
+#endif
 
 #endif // SPINV_CONTEXT_HPP

@@ -70,6 +70,7 @@ int linein(FILE * luin, int *nline, int iqnfmt);
 /**
  * @brief Process lines and set up block structure for fitting
  *
+ * @param calc Engine used for finding relevant quantum numbers
  * @param lu Output file pointer for listing
  * @param flg Flag for printing (negative for detailed output)
  * @param nline Number of lines
@@ -77,7 +78,12 @@ int linein(FILE * luin, int *nline, int iqnfmt);
  * @param iqnfmt Quantum number format for line input
  * @return int Number of bad lines
  */
-int lineix(FILE * lu, int flg, int nline, int nblkpf, int iqnfmt);
+int lineix(CalculationEngine *calc, FILE *lu, int flg,
+           int nline, int nblkpf, int iqnfmt);
+
+int getblk(CalculationEngine *calc, /*@out@*/ int *iblk,
+           /*@out@*/ int *indx, short *iqnum,
+           int nblkpf, int ipos, int nqn);
 /********************************************************************/
 static char card[NDCARD];  /* Buffer for reading input lines */
 
@@ -385,7 +391,7 @@ int main(int argc, char *argv[])
   /* set parameter labels */
   getlbl(npar, idpar, parlbl, namfil, k, LBLEN);
   /* convert lines */
-  line = lineix(lufit, nitr, nline, nblkpf, iqnfmt);
+  line = lineix(calc, lufit, nitr, nline, nblkpf, iqnfmt);
   if (line > 0)
     printf("%d bad lines\n", line);
   fflush(stdout);
@@ -1094,7 +1100,7 @@ int linein(FILE *luin, int *nline, int iqnfmt)
  * @param iqnfmt Quantum number format for line input
  * @return int Number of bad lines
  */
-int lineix(FILE *lu, int flg, int nline, int nblkpf, int iqnfmt)
+int lineix(CalculationEngine *calc, FILE *lu, int flg, int nline, int nblkpf, int iqnfmt)
 {  /*   get lines from input and store them */
   /*     LU = unit for printout of lines ( if > 0 ) */
   /*     NLINE = number of lines */
@@ -1143,8 +1149,8 @@ int lineix(FILE *lu, int flg, int nline, int nblkpf, int iqnfmt)
     xwtn = xline->xwt;
     /* find blocks and index for upper and lower states */
     iqnum = xline->qn;
-    getblk(&iblku, &indxu, iqnum, nblkpf, ipos, nqn);
-    getblk(&iblkl, &indxl, &iqnum[nqn], nblkpf, ipos, nqn);
+    getblk(calc, &iblku, &indxu, iqnum, nblkpf, ipos, nqn);
+    getblk(calc, &iblkl, &indxl, &iqnum[nqn], nblkpf, ipos, nqn);
     if (iblkl == 0 && iqnum[nqn] >= 0)
       iblku = 0;
     xline->ibu = iblku;
@@ -1235,3 +1241,108 @@ int lineix(FILE *lu, int flg, int nline, int nblkpf, int iqnfmt)
   free(prvblk);
   return nbad;
 }                               /* lineix */
+
+int getblk(CalculationEngine *calc, int *iblk, int *indx,
+           short *iqnum, int nblkpf, int ipos, int nqn)
+{
+  int ibgn, kbgn, nblk, iqnf, k, idblk, kdtau, kk, nn, icmp;
+  int iblkx, indxx, idgn, nsize, ncod;
+  short kqnum[MAXQN];
+
+  /*  gets block (IBLK) and INDEX from quantum numbers (IQNUM) */
+
+  /*     NBLKPF IS THE NUMBER OF BLOCKS PER "F" */
+  /*     IPOS   IS THE POSITION IN IQNUM TO FIND "F" */
+  /*     NQN    IS THE NUMBER OF QUANTUM NUMBERS */
+
+  *indx = 0;
+  *iblk = 0;
+  /*   ..check for indication of null level */
+  if (iqnum[0] < 0)
+    return 0;
+  --ipos;
+  iqnf = iqnum[ipos];
+  iqnum[ipos] = iqnum[0];
+  ibgn = iqnf;
+  nblk = nblkpf;
+  if (ibgn < 0)
+  {
+    ibgn = -ibgn;
+    k = 10 - ibgn;
+    if (k > 1)
+      nblk *= k;
+  }
+  ibgn *= nblkpf;
+  /*   ..loop over blocks for given F */
+  icmp = 1;
+  iblkx = indxx = 0;
+  for (idblk = 1; idblk <= nblk; ++idblk)
+  {
+    iblkx = ibgn + idblk;
+    calc->getqn(iblkx, 0, 0, kqnum, &nsize);
+    indxx = 1;
+    /*       ..search for match within block */
+    while (indxx <= nsize)
+    {
+      ncod = calc->getqn(iblkx, indxx, nqn, kqnum, &idgn);
+      kqnum[ipos] = kqnum[0];
+      nn = (ncod > 0) ? ncod : -ncod;
+      /*           ..NN is the size of a wang sub-block */
+      /*           ..NCOD < 0 if oblate basis */
+      if (nn <= 1)
+      {
+        nn = 1;
+        kbgn = 1;
+      }
+      else
+      {
+        kbgn = 3;
+      }
+      icmp = 0;
+      for (k = kbgn; k < nqn; ++k)
+      {
+        icmp = iqnum[k] - kqnum[k];
+        if (icmp != 0)
+          break;
+      }
+      if (icmp == 0)
+      {
+        /* all quanta tested equal */
+        if (nn == 1)
+          break;
+        /* assignment could be in this sub-block */
+        kdtau = iqnum[1] - iqnum[2] - kqnum[1] + kqnum[2];
+        if (ncod < 0)
+          kdtau = -kdtau;
+        if (kdtau >= 0 && (kdtau & 3) == 0)
+        { /* symmetry is good */
+          kk = (int)((unsigned)kdtau >> 2);
+          if (kk < nn)
+          {
+            /* value is in range */
+            indxx += kk;
+            break;
+          }
+        }
+        ++icmp;
+      }
+      /*  to get here, quanta were not right */
+      indxx += nn;
+    }
+    if (icmp == 0)
+      break;
+  }
+  if (icmp == 0)
+  { /*   standard return */
+    if (nblk > nblkpf)
+    {
+      iqnf -= (iblkx - ibgn - 1) / nblkpf;
+    }
+    if (iqnf < 0)
+      indxx = -indxx;
+    *iblk = iblkx;
+    *indx = indxx;
+  }
+  iqnum[ipos] = (short)iqnf;
+  return 0;
+} /* getblk */

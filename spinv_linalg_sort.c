@@ -357,7 +357,7 @@ int bestk(struct SpinvContext *ctx, const int ndm, const int nsize, short *iqnse
  * )
  * @return int Always 0.
  */
-int dclr(struct SpinvContext *ctx, const int n1, const int n2, double *vec, const ix)
+int dclr(struct SpinvContext *ctx, const int n1, const int n2, double *vec, const int ix)
 { /*  clear a N1*N2 block */            /* Original comment */
   static long nbig_chunk_size = 0x7ff0; /* Max elements for dcopy at once (approx 32k, for 16-bit int limit?) */
   long n_elements_to_clear;             /* Renamed nsq */

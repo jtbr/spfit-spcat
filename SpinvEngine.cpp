@@ -1,6 +1,6 @@
+#include <cstdlib>
 #include "spinv_internal.h"
 #include "SpinvEngine.hpp"
-#include <cstdlib>
 
 SpinvEngine::SpinvEngine() :
   m_context {

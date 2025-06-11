@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.0)
 project(spfit LANGUAGES C CXX DESCRIPTION "SPFIT/SPCAT")
 cmake_policy(SET CMP0057 NEW)
+# set with `cmake [path] -DBUILD_ALL=ON`
+option(BUILD_ALL "Build all executables" OFF)
 
 # TODO re-add debug options
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -O3 -march=native")
@@ -55,6 +57,7 @@ set(SOURCE_FILES
     readopt.c  # Added missing common files
 )
 
+set_source_files_properties(${SOURCE_FILES} PROPERTIES COMPILE_FLAGS "-Wno-missing-field-initializers")
 #set_source_files_properties(${SOURCE_FILES} PROPERTIES COMPILE_FLAGS "-Wno-unused-function")
 
 # Add executable macro
@@ -88,6 +91,14 @@ endmacro()
 
 # Define executables
 set(DEFAULT_EXECUTABLES spfit spcat)
+set(OPTIONAL_EXECUTABLES calmrg moiam stark termval sortn calbak reassign sortegy iambak)
+if(BUILD_ALL)
+    set(EXECUTABLES ${DEFAULT_EXECUTABLES} ${OPTIONAL_EXECUTABLES})
+else()
+    set(EXECUTABLES ${DEFAULT_EXECUTABLES})
+endif()
+
+
 if(NOT DEFINED EXECUTABLES)
   set(EXECUTABLES ${DEFAULT_EXECUTABLES})
 endif()

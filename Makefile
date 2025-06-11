@@ -19,10 +19,14 @@ install:
 	-mv ${EXEQ} /usr/local/bin
 clean:
 	rm -f ${EXEA} *.o *.a
+
+SPLIB_OBJFILES=ulib.o cnjj.o slibgcc.o catutil.o lsqfit.o
+SPINV_OBJFILES=spinv_setup.o spinv_spin_symmetry.o spinv_linalg_sort.o spinv_hamiltonian.o spinv_utils.o
+OBJFILES=dpi.o spinit.o $(SPLIB_OBJFILES) $(SPINV_OBJFILES) SpinvEngine.o DpiEngine.o
 # dpfit: calfit.o subfit.o dpi.o splib.a; gcc -o $@ $^ $(BLASLIB) -lm
 # dpcat: calcat.o sortsub.o dpi.o splib.a; gcc -o $@ $^ $(BLASLIB) -lm
-spfit: calfit.o subfit.o spinv.a dpi.o spinit.o splib.a SpinvEngine.o DpiEngine.o; g++ -o $@ $^ $(BLASLIB) -lm
-spcat: calcat.o sortsub.o spinv.a dpi.o spinit.o splib.a SpinvEngine.o DpiEngine.o; g++ -o $@ $^ $(BLASLIB) -lm
+spfit: calfit.o subfit.o $(OBJFILES); g++ -o $@ $^ $(BLASLIB) -lm
+spcat: calcat.o sortsub.o $(OBJFILES); g++ -o $@ $^ $(BLASLIB) -lm
 calmrg: calmrg.o splib.a; gcc -o $@ $^ $(BLASLIB) -lm
 calbak: calbak.o splib.a; gcc -o $@ $^ $(BLASLIB) -lm
 termval: termval.o splib.a; gcc -o $@ $^ $(BLASLIB) -lm
@@ -39,9 +43,9 @@ splib.a: ulib.o cnjj.o slibgcc.o catutil.o lsqfit.o $(LBLAS)
 	ar r splib.a $^
 	ranlib splib.a
 
-spinv.a: spinv_setup.o spinv_spin_symmetry.o spinv_linalg_sort.o spinv_hamiltonian.o spinv_utils.o
-	ar r spinv.a $^
-	ranlib spinv.a
+# spinv.a: spinv_setup.o spinv_spin_symmetry.o spinv_linalg_sort.o spinv_hamiltonian.o spinv_utils.o
+# 	ar r libspinv.a $^
+# 	ranlib libspinv.a
 
 calfit.o:calfit.cpp calpgm.h SpinvEngine.hpp
 #	gcc -c calfit.cpp $(CFLAGS)
