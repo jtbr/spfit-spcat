@@ -30,6 +30,7 @@
 //#include "calpgm.h"
 #include "lsqfit.h"
 #include "SpinvEngine.hpp"
+#include "DpiEngine.hpp"
 
 #define NDCARD 130
 #define PR_DELAY 6    /* seconds delay between informational messages */
@@ -134,8 +135,19 @@ int main(int argc, char *argv[])
   marqflg = 0;
   nsize_p = maxmem(&nl);
 
-  /* initialize SpinvEngine */
-  SpinvEngine spinv;
+  CalculationEngine *calc = new SpinvEngine(); // DEFAULT;
+  // Choose the calculation engine (SPINV by default, or DPI) based upon the first argument to the software.
+  if (argc > 1) {
+    if (strcasecmp(argv[1], "--dpi") == 0) {
+      delete calc;
+      calc = new DpiEngine();
+      char *name = *argv; argv++; *argv = name; argc--; // remove first argument (second element)
+    } else {
+      if (strcasecmp(argv[1], "--spinv") == 0) {
+        char *name = *argv; argv++; *argv = name; argc--; // remove first argument (second element)
+      }
+    }
+  }
 
   /*     open read and write files */
   filget(argc, argv, NFILE, fname, ext);
@@ -147,6 +159,7 @@ int main(int argc, char *argv[])
 
   if (fgetstr(card, NDCARD, lubak) <= 0) {
     puts(" Unable to read title of .par file");
+    delete calc;
     exit(EXIT_FAILURE);
   }
   chtime(card, 82);
@@ -166,6 +179,7 @@ int main(int argc, char *argv[])
     n = pcard(card, dvec, 8, NULL);
   if (n == 0) {
     puts(" Unable to read second line of .par file");
+    delete calc;
     exit(EXIT_FAILURE);
   }
   npar = (int) dvec[0];
@@ -193,16 +207,18 @@ int main(int argc, char *argv[])
   }
   if ((long) nline != (long) nl) {
     puts(" number of lines too big for this computer ");
+    delete calc;
     exit(EXIT_FAILURE);
   }
   /*  read in option card(s) */
   iqnfmt = 0; nfmt = catqn;
-  noptn = spinv.setopt(lubak, &nfmt, &itd, &ndbcd, namfil);
+  noptn = calc->setopt(lubak, &nfmt, &itd, &ndbcd, namfil);
   if (noptn <= 0) {
     puts("Error reading option lines");
+    delete calc;
     exit(EXIT_FAILURE);
   }
-  nqn = spinv.setfmt(&iqnfmt, 1);
+  nqn = calc->setfmt(&iqnfmt, 1);
   if (nqn > MAXCAT) catqn = nqn;
   nqn = nqn + nqn;
   printf(       "LINES REQUESTED=%5d NUMBER OF PARAMETERS=%3d", limlin, npar);
@@ -231,6 +247,7 @@ int main(int argc, char *argv[])
   if (ndfit > nsize_p) {
     printf("number of independent parameters is too big: %d %d\n",
            nfit, nsize_p - 1);
+    delete calc;
     exit(EXIT_FAILURE);
   }
   nl = (size_t) nfit * sizeof(int);
@@ -358,12 +375,13 @@ int main(int argc, char *argv[])
   fflush(stdout);
   if (nline <= 0) {
     puts("no lines read");
+    delete calc;
     exit(EXIT_FAILURE);
   }
   /* initialize block structure */
   nblkpf = maxf;
   maxdm = nsize_p;
-  k = spinv.setblk(lufit, npar, idpar, par, &nblkpf, &maxdm);
+  k = calc->setblk(lufit, npar, idpar, par, &nblkpf, &maxdm);
   /* set parameter labels */
   getlbl(npar, idpar, parlbl, namfil, k, LBLEN);
   /* convert lines */
@@ -374,6 +392,7 @@ int main(int argc, char *argv[])
   /* allocate memory for energy, derivatives, and eigenvector */
   if (maxdm > nsize_p) {
     printf(" Hamiltonian dinension is too big: %d %d\n", maxdm, nsize_p);
+    delete calc;
     exit(EXIT_FAILURE);
   }
   nlsq = (size_t) maxdm;
@@ -409,14 +428,14 @@ int main(int argc, char *argv[])
       if (iblk != lblk) {       /*  get size of block */
         if (rqexit(0) != 0)
           break;                /*  check operator interrupt */
-        spinv.getqn(iblk, 0, 0, qnum, &nsize);
+        calc->getqn(iblk, 0, 0, qnum, &nsize);
         if (nsize == 0)
           continue;
         lblk = iblk;
         if (nsize > maxdm) {
-          printf
-              ("WARNING .. SIZE OF BLOCK %d2 IS %d AND EXCEEDS DIMENSIONS\n",
-               iblk, nsize);
+          printf("WARNING .. SIZE OF BLOCK %d2 IS %d AND EXCEEDS DIMENSIONS\n",
+                 iblk, nsize);
+          delete calc;
           exit(EXIT_FAILURE);
         }
         k = (iblk - 1) / nblkpf;
@@ -428,7 +447,7 @@ int main(int argc, char *argv[])
         /*  get energies and derivatives */
         egy = pmix + nsize;
         egyder = egy + nsize;
-        spinv.hamx(iblk, nsize, npar, idpar, par, egy, teig, egyder, pmix, FALSE);
+        calc->hamx(iblk, nsize, npar, idpar, par, egy, teig, egyder, pmix, FALSE);
       }
       /* save energies and derivatives for lines in this block */
       dnuadd(nfit, nxfit, initl, indx, ifac, egy, egyder, nsize, line,
@@ -711,9 +730,10 @@ int main(int argc, char *argv[])
   /************************************************************************/
 
   lbufof(-1, 0);      /* release storage */
-  spinv.setblk(lufit, 0, idpar, par, &nblkpf, &maxdm); /* release storage */
+  calc->setblk(lufit, 0, idpar, par, &nblkpf, &maxdm); /* release storage */
   if (itr == 0) {
     puts(" output files not updated");
+    delete calc;
     exit(0);
   }
   rewind(lubak);
@@ -799,6 +819,7 @@ int main(int argc, char *argv[])
   free(idpar);
   free(par);
   free(parlbl);
+  delete calc;
   return 0;
 }                               /* MAIN */
 

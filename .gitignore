@@ -3,8 +3,6 @@
 # build targets
 spcat
 spfit
-dpcat
-dpfit
 calbak
 calmrg
 # build "all" targets

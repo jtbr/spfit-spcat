@@ -1,5 +1,5 @@
-#include "SpinvEngine.hpp"
 #include "spinv_internal.h"
+#include "SpinvEngine.hpp"
 #include <cstdlib>
 
 SpinvEngine::SpinvEngine() :

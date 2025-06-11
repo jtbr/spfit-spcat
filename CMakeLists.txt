@@ -31,7 +31,7 @@ set(SOURCE_FILES
     spinv_utils.c
     spinit.c
     SpinvEngine.cpp
-    calcat.c
+    calcat.cpp
     sortsub.c
     calmrg.c
     calbak.c
@@ -103,7 +103,9 @@ if("spfit" IN_LIST EXECUTABLES)
     spinv_hamiltonian.c
     spinv_utils.c
     spinit.c
+    dpi.c
     SpinvEngine.cpp
+    DpiEngine.cpp
     catutil.c
     ulib.c
     cnjj.c
@@ -117,7 +119,7 @@ endif()
 # Add spcat
 if("spcat" IN_LIST EXECUTABLES)
   add_executable_plus(spcat TRUE # This target uses BLAS
-    calcat.c
+    calcat.cpp
     sortsub.c
     spinv_setup.c
     spinv_spin_symmetry.c
@@ -125,7 +127,9 @@ if("spcat" IN_LIST EXECUTABLES)
     spinv_hamiltonian.c
     spinv_utils.c
     spinit.c
+    dpi.c
     SpinvEngine.cpp
+    DpiEngine.cpp
     catutil.c
     ulib.c
     cnjj.c
@@ -135,27 +139,27 @@ if("spcat" IN_LIST EXECUTABLES)
   )
 endif()
 
-# Add dpfit
-if (NOT DEFINED EXCLUDE_CALMRG AND "calmrg" IN_LIST EXECUTABLES)
-  add_executable_plus(calmrg TRUE # This target uses BLAS
-      calfit.c
-      sortfit.c
-      dpi.c
-      ulib.c cnjj.c slibgcc.c catutil.c lsqfit.c # splib
-      # dblas.c removed
-  )
-endif()
+# # Add dpfit
+# if (NOT DEFINED EXCLUDE_CALMRG AND "calmrg" IN_LIST EXECUTABLES)
+#   add_executable_plus(calmrg TRUE # This target uses BLAS
+#       calfit.c
+#       sortfit.c
+#       dpi.c
+#       ulib.c cnjj.c slibgcc.c catutil.c lsqfit.c # splib
+#       # dblas.c removed
+#   )
+# endif()
 
-# Add dpcat
-if (NOT DEFINED EXCLUDE_CALMRG AND "calmrg" IN_LIST EXECUTABLES)
-  add_executable_plus(calmrg TRUE # This target uses BLAS
-      calcat.c
-      sortsub.c
-      dpi.c
-      ulib.c cnjj.c slibgcc.c catutil.c lsqfit.c # splib
-      # dblas.c removed
-  )
-endif()
+# # Add dpcat
+# if (NOT DEFINED EXCLUDE_CALMRG AND "calmrg" IN_LIST EXECUTABLES)
+#   add_executable_plus(calmrg TRUE # This target uses BLAS
+#       calcat.c
+#       sortsub.c
+#       dpi.c
+#       ulib.c cnjj.c slibgcc.c catutil.c lsqfit.c # splib
+#       # dblas.c removed
+#   )
+# endif()
 
 # --non defaults --
 

@@ -28,7 +28,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
-#include "calpgm.h"
+//#include "calpgm.h"
+//#include "lsqfit.h"
+#include "SpinvEngine.hpp"
+#include "DpiEngine.hpp"
+
 #define MAXQNX  13
 typedef struct {
   /*@owned@*/ /*@null@*/ double *eigblk;
@@ -48,6 +52,7 @@ SBLK *sblk_alloc(const int nstruct, const unsigned mxdm);
 
 /********************************************************************/
 #define PR_DELAY 6   /* seconds delay between informational messages */
+
 
 int main(int argc, char* argv[])
 {
@@ -100,6 +105,32 @@ int main(int argc, char* argv[])
   nsize_p = maxmem(&nl);
   pregy = FALSE;
   prstr = FALSE;
+
+  CalculationEngine *calc = new SpinvEngine(); // DEFAULT;
+  // Choose the calculation engine (SPINV by default, or DPI) based upon the first argument to the software.
+  if (argc > 1)
+  {
+    if (strcasecmp(argv[1], "--dpi") == 0)
+    {
+      delete calc;
+      calc = new DpiEngine();
+      char *name = *argv;
+      argv++;
+      *argv = name;
+      argc--; // remove first argument (second element)
+    }
+    else
+    {
+      if (strcasecmp(argv[1], "--spinv") == 0)
+      {
+        char *name = *argv;
+        argv++;
+        *argv = name;
+        argc--; // remove first argument (second element)
+      }
+    }
+  }
+
   filget(argc, argv, NFILE, fname, ext);
   luout = fopenq(fname[eout], "w");
   luegy = lustr = luout;
@@ -170,6 +201,7 @@ int main(int argc, char* argv[])
     puts(" ERROR IN READING  FIRST CARDS OF .INT");
     fclose(luint);
     fclose(luout);
+    delete calc;
     exit(EXIT_FAILURE);
   }
   if (qrot < 1)
@@ -276,16 +308,17 @@ int main(int argc, char* argv[])
   }
   /* read option line(s) */
   nfmt = catqn;
-  if (npar > 0 && setopt(luvar, &nfmt, &itd, &ndbcd, titl) <= 0)
+  if (npar > 0 && calc->setopt(luvar, &nfmt, &itd, &ndbcd, titl) <= 0)
     npar = 0;
   if (npar <= 0) {
     puts("Error reading .VAR file");
+    delete calc;
     exit(EXIT_FAILURE);
   }
   itmp = 10;
   iqnfmtv = (int *)mallocq((size_t) (nfmt << 1) * sizeof(int));
   iqnfmtv[0] = 0;
-  nqn = setfmt(iqnfmtv, nfmt);
+  nqn = calc->setfmt(iqnfmtv, nfmt);
   if (nqn > MAXCAT) {
     catqn = nqn;
   } else {
@@ -319,6 +352,7 @@ int main(int argc, char* argv[])
   ndel = (unsigned) (nfit + 1);
   if (nfit > nsize_p || nfit <= 0) {
     puts(" memory allocation error for var matrix");
+    delete calc;
     exit(EXIT_FAILURE);
   }
   if ((nfit & 1) == 0) {
@@ -334,7 +368,7 @@ int main(int argc, char* argv[])
   nbkpj = lblk;
   i = nsize_p;
   fprintf(luout, "IQNFMT = %d\n", iqnfmt);
-  setblk(luout, npar, idpar, par, &nbkpj, &i);
+  calc->setblk(luout, npar, idpar, par, &nbkpj, &i);
   maxdm = (unsigned) i;
   inblk = nbkpj * inblk + 1;
   lblk = nbkpj * (lblk + 1);
@@ -348,7 +382,7 @@ int main(int argc, char* argv[])
     s[k] = (double *) mallocq(nl);
   }
   /* set up DIAG,NSAV */
-  setint(luout, &diag, &nsav, ndip, idip, isimag);
+  calc->setint(luout, &diag, &nsav, ndip, idip, isimag);
   if (prstr) {
     k = 0; i = nvdip[0]; ij = 0;
     /* check dipole moments */
@@ -416,7 +450,7 @@ int main(int argc, char* argv[])
   scomp = -38;
   strmn = (starg > scomp) ? starg : scomp;
   strmn = pow(10., strmn);
-  maxqn = getqn(inblk, 0, 0, iqni, &isiz);
+  maxqn = calc->getqn(inblk, 0, 0, iqni, &isiz);
   if (maxqn > MAXQNX)
     maxqn = MAXQNX;
   ktsp = -1;
@@ -446,7 +480,7 @@ int main(int argc, char* argv[])
     /*  move first block to unused position */
     pblk = ibufof(-1, ndel, blk);
     /* get energy and derivatives for new block */
-    getqn(iblk, 0, 0, iqni, &isiz);
+    calc->getqn(iblk, 0, 0, iqni, &isiz);
     if (isiz <= 0)
       continue;
     if ((unsigned) isiz > maxdm)
@@ -462,7 +496,7 @@ int main(int argc, char* argv[])
     if (egy == NULL)
       break;
     dedp = egy + isiz;
-    hamx(iblk, isiz, npar, idpar, par, egy, teig, dedp, pmix, ifdump);
+    calc->hamx(iblk, isiz, npar, idpar, par, egy, teig, dedp, pmix, ifdump);
     /* print out energies and compute partition function */
     if (prfrq) {
       fprintf(luout, " ENERGIES FOR BLOCK NUMBER %3d, INDEX-DEGEN-ENERGY-",
@@ -475,7 +509,7 @@ int main(int argc, char* argv[])
     for (i = 0; i < isiz; ++i, teigp += isiz) {
       if (ifdump)
         kbgn = i;
-      getqn(iblk, i + 1, nqn, iqni, &idgn);
+      calc->getqn(iblk, i + 1, nqn, iqni, &idgn);
       if (idgn <= 0)
         continue;
       iv = iqni[iposv];
@@ -488,7 +522,7 @@ int main(int argc, char* argv[])
         ktsp = -1;
         if (newfmt != 0)
           ktsp = iqni[nqn - 2];
-        getqn(iblk, i + 1, maxqn, iqni, &idgn);
+        calc->getqn(iblk, i + 1, maxqn, iqni, &idgn);
       }
       if (diag) {   /* check if eigenvector is zero */
         if (fabs(teigp[i]) < 0.01) {
@@ -594,8 +628,8 @@ int main(int argc, char* argv[])
       ij = 0;
       for (i = 0; i < npdip; ++i) {     /*  get intensity */
         sij = s[i];
-        idf = intens(iblk, isiz, jblk, jsiz, nvdip[i],
-                     &idip[ij * NDECDIP], &dip[ij], sij);
+        idf = calc->intens(iblk, isiz, jblk, jsiz, nvdip[i],
+                           &idip[ij * NDECDIP], &dip[ij], sij);
         if (idf != 0) {
           if (diag)
             simt(isiz, jsiz, sij, teig, teigp, pmix);
@@ -613,7 +647,7 @@ int main(int argc, char* argv[])
       idf = (int) maxdm;
       jmax = jsiz;
       for (i = 0; i < isiz; ++i) {
-        getqn(iblk, i + 1, nqn, iqni, &idgn);
+        calc->getqn(iblk, i + 1, nqn, iqni, &idgn);
         if (idgn <= 0 || iqni[iposv] > (short)maxv)
           continue;
         dgn = idgn / dgnf;
@@ -622,7 +656,7 @@ int main(int argc, char* argv[])
         for (j = 0; j < jmax; ++j) {
           if (i - j + idf < 0)
             break;
-          getqn(jblk, j + 1, nqn, &iqni[MAXQN], &jdgn);
+          calc->getqn(jblk, j + 1, nqn, &iqni[MAXQN], &jdgn);
           if (jdgn <= 0 || iqni[iposv + MAXQN] > (short) maxv)
             continue;
           frq = egy[i] - egyp[j];
@@ -746,7 +780,7 @@ int main(int argc, char* argv[])
     fclose(luegy);
   if (prstr)
     fclose(lustr);
-  setblk(luout, 0, idpar, par, &nbkpj, &i);     /* release storage */
+  calc->setblk(luout, 0, idpar, par, &nbkpj, &i); /* release storage */
   fclose(luout);
   fclose(lucat);
   /* free up memory */
@@ -779,13 +813,11 @@ int main(int argc, char* argv[])
   free(dvec);
   /* sort cat file */
   sortn(fname[ecat], fname[ecat], FALSE);
+  delete calc;
   return 0;
 }                               /* main */
 
-int qnfmt(iqu, nqn, sqn)
-short *iqu;
-int nqn;
-char *sqn;
+int qnfmt(short *iqu, int nqn, char *sqn)
 { /* subroutine to do quick conversion of quantum integers to characters */
   static int czero = (int) '0';
   int i, k, ix;
@@ -826,9 +858,7 @@ char *sqn;
   return 0;
 }                               /* qnfmt */
 
-int simt(isiz, jsiz, s, t, u, wk)
-int isiz, jsiz;
-double *s, *t, *u, *wk;
+int simt(int isiz, int jsiz, double *s, double *t, double *u, double *wk)
 {
   int i, j;
   double *sij, *si, *tc, *uc;
@@ -863,10 +893,7 @@ double *s, *t, *u, *wk;
   return 0;
 }                               /* simt */
 
-SBLK *ibufof(ipos, ndel, blk)
-const int ipos;
-const unsigned int ndel;
-SBLK *blk;
+SBLK *ibufof(const int ipos, const unsigned int ndel, SBLK *blk)
 {
   /* Initialized data */
   static FILE *scratch;
@@ -982,9 +1009,7 @@ SBLK *blk;
   return pmblk;
 }                               /* ibufof */
 
-SBLK *sblk_alloc(nstruct, mxdem)
-const int nstruct;
-const unsigned mxdem;
+SBLK *sblk_alloc(const int nstruct, const unsigned mxdem)
 {
   SBLK *pret, *pblk;
   int k;

@@ -14,15 +14,15 @@
 #include <stdlib.h>
 #include <math.h>
 #include <string.h>
-#include "calpgm.h"
+#include "calpgm.h" // TODO: to remove
 #include "DpiContext.hpp"
 #include "dpi.h"
 
 /* Common Declarations */
 
-int hamx(struct DpiContext *ctx, const int iblk, const int nsize, const int npar,
-         const bcd_t *idpar, const double *par, double *egy, double *t, double *dedp,
-         double *pmix, const BOOL ifdump)
+int hamx_dpi(struct DpiContext *ctx, const int iblk, const int nsize, const int npar,
+             const bcd_t *idpar, const double *par, double *egy, double *t, double *dedp,
+             double *pmix, const BOOL ifdump)
 {
 #define NDPAR 27
 #define NZPAR 11
@@ -120,7 +120,7 @@ int hamx(struct DpiContext *ctx, const int iblk, const int nsize, const int npar
     }
     return nsize;
   }
-  getqn(ctx, iblk, 1, MAXQN, jq, &idgn);
+  getqn_dpi(ctx, iblk, 1, MAXQN, jq, &idgn);
   f = idgn - 1;
   aii = ctx->isdgn - 1;
   js = jq[0];
@@ -466,8 +466,8 @@ int hamx(struct DpiContext *ctx, const int iblk, const int nsize, const int npar
  * @param s Output intensity matrix
  * @return int Degeneracy of upper state, or 0 if no transition allowed
  */
-int intens(struct DpiContext *ctx, const int iblk, const int isiz, const int jblk,
-           const int jsiz, const int ndip, const bcd_t *idip, const double *dip, double *s)
+int intens_dpi(struct DpiContext *ctx, const int iblk, const int isiz, const int jblk,
+               const int jsiz, const int ndip, const bcd_t *idip, const double *dip, double *s)
 {
   double fac, aji, ajj, omeg, val;
   int idgn, jdgn, i, j, k, fi, fj, ix, jx, idif, jji, jjj, ii;
@@ -562,8 +562,8 @@ int intens(struct DpiContext *ctx, const int iblk, const int isiz, const int jbl
  * @param isimag Array for magnetic interaction flags
  * @return int Always returns 0
  */
-int setint(struct DpiContext *ctx, FILE *lu, BOOL *ifdiag, int *nsav,
-           const int ndip, bcd_t *idip, int *isimag)
+int setint_dpi(struct DpiContext *ctx, FILE *lu, BOOL *ifdiag, int *nsav,
+               const int ndip, bcd_t *idip, int *isimag)
 {
   (void) lu; /* do nothing, just avoid a warning */
   bcd_t iv,jv;
@@ -596,8 +596,8 @@ int setint(struct DpiContext *ctx, FILE *lu, BOOL *ifdiag, int *nsav,
  * @param idgn Pointer to degeneracy value
  * @return int Number of quantum numbers
  */
-int getqn(struct DpiContext *ctx, const int iblk, const int indx,
-          const int maxqn, short *iqn, int *idgn)
+int getqn_dpi(struct DpiContext *ctx, const int iblk, const int indx,
+              const int maxqn, short *iqn, int *idgn)
 {
   int kf, idif, tdgn, iv, ix;
 
@@ -647,7 +647,7 @@ int getqn(struct DpiContext *ctx, const int iblk, const int indx,
  * @param namfil Output name file path
  * @return int 1 for success, -1 for failure
  */
-int setopt(struct DpiContext *ctx, FILE *luin, int *nfmt, int *itd, int *ndbcd, char *namfil)
+int setopt_dpi(struct DpiContext *ctx, FILE *luin, int *nfmt, int *itd, int *ndbcd, char *namfil)
 {                               /* SET OPTIONS */
   char card[82];
   double val[2];
@@ -684,7 +684,7 @@ int setopt(struct DpiContext *ctx, FILE *luin, int *nfmt, int *itd, int *ndbcd, 
  * @param nfmt Number of quantum number formats
  * @return int Number of quantum numbers
  */
-int setfmt(struct DpiContext *ctx, int *iqnfmt, int nfmt)
+int setfmt_dpi(struct DpiContext *ctx, int *iqnfmt, int nfmt)
 {
   (void)nfmt; /* do nothing, just avoid a warning */
   *iqnfmt = 804;
@@ -712,7 +712,7 @@ int setfmt(struct DpiContext *ctx, int *iqnfmt, int nfmt)
  * @param negy Pointer to maximum size of energy matrix
  * @return int Size factor for vibrational states
  */
-int setblk(struct DpiContext *ctx, FILE *lu, const int npar, bcd_t *idpar, const double *par, int *nblkpf, int *negy)
+int setblk_dpi(struct DpiContext *ctx, FILE *lu, const int npar, bcd_t *idpar, const double *par, int *nblkpf, int *negy)
 {
   int nsiz;
   double ai;
@@ -728,7 +728,7 @@ int setblk(struct DpiContext *ctx, FILE *lu, const int npar, bcd_t *idpar, const
   } else {
     nsiz = 0;
   }
-  hamx(ctx, 0, nsiz, npar, idpar, par, &ai, &ai, &ai, &ai, 0);
+  hamx_dpi(ctx, 0, nsiz, npar, idpar, par, &ai, &ai, &ai, &ai, 0);
   nsiz = 1;
   if (ctx->nvib > 1)
     nsiz = 100;

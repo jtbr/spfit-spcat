@@ -1,0 +1,5 @@
+#!/bin/sh
+# the former 'dpfit' is now included as an option for spfit
+# executable is assumed to reside in the same directory as this script.
+SCRIPT_DIR=$(dirname $(readlink -f "$0"))
+$SCRIPT_DIR/spfit --dpi $@

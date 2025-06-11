@@ -2,7 +2,7 @@ CC=gcc
 #CFLAGS=-g -Od -Wall -Wextra  # debug
 #CFLAGS=-O3 -Wall  # optimized for distribution
 CFLAGS=-O3 -Wall -Wextra -march=native -I.  # optimized for speed on current device (-Ofast is faster but math results may differ very slightly)
-EXEQ=spfit spcat # calmrg dpfit dpcat
+EXEQ=spfit spcat calmrg  # dpcat and dpfit are optional variations to spcat and spfit respectively
 EXEA=${EXEQ} moiam stark termval sortn calbak reassign sortegy iambak # iamcalc is broken
 #next line for atlas blas
 #BLASLIB=-lcblas -latlas
@@ -19,10 +19,10 @@ install:
 	-mv ${EXEQ} /usr/local/bin
 clean:
 	rm -f ${EXEA} *.o *.a
-dpfit: calfit.o subfit.o dpi.o splib.a; gcc -o $@ $^ $(BLASLIB) -lm
-dpcat: calcat.o sortsub.o dpi.o splib.a; gcc -o $@ $^ $(BLASLIB) -lm
-spfit: calfit.o subfit.o spinv.a spinit.o splib.a SpinvEngine.o; g++ -o $@ $^ $(BLASLIB) -lm
-spcat: calcat.o sortsub.o spinv.a spinit.o splib.a SpinvEngine.o; g++ -o $@ $^ $(BLASLIB) -lm
+# dpfit: calfit.o subfit.o dpi.o splib.a; gcc -o $@ $^ $(BLASLIB) -lm
+# dpcat: calcat.o sortsub.o dpi.o splib.a; gcc -o $@ $^ $(BLASLIB) -lm
+spfit: calfit.o subfit.o spinv.a dpi.o spinit.o splib.a SpinvEngine.o DpiEngine.o; g++ -o $@ $^ $(BLASLIB) -lm
+spcat: calcat.o sortsub.o spinv.a dpi.o spinit.o splib.a SpinvEngine.o DpiEngine.o; g++ -o $@ $^ $(BLASLIB) -lm
 calmrg: calmrg.o splib.a; gcc -o $@ $^ $(BLASLIB) -lm
 calbak: calbak.o splib.a; gcc -o $@ $^ $(BLASLIB) -lm
 termval: termval.o splib.a; gcc -o $@ $^ $(BLASLIB) -lm
@@ -47,7 +47,7 @@ calfit.o:calfit.cpp calpgm.h SpinvEngine.hpp
 #	gcc -c calfit.cpp $(CFLAGS)
 subfit.o:subfit.c calpgm.h
 lsqfit.o:lsqfit.c lsqfit.h
-calcat.o:calcat.c calpgm.h
+calcat.o:calcat.cpp calpgm.h DpiEngine.hpp
 sortsub.o: sortsub.c calpgm.h
 calmrg.o:calmrg.c calpgm.h
 termval.o:termval.c calpgm.h
@@ -66,8 +66,8 @@ spinv_hamiltonian.o:spinv_hamiltonian.c calpgm.h spinit.h spinv_internal.h Spinv
 spinv_utils.o:spinv_utils.c calpgm.h spinit.h spinv_internal.h SpinvContext.hpp
 spinit.o:spinit.c calpgm.h spinit.h
 SpinvEngine.o: SpinvEngine.cpp SpinvEngine.hpp SpinvContext.hpp spinv_internal.h
-#	gcc -c SpinvEngine.cpp $(CFLAGS)
-dpi.o:dpi.c calpgm.h
+DpiEngine.o: DpiEngine.cpp DpiEngine.hpp DpiContext.hpp dpi.h
+dpi.o:dpi.c dpi.h calpgm.h DpiContext.hpp
 ftran.o:ftran.c
 sortn.o: sortn.c
 sortsub.o: sortsub.c
