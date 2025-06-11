@@ -15,20 +15,14 @@
 #include <math.h>
 #include <string.h>
 #include "calpgm.h"
+#include "DpiContext.hpp"
+#include "dpi.h"
+
 /* Common Declarations */
 
-static double zero = 0.;        /* Constant zero value */
-static int nvib;                /* Number of vibrational states */
-static int iwhole;              /* Flag for whole/half-integer quantum numbers */
-static int isdgn;               /* Nuclear spin degeneracy */
-static int nqn;                 /* Number of quantum numbers */
-
-int hamx(iblk, nsize, npar, idpar, par, egy, t, dedp, pmix, ifdump)
-const int iblk, nsize, npar;
-const BOOL ifdump;
-const bcd_t *idpar;
-const double *par;
-double *egy, *t, *dedp, *pmix;
+int hamx(struct DpiContext *ctx, const int iblk, const int nsize, const int npar,
+         const bcd_t *idpar, const double *par, double *egy, double *t, double *dedp,
+         double *pmix, const BOOL ifdump)
 {
 #define NDPAR 27
 #define NZPAR 11
@@ -92,7 +86,7 @@ double *egy, *t, *dedp, *pmix;
       if (NEGBCD(idpar[ibcd]) != 0) {
         --nfit;
       }
-      if (nvib == 1) {
+      if (ctx->nvib == 1) {
         iv = 0;
         ibtmp = idpar[ibcd + 1];
       } else {
@@ -126,13 +120,13 @@ double *egy, *t, *dedp, *pmix;
     }
     return nsize;
   }
-  getqn(iblk, 1, MAXQN, jq, &idgn);
+  getqn(ctx, iblk, 1, MAXQN, jq, &idgn);
   f = idgn - 1;
-  aii = isdgn - 1;
+  aii = ctx->isdgn - 1;
   js = jq[0];
   pty = jq[2];
   iv = jq[3];
-  if (nvib == 1)
+  if (ctx->nvib == 1)
     iv = 0;
   jj = js;
   if (pty < 0)
@@ -148,7 +142,7 @@ double *egy, *t, *dedp, *pmix;
   nsq = nsize * nsize;
   for (i = 0; i <= NDPAR; ++i) {        /* ZERO DERIVATIVE W */
     if ((w = wp[i]) != NULL)
-      dcopy(nsq, &zero, 0, w, 1);
+      dcopy(nsq, &ctx->zero, 0, w, 1);
   }
   for (i = 0; i < nsize; i += 2) {      /* SET UP FINE STRUCTURE TERMS */
     ii = i + 1;
@@ -363,8 +357,9 @@ double *egy, *t, *dedp, *pmix;
     } /* i loop */
   }
   /*  BRING H TOGETHER */
-  dcopy(nsq, &zero, 0, t, 1);
-  egy0 = zero; kk = 0;
+  dcopy(nsq, &ctx->zero, 0, t, 1);
+  egy0 = ctx->zero;
+  kk = 0;
   for (ipar = 0, ibcd = 0; ipar < npar; ++ipar, ibcd += ndbcd) {
     if (NEGBCD(idpar[ibcd]) == 0)
       kk = ipar;
@@ -389,7 +384,7 @@ double *egy, *t, *dedp, *pmix;
       t[i + i * nsize] += egy0;
       egy[i] = t[i + i * nsize];
       pmix[i] = 0.;
-      dcopy(nfit, &zero, 0, &dedp[i], nsize);
+      dcopy(nfit, &ctx->zero, 0, &dedp[i], nsize);
     }
     return 0;
   }
@@ -416,7 +411,7 @@ double *egy, *t, *dedp, *pmix;
     if (NEGBCD(idpar[ibcd]) == 0) {
       if (ipar != 0)
         pd += nsize;
-      dcopy(nsize, &zero, 0, pd, 1);
+      dcopy(nsize, &ctx->zero, 0, pd, 1);
       kk = ipar;
     } else {
       ab = par[ipar];
@@ -471,11 +466,8 @@ double *egy, *t, *dedp, *pmix;
  * @param s Output intensity matrix
  * @return int Degeneracy of upper state, or 0 if no transition allowed
  */
-int intens(iblk, isiz, jblk, jsiz, ndip, idip, dip, s)
-const int iblk, isiz, jblk, jsiz, ndip;
-const bcd_t *idip;
-const double *dip;
-double *s;
+int intens(struct DpiContext *ctx, const int iblk, const int isiz, const int jblk,
+           const int jsiz, const int ndip, const bcd_t *idip, const double *dip, double *s)
 {
   double fac, aji, ajj, omeg, val;
   int idgn, jdgn, i, j, k, fi, fj, ix, jx, idif, jji, jjj, ii;
@@ -486,11 +478,11 @@ double *s;
   if (((iblk + jblk) & 1) == 0)
     return 0;
   iv = (iblk - 1) >> 1;
-  fi = iv / nvib;
-  iv -= fi * nvib;
+  fi = iv / ctx->nvib;
+  iv -= fi * ctx->nvib;
   jv = (jblk - 1) >> 1;
-  fj = jv / nvib;
-  jv -= fj * nvib;
+  fj = jv / ctx->nvib;
+  jv -= fj * ctx->nvib;
   idif = fi - fj;
   if (idif > 1 || idif < -1)
     return 0;
@@ -503,22 +495,22 @@ double *s;
   }
   if (kdip >= ndip)
     return 0;
-  idgn = fi + fi + iwhole;
+  idgn = fi + fi + ctx->iwhole;
   fi = idgn - 1;
-  jdgn = fj + fj + iwhole;
+  jdgn = fj + fj + ctx->iwhole;
   fj = jdgn - 1;
   fac = dip[kdip] * sqrt((double) (idgn * jdgn));
   if (fi != fj) fac = -fac;
-  ix = idgn - isdgn;
+  ix = idgn - ctx->isdgn;
   if (ix < 0)
     ix = -ix;
-  jx = jdgn - isdgn;
+  jx = jdgn - ctx->isdgn;
   if (jx < 0)
     jx = -jx;
   jx += 2 - ix;
-  ii = isdgn - 1;
+  ii = ctx->isdgn - 1;
   for (i = 0; i < isiz; ++i) {
-    dcopy(jsiz, &zero, 0, &s[i], isiz);
+    dcopy(jsiz, &ctx->zero, 0, &s[i], isiz);
     k = i & 1;
     omeg = k + 0.5;
     jji = ix + i - k;
@@ -556,7 +548,6 @@ double *s;
   return idgn;
 }                               /* intens */
 
-
 /**
  * @brief Initialize intensity calculation parameters
  *
@@ -571,19 +562,15 @@ double *s;
  * @param isimag Array for magnetic interaction flags
  * @return int Always returns 0
  */
-int setint(lu, ifdiag, nsav, ndip, idip, isimag)
-FILE *lu;
-BOOL *ifdiag;
-int *nsav, *isimag;
-const int ndip;
-bcd_t *idip;
+int setint(struct DpiContext *ctx, FILE *lu, BOOL *ifdiag, int *nsav,
+           const int ndip, bcd_t *idip, int *isimag)
 {
   (void) lu; /* do nothing, just avoid a warning */
   bcd_t iv,jv;
   int kdip, ibcd;
   *ifdiag = TRUE;
   *nsav = 1;
-  if (nvib == 1 && ndip > 0) {
+  if (ctx->nvib == 1 && ndip > 0) {
     idip[1] = (bcd_t) 0; idip[2] = (bcd_t) 0;
   }
   for (kdip = 0, ibcd = 1; kdip < ndip; ++kdip, ibcd += NDECDIP) {
@@ -609,10 +596,8 @@ bcd_t *idip;
  * @param idgn Pointer to degeneracy value
  * @return int Number of quantum numbers
  */
-int getqn(iblk, indx, maxqn, iqn, idgn)
-const int iblk, indx, maxqn;
-short *iqn;
-int *idgn;
+int getqn(struct DpiContext *ctx, const int iblk, const int indx,
+          const int maxqn, short *iqn, int *idgn)
 {
   int kf, idif, tdgn, iv, ix;
 
@@ -620,24 +605,24 @@ int *idgn;
 
   /* ..PACKAGE FOR DOUBLET PI */
   iv = (iblk - 1) >> 1;
-  kf = iv / nvib;
-  iv -= kf * nvib;
-  tdgn = kf + kf + iwhole;
+  kf = iv / ctx->nvib;
+  iv -= kf * ctx->nvib;
+  tdgn = kf + kf + ctx->iwhole;
   if (indx == 0) {
-    if (tdgn > isdgn)
-      tdgn = isdgn;
+    if (tdgn > ctx->isdgn)
+      tdgn = ctx->isdgn;
     *idgn = tdgn + tdgn;
-    return nqn;
+    return ctx->nqn;
   }
   ix = indx + 1;
-  idif = tdgn - isdgn;
+  idif = tdgn - ctx->isdgn;
   if (idif < 0)
     idif = -idif;
   iqn[0] = (short) ((idif >> 1) + (ix >> 1));
   iqn[1] = (short) ((ix & 1) + 1);
   iqn[2] = (short) (((iblk & 1) != 0) ? -1 : 1);
   iqn[3] = (short) kf;
-  if (nvib > 1) {
+  if (ctx->nvib > 1) {
     iqn[4] = iqn[3];
     iqn[3] = (short) iv;
   }
@@ -662,10 +647,7 @@ int *idgn;
  * @param namfil Output name file path
  * @return int 1 for success, -1 for failure
  */
-int setopt(luin, nfmt, itd, ndbcd, namfil)
-FILE *luin;
-int *nfmt, *itd, *ndbcd;
-char *namfil;
+int setopt(struct DpiContext *ctx, FILE *luin, int *nfmt, int *itd, int *ndbcd, char *namfil)
 {                               /* SET OPTIONS */
   char card[82];
   double val[2];
@@ -675,17 +657,17 @@ char *namfil;
     return -1;
   val[1] = val[0] = 1.;
   pcard(card, val, 2, NULL);
-  isdgn = (int) val[0];
-  if (isdgn < 1)
-    isdgn = 1;
-  nvib = (int) val[1];
-  if (nvib < 1 || nvib > 99)
-    nvib = 1;
-  nqn = 4;
-  if (nvib > 1)
-    ++nqn;
+  ctx->isdgn = (int) val[0];
+  if (ctx->isdgn < 1)
+    ctx->isdgn = 1;
+  ctx->nvib = (int)val[1];
+  if (ctx->nvib < 1 || ctx->nvib > 99)
+    ctx->nvib = 1;
+  ctx->nqn = 4;
+  if (ctx->nvib > 1)
+    ctx->nqn++;
   strcpy(namfil, "dpi.nam");
-    iwhole = (isdgn + 1) & 1;
+  ctx->iwhole = (ctx->isdgn + 1) & 1;
   *itd = 2;
   *ndbcd = 3;
   *nfmt = 1;
@@ -702,18 +684,17 @@ char *namfil;
  * @param nfmt Number of quantum number formats
  * @return int Number of quantum numbers
  */
-int setfmt(iqnfmt, nfmt)
-int *iqnfmt, nfmt;
+int setfmt(struct DpiContext *ctx, int *iqnfmt, int nfmt)
 {
   (void)nfmt; /* do nothing, just avoid a warning */
   *iqnfmt = 804;
-  if (iwhole == 0)
+  if (ctx->iwhole == 0)
     *iqnfmt += 10;
-  if (isdgn == 1)
+  if (ctx->isdgn == 1)
     *iqnfmt = 803;
-  if (nvib > 1)
+  if (ctx->nvib > 1)
     *iqnfmt += 1101;
-  return nqn;
+  return ctx->nqn;
 }
 
 /**
@@ -731,30 +712,25 @@ int *iqnfmt, nfmt;
  * @param negy Pointer to maximum size of energy matrix
  * @return int Size factor for vibrational states
  */
-int setblk(lu, npar, idpar, par, nblkpf, negy)
-FILE *lu;
-const int npar;
-int *nblkpf, *negy;
-bcd_t *idpar;
-const double *par;
+int setblk(struct DpiContext *ctx, FILE *lu, const int npar, bcd_t *idpar, const double *par, int *nblkpf, int *negy)
 {
   int nsiz;
   double ai;
   if (npar > 0) {
-    *nblkpf = nvib + nvib;
-    ai = 0.5 * (isdgn - 1);
+    *nblkpf = ctx->nvib + ctx->nvib;
+    ai = 0.5 * (ctx->isdgn - 1);
     fprintf(lu, "doublet PI lines for I = %5.1f\n", ai);
-    if (nvib > 1)
-      fprintf(lu, "  and %d vibrations\n", nvib);
-    nsiz = isdgn + isdgn;
+    if (ctx->nvib > 1)
+      fprintf(lu, "  and %d vibrations\n", ctx->nvib);
+    nsiz = ctx->isdgn + ctx->isdgn;
     if (*negy > nsiz)
       *negy = nsiz;
   } else {
     nsiz = 0;
   }
-  hamx(0, nsiz, npar, idpar, par, &ai, &ai, &ai, &ai, 0);
+  hamx(ctx, 0, nsiz, npar, idpar, par, &ai, &ai, &ai, &ai, 0);
   nsiz = 1;
-  if (nvib > 1)
+  if (ctx->nvib > 1)
     nsiz = 100;
   return nsiz;
 }                               /* setblk */

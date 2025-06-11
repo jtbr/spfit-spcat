@@ -9,17 +9,19 @@ public:
     virtual ~CalculationEngine() {}
 
     virtual int hamx(int iblk, int nsize, int npar, bcd_t *idpar, double *par,
-                     double *egy, double *teig, double *egyder, double *pmix,
-                     int iflg) = 0;
-    virtual int setint(int npar, bcd_t *idpar, double *par) = 0;
-    virtual double intens(int *iqn, double *dip, int nstat, int *kat,
-                          double *egy, double *eigy, int *jrot, int *jroty,
-                          int *inv, int *invy, int nsize, int nsiz) = 0;
-    virtual void getqn(int iblk, int iqn, int nsize, short *qnum, int *nqn) = 0;
+                     double *egy, double *t,
+                     double *dedp, double *pmix, const BOOL ifdump) = 0;
+    virtual int setint(FILE *lu, BOOL *ifdiag, int *nsav, const int ndip,
+                       bcd_t *idip, int *isimag) = 0;
+    virtual int intens(const int iblk, const int isiz, const int jblk,
+                       const int jsiz, const int ndip, const bcd_t *idip,
+                       const double *dip, double *s) = 0;
+    virtual int getqn(const int iblk, const int indx, const int maxqn,
+                      short *iqn, int *idgn) = 0;
     virtual int setopt(FILE *lu, int *nfmt, int *itd, int *ndbcd, char *namfil) = 0;
-    virtual int setfmt(int *iqnfmt, int iflg) = 0;
+    virtual int setfmt(int *iqnfmt, int nfmt) = 0;
     virtual int setblk(FILE *lu, int npar, bcd_t *idpar, double *par,
-                       int *nblkpf, int *maxdm) = 0;
+                       int *nblkpf, int *negy) = 0;
 };
 
 #endif // CALCULATION_ENGINE_HPP

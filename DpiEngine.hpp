@@ -5,24 +5,26 @@
 #include "DpiContext.hpp"
 
 class DpiEngine : public CalculationEngine {
-public:
+  public:
     DpiEngine();
     ~DpiEngine();
 
     int hamx(int iblk, int nsize, int npar, bcd_t *idpar, double *par,
-             double *egy, double *teig, double *egyder, double *pmix,
-             int iflg) override;
-    int setint(int npar, bcd_t *idpar, double *par) override;
-    double intens(int *iqn, double *dip, int nstat, int *kat,
-                  double *egy, double *eigy, int *jrot, int *jroty,
-                  int *inv, int *invy, int nsize, int nsiz) override;
-    void getqn(int iblk, int iqn, int nsize, short *qnum, int *nqn) override;
+             double *egy, double *t, double *dedp,
+             double *pmix, const BOOL ifdump) override;
+    int setint(FILE *lu, BOOL *ifdiag, int *nsav, const int ndip,
+               bcd_t *idip, int *isimag) override;
+    int intens(const int iblk, const int isiz, const int jblk,
+                  const int jsiz, const int ndip, const bcd_t *idip,
+                  const double *dip, double *s) override;
+    int getqn(const int iblk, const int indx, const int maxqn,
+               short *iqn, int *idgn) override;
     int setopt(FILE *lu, int *nfmt, int *itd, int *ndbcd, char *namfil) override;
-    int setfmt(int *iqnfmt, int iflg) override;
+    int setfmt(int *iqnfmt, int nfmt) override;
     int setblk(FILE *lu, int npar, bcd_t *idpar, double *par,
-               int *nblkpf, int *maxdm) override;
+               int *nblkpf, int *negy) override;
 
-private:
+  private:
     DpiContext m_context;
 };
 
