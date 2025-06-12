@@ -797,7 +797,7 @@ int setopt(struct SpinvContext *ctx, FILE *luin, int *nfmt, int *itd, int *nbcd,
       }
       ivib = -ctx->glob.nvib;
     }
-    setwt(ctx, pvinfo, ivib, iax, iwtpl, iwtmn, vsym); /* set up weights */
+    setwt(pvinfo, ivib, iax, iwtpl, iwtmn, vsym); /* set up weights */
   } while (ivsym < 0); /*   end of reading */
   setsp(ctx);
   /* set up format */
@@ -1229,7 +1229,7 @@ int setblk(struct SpinvContext *ctx, FILE *lu, const int npar, bcd_t *idpar, con
         continue;
       ivmin = (iv < jv) ? iv : jv;
       itmp = iv + jv + ivmin * ctx->glob.vibfac;
-      ivsym = blksym(ctx, ctx->ixcom, ctx->jxcom) + ((unsigned int)itmp << 2);
+      ivsym = blksym(ctx->ixcom, ctx->jxcom) + ((unsigned int)itmp << 2);
       for (spar_now = ctx->spar_head[ivmin]; spar_now != NULL;
            spar_now = spar_now->next)
       {
@@ -1241,7 +1241,7 @@ int setblk(struct SpinvContext *ctx, FILE *lu, const int npar, bcd_t *idpar, con
           continue;
         if (sznz < 0)
           sznzfix(ctx, sznz, ni, nj, ctx->ixcom, ctx->jxcom, ctx->iscom, ctx->jscom);
-        kl = idpars(ctx, spar_now, &ikq, &neuler, &lt, &ld, &kd, &ins, &si1, &si2,
+        kl = idpars(spar_now, &ikq, &neuler, &lt, &ld, &kd, &ins, &si1, &si2,
                     &sznz, &ifc, &alpha, &ldel, &kavg);
         if (ODD(neuler))
           continue;
@@ -1523,7 +1523,7 @@ int setblk(struct SpinvContext *ctx, FILE *lu, const int npar, bcd_t *idpar, con
     ctx->ndmx = ii;
   nl = (size_t)(nsize + ctx->ndmx) * sizeof(double);
   ctx->wk = (double *)mallocq(nl);
-  ctx->wk[0] = ctx->zero;
+  ctx->wk[0] = 0.0;
   /* allocate space for sub-block information */
   nl = (size_t)(ctx->ndmx + 1) * sizeof(short);
   ctx->idx = (short *)mallocq(nl);
@@ -1588,6 +1588,8 @@ int pasort(struct SpinvContext *ctx, FILE *lu, const int npar, bcd_t *idpar, con
   unsigned int ivsym;
   bcd_t *idval;
   BOOL first;
+  const double zero = 0.0;
+  const short szero = 0;
 
   if (ctx->glob.parinit > 0)
   {
@@ -1625,9 +1627,13 @@ int pasort(struct SpinvContext *ctx, FILE *lu, const int npar, bcd_t *idpar, con
     ctx->spfac2[i] = 0.25 * sqrt((dtmp + 1.5) / (dtmp - 0.5)) / dtmp;
   }
   /* initialize SPECFC and DIRCOS */
-  specfc(ctx, 0, 0, 0, 0, 0, 0, 0, &ctx->zero, &ctx->szero, &ctx->szero);
+  #pragma GCC diagnostic push
+  #pragma GCC diagnostic ignored "-Wdiscarded-qualifiers"
+  // zero is used as non-const in specfc & dircos but should not actually be modified with these sets of parameters
+  specfc(ctx, 0, 0, 0, 0, 0, 0, 0, &zero, &szero, &szero);
   kk = 0;
-  dircos(ctx, idmy, idmy, 0, 0, 0, &ctx->zero, &ctx->szero, &ctx->szero, 0, MODD, 0, &kk);
+  dircos(ctx, idmy, idmy, 0, 0, 0, &zero, &szero, &szero, 0, MODD, 0, &kk);
+  #pragma GCC diagnostic pop
   ifac = ctx->glob.vibfac + 1;
   ndecv = ctx->glob.vibdec;
   ilim = ifac * ifac - 1;
@@ -1730,7 +1736,7 @@ int pasort(struct SpinvContext *ctx, FILE *lu, const int npar, bcd_t *idpar, con
         {
           notused = 0;
           dtmp = par[ipar];
-          specfc(ctx, 0, iv1, iv1, 0, 0, 0, 1, &dtmp, &ctx->szero, &ctx->szero);
+          specfc(ctx, 0, iv1, iv1, 0, 0, 0, 1, &dtmp, &szero, &szero);
         }
         break;
       }
@@ -1765,7 +1771,7 @@ int pasort(struct SpinvContext *ctx, FILE *lu, const int npar, bcd_t *idpar, con
       if (njqt > ctx->nsqmax)
         ctx->nsqmax = njqt;
       isym = (int)spar_now->ipsym;
-      idpars(ctx, spar_now, &ikq, &neuler, &lt, &ld, &kd, &ins, &si1, &si2,
+      idpars(spar_now, &ikq, &neuler, &lt, &ld, &kd, &ins, &si1, &si2,
              &sznz, &ifc, &alpha, &ldel, &kavg);
       iiv1 = pvib1->spt;
       iiv2 = pvib2->spt;
@@ -1979,7 +1985,7 @@ int pasort(struct SpinvContext *ctx, FILE *lu, const int npar, bcd_t *idpar, con
           if (spar_now->ipsym < ivsym)
             break;
           spar_last = spar_now;
-          klp = idpars(ctx, spar_now, &ikqp, &neulerp, &ltp, &ldp, &kdp, &insp,
+          klp = idpars(spar_now, &ikqp, &neulerp, &ltp, &ldp, &kdp, &insp,
                        &si1p, &si2p, &sznzp, &ifcp, &alphap, &ldelp, &kavgp);
           klp &= MMASK;
           /* check for same K dependence */

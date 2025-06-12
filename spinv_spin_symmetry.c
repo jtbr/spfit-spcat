@@ -436,13 +436,13 @@ int checksp(struct SpinvContext *ctx, const BOOL first, int si1, int si2, const 
  * @param iscom_bra_qns Array of 2*angular momentum values for bra state. Renamed iscom.
  * @param jscom_ket_qns Array of 2*angular momentum values for ket state. Renamed jscom.
  * @param lscom_tensor_orders Array of 2*tensor orders for intermediate and spin operators. Renamed lscom.
- * @param spin_index_map Maps operator spin index to actual spin index in iscom/jscom. Renamed imap.
+ * @param spin_index_map Maps operator spin index to actual spin index in iscom/jscom. Renamed smap.
  * @param num_coupled_pairs Number of spin coupling stages. Renamed npair.
  * @param alpha_sym_component I_tot alpha symmetry component. Renamed alpha.
  * @return int Always 0.
  */
-int tensor(struct SpinvContext *ctx, double *zval, const int iscom[], const int jscom[],
-           const int lscom[], const int imap[], int npair, int alpha)
+int tensor(struct SpinvContext *ctx, double *zval, const int *iscom, const int *jscom,
+           const int *lscom, const int *smap, int npair, int alpha)
 {
   /*     subroutine to find spherical tensor spin coupling coefficients */
   /*     on entry: */
@@ -463,11 +463,11 @@ int tensor(struct SpinvContext *ctx, double *zval, const int iscom[], const int 
   zsq = 1.;
   for (i = 0; i < npair; ++i)
   {
-    ix = imap[i + i];
+    ix = smap[i + i];
     lln = lscom[ix];
     nni = iscom[ix];
     nnf = jscom[ix];
-    ix = imap[i + i + 1];
+    ix = smap[i + i + 1];
     lls = lscom[ix];
     ssi = iscom[ix];
     ssf = jscom[ix];
@@ -544,7 +544,7 @@ int tensor(struct SpinvContext *ctx, double *zval, const int iscom[], const int 
  */
 int getll(struct SpinvContext *ctx, const int llf_total_tensor_order, const int dir_cos_order,
           const int n_tensor_order, const int k_delta_op, const int spin1_idx, const int spin2_idx,
-          int lscom_tensor_orders_out[], const int iscom_bra_qns[], const int jscom_ket_qns[])
+          int *lscom_tensor_orders_out, const int *iscom_bra_qns, const int *jscom_ket_qns)
 {
   int *l_individual_spin_tensors_ptr;                                                                                                                                                                             /* Renamed lsscom */
   int i_spin_level, current_intermediate_L_times_2, ll_dir_cos_times_2, ll_n_tensor_times_2, max_L_N_operator_times_2, delta_2N_val, sum_2N_val, max_involved_spin_idx, error_return_flag, num_spins_minus_2_val; /* Renamed i, llj, lld, lln, llmax, jdif, jsum, maxspin, ierr, nm2 */
@@ -709,7 +709,7 @@ int setgsym(struct SpinvContext *ctx, const int gsym)
  *                                       or indicates if current state's weights should be swapped if positive.
  * @return int Always 0.
  */
-int setwt(struct SpinvContext *ctx, SVIB *pvinfov, const int ivib, const int iax,
+int setwt(SVIB *pvinfov, const int ivib, const int iax,
           const int iwtpl, const int iwtmn, double vsym)
 {
   /*  set weights */
@@ -946,7 +946,7 @@ int checkwt(struct SpinvContext *ctx, int *iwt, int *jwt)
  * @return unsigned int The symmetry of the interaction (0=A, 1=Bx, 2=By, 3=Bz in D2),
  *                      result of XORing bra and ket state symmetries.
  */
-unsigned int blksym(struct SpinvContext *ctx, const int *ixcom, const int *jxcom)
+unsigned int blksym(const int *ixcom, const int *jxcom)
 { /* get block symmetry from state symmetry */            /* Original comment */
   return (unsigned int)(3 & (ixcom[XSYM] ^ jxcom[XSYM])); /* XOR symmetries and mask to 2 bits */
 } /* blksym */

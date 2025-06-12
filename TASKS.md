@@ -63,14 +63,16 @@ This document outlines the prioritized tasks for modernizing the SPFIT/SPCAT sof
             - The `DpiEngine`'s methods will then call these modified C functions, passing in the `DpiContext` member variable.
         - **Step 4: Integrate the `CalculationEngine` into `spfit` and `spcat`**:
             - Modify the `main` functions in `calfit.c` and `calcat.c` to use the `CalculationEngine` interface.
-        - **Step 5: Refactor `calfit.c` and `calcat.c`**:
+        - **Step 5: Preliminary simplifications**:
+            - Remove `zero` and `szero` from `SpinvContext` and `DpiContext`, use `memset` instead of `dcopy()` where simple, remove context parameter from functions that don't need it.
+        - **Step 6: Refactor `calfit.c` and `calcat.c`**:
             - Refactor `calfit.c` and `calcat.c` to be more modular.
             - This will involve creating `Spfit` and `Spcat` classes and moving the logic from the `main` functions into these classes.
             In this step we'll need to:
               - **Define Clear C++ APIs**: Create well-defined C++ class interfaces (e.g., `Spfit`, `Spcat`) with methods that encapsulate core functionalities. These methods should take C++ data structures as input and return C++ data structures as output.
               - **Separate I/O from Logic**: Modify core calculation functions to operate on in-memory data structures (passed via the new C++/C structs/classes) rather than directly performing file I/O. Create separate C++ utility functions or methods for reading from and writing to files.
               - **Leverage C++ Features**: Utilize RAII (Resource Acquisition Is Initialization) with `std::unique_ptr` and `std::vector` for robust memory management within the new C++ interface layer.
-    - **Progress**: Steps 1-4 are complete. We are now on Step 5.
+    - **Progress**: Steps 1-5 are complete. We are now on Step 6.
     - **Expected Outcome**: A highly modular codebase with a clean C++ API, enabling easy programmatic integration and future Python bindings.
     - **Constraint**: Quantitative results must remain unchanged, and current functionality must be retained.
 

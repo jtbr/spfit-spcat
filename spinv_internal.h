@@ -190,8 +190,8 @@ int setblk(struct SpinvContext *ctx, FILE *lu, const int npar, bcd_t *idpar, con
 
 /* internal functions */
 
-int dclr(struct SpinvContext *ctx, const int n1, const int n2, double *vec, const int ix);
-int specop(struct SpinvContext* ctx, const int neuler, BOOL * newblk, int *nsqj, int *ikq,
+int dclr(const int n1, const int n2, double *vec, const int ix);
+int specop(const int neuler, BOOL *newblk, int *nsqj, int *ikq,
                   const int ksi, const int ksj, const int ni, const int nj,
                   const int ncos, double *wk, const short *ix,
                   const short *jx, const double par);
@@ -200,66 +200,66 @@ int specfc(struct SpinvContext* ctx, const int ifc, const int iv, const int jv,
                   const int ncos, double *wk, const short *ix,
                   const short *jx);
 int sznzfix(struct SpinvContext* ctx, const int sznz, const int ni, const int nj, int *ixcom,
-                   int *jxcom, int *iscom, int *jscom);
+                  int *jxcom, int *iscom, int *jscom);
 int sznzop(struct SpinvContext* ctx, const int ni, const int nj, const int ksi, const int ksj,
                   const int *iscom, const int *jscom, const int ncos,
                   double *wk, const short *ix, const short *jx);
-unsigned int blksym(struct SpinvContext* ctx, const int *ixcom, const int *jxcom);
-int ordham(struct SpinvContext* ctx, const int nn, short *mask, double *egy, const short *isblk,
+unsigned int blksym(const int *ixcom, const int *jxcom);
+int ordham(const int nn, short *mask, double *egy, const short *isblk,
                   short *iswap);
-int fixham(struct SpinvContext* ctx, const int ndm, const int nn, double *t, double *egy,
+int fixham(const int ndm, const int nn, double *t, double *egy,
                   double *p, const short *iswap);
-BOOL kroll(struct SpinvContext* ctx, const int nsizd, double *t, const int nsblk,
+BOOL kroll(const int nsizd, double *t, const int nsblk,
                   const short *sbkptr, const short *kmin);
-int bestk(struct SpinvContext* ctx, const int ndm, const int nsize, short *iqnsep, short *ibkptr,
-          short *itau, short *idx, double *t, double *egy, double *pmix,
-          double *wk);
+int bestk(const int ndm, const int nsize, short *iqnsep, short *ibkptr,
+                  short *itau, short *idx, double *t, double *egy, double *pmix,
+                  double *wk);
 int getqs(struct SpinvContext* ctx, const int mvs, const int iff, const int nsiz, const int kbgn,
-               /*@out@*/ int *ixcom, /*@out@*/ int *iscom, /*@out@*/ int *iv);
-int idpars(struct SpinvContext* ctx, SPAR * pspar, /*@out@*/ int *ksq, /*@out@*/ int *itp,
-               /*@out@*/ int *l, /*@out@*/ int *ld, /*@out@*/ int *kdel,
-               /*@out@*/ int *ins, /*@out@*/ int *si1, /*@out@*/ int *si2,
-               /*@out@*/ int *sznz, /*@out@*/ int *ifc, /*@out@*/ int *alpha,
-               /*@out@*/ int *ldel,/*@out@*/ int *kavg);
-int getll(struct SpinvContext* ctx, const int llf, const int ld, const int ln, const int kd, /* signature was wrong in original code */
-          const int si1, const int si2, int *lscom, const int *iscom,
-          const int *jscom);
+                  int *ixcom, /*@out@*/ int *iscom, /*@out@*/ int *iv);
+int idpars(SPAR * pspar, /*@out@*/ int *ksq, /*@out@*/ int *itp,
+                  /*@out@*/ int *l, /*@out@*/ int *ld, /*@out@*/ int *kdel,
+                  /*@out@*/ int *ins, /*@out@*/ int *si1, /*@out@*/ int *si2,
+                  /*@out@*/ int *sznz, /*@out@*/ int *ifc, /*@out@*/ int *alpha,
+                  /*@out@*/ int *ldel,/*@out@*/ int *kavg);
+int getll(struct SpinvContext *ctx, const int llf, const int ld, const int ln, const int kd, /* signature was wrong in original code */
+                  const int si1, const int si2, int *lscom, const int *iscom,
+                  const int *jscom);
 int getmask(struct SpinvContext* ctx, const int *xbra, const int *xket, const int kd, const int ldel,
-                   const int loff, const int alpha);
-double rmatrx(struct SpinvContext* ctx, const int ld, const int lv, const int *ixcom,
-                     const int *jxcom);
+                  const int loff, const int alpha);
+double rmatrx(const int ld, const int lv, const int *ixcom,
+                  const int *jxcom);
 int symnsq(struct SpinvContext* ctx, const int inq, const int ins, const int *iscom,
                   const int *jscom, double *z);
-int symksq(struct SpinvContext* ctx, const int ikq, const int ksi, const int ksj, const int n,
+int symksq(const int ikq, const int ksi, const int ksj, const int n,
                   double *wk, short *ix, short *jx);
-int dpmake(struct SpinvContext* ctx, const int nsize, double *dp, const double *t,
+int dpmake(const int nsize, double *dp, const double *t,
                   const int n, const double *wk, const short *ix,
                   const short *jx, const int isunit);
 int pasort(struct SpinvContext* ctx, FILE * lu, const int npar, bcd_t *idpar,
                   const double *par);
-int idpari(struct SpinvContext* ctx, bcd_t *idval, int itp, /*@out@*/ SPAR * pspar);
+int  idpari(struct SpinvContext* ctx, bcd_t *idval, int itp, /*@out@*/ SPAR * pspar);
 int checksp(struct SpinvContext* ctx, const BOOL first, int si1, int si2, const short *iiv1,
-            const short *iiv2, double *zfac);
-int tensor(struct SpinvContext* ctx, double *z, const int *iscom, const int *jscom,
-           const int *lscom, const int *smap, int npair, int alpha);
-int setwt(struct SpinvContext* ctx, SVIB * pvinfo, const int ivib, const int iax,
-                 const int iwtpl, const int iwtmn, double vsym);
-int getwt(struct SpinvContext* ctx, SVIB * pvinfo, const int isym, const int iispin,
-          /*@out@*/ int *ivwt);
+                  const short *iiv2, double *zfac);
+int  tensor(struct SpinvContext* ctx, double *z, const int *iscom, const int *jscom,
+                  const int *lscom, const int *smap, int npair, int alpha);
+int   setwt(SVIB * pvinfo, const int ivib, const int iax,
+                  const int iwtpl, const int iwtmn, double vsym);
+int   getwt(struct SpinvContext* ctx, SVIB * pvinfo, const int isym, const int iispin,
+                  /*@out@*/ int *ivwt);
 BOOL testwt(struct SpinvContext* ctx, SVIB *pvib1, SVIB *pvib2, int isym, int alpha);
 int checkwt(struct SpinvContext* ctx, int *iwt, int *jwt);
 int setgsym(struct SpinvContext* ctx, const int gsym);
-int getsp(struct SpinvContext* ctx, const bcd_t *ispnx, SVIB *pvinfo);
-void setsp(struct SpinvContext* ctx);
-int getqq(struct SpinvContext* ctx, const int iblk, /*@out@*/ int *f, /*@out@*/ int *iwtb,
-                 /*@out@*/ short *sbkptr, /*@out@*/ short *kmin,
-                 /*@out@*/ int *vs);
+int   getsp(struct SpinvContext* ctx, const bcd_t *ispnx, SVIB *pvinfo);
+void  setsp(struct SpinvContext* ctx);
+int   getqq(struct SpinvContext* ctx, const int iblk, /*@out@*/ int *f, /*@out@*/ int *iwtb,
+                  /*@out@*/ short *sbkptr, /*@out@*/ short *kmin,
+                  /*@out@*/ int *vs);
 int dircos(struct SpinvContext* ctx, const int *xbra, const int *xket, const int ld,
                   const int kd, const int ncmax, /*@out@*/ double *direl,
                   /*@out@*/ short *ibra, /*@out@*/ short *iket,
                   const int ifup, const int loff, int mask,
                   /*@out@*/ int *isunit);
-int ffcal(struct SpinvContext* ctx, const int nff, const int kff, /*@out@*/ double *ff);
+int ffcal(const int nff, const int kff, /*@out@*/ double *ff);
 
 #ifdef __cplusplus
 } // end extern "C"

@@ -29,13 +29,11 @@ SpinvEngine::SpinvEngine() :
     m_context.ikmin = &m_context.zikmin;
 
     // initial values
-    m_context.zero = 0.;
     m_context.zwk = 0.;
     m_context.zmoldv = 0;
     m_context.zblkptr = 0;
     m_context.zivs = 0;
     m_context.zipder = 0;
-    m_context.szero = 0;
     m_context.zidx = 0;
     m_context.zjdx = 0;
     m_context.ziqnsep = 0;

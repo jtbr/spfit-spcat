@@ -438,7 +438,7 @@ short *iqsep;
       dscal(nvz, bb, zkk, 1);
       zim[nv] = bb + 1.;
     } else {
-      dcopy(nv, &zero, 0, zim, 1);
+      memset(zim, 0, nv * sizeof(double));
       dcopy(nv, &zero, 0, &z[nv], ndm);
       zim[nv] = 1.;
     }
@@ -690,7 +690,7 @@ const int nfit, iflg;
     for (j = 1; j < nfit; ++j) {
       ++k; ibcd += ndbcd;
       ++pvar;
-      dcopy(j, &zero, 0, pvar, 1);
+      memset(pvar, 0, sizeof(double) * j);
       pvar += j;
       while (NEGBCD(idpar[ibcd]) != 0) {
         ++k; ibcd += ndbcd;

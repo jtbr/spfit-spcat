@@ -7,7 +7,6 @@ extern "C" {
 
 struct DpiContext
 {
-  double zero;
   int nvib;
   int iwhole;
   int isdgn;

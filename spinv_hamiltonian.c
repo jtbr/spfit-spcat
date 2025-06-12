@@ -84,10 +84,10 @@ int hamx(struct SpinvContext *ctx, const int iblk, const int nsize, const int np
   itau = &(ctx->ikmin)[ctx->glob.maxblk]; /* itau points to an area after ikmin, used to store sorting keys (tau or K values) */
   nsblk = getqq(ctx, iblk, &iff, iiwt, ctx->ibkptr, ctx->ikmin, ctx->ivs); /* Get sub-block structure for current F block (iblk) */
   /* zero hamiltonian matrix t */
-  dclr(ctx, nsize, nsize, t, 1);
+  dclr(nsize, nsize, t, 1);
   /* zero derivative matrix dedp */
   n_sub_block_size = ctx->glob.nfit; /* Number of parameters to fit */
-  dclr(ctx, nsize, n_sub_block_size, dedp, 1);
+  dclr(nsize, n_sub_block_size, dedp, 1);
   /* set up hamiltonian */
   oldpar = parskp = roll = firstpar = FALSE; /* Initialize flags */
   ncos = sznz = 0; isgn = 1; isunit = 0; kbgni = 0; /* Initialize operator properties */
@@ -137,7 +137,7 @@ int hamx(struct SpinvContext *ctx, const int iblk, const int nsize, const int np
         /* Create a packed identifier for the vibrational pair and overall block symmetry */
         ivsym = (unsigned int) (ivbase + jvbase + ivmin * ctx->glob.vibfac) << 2;
         ivcmp = ivsym + 3; /* Upper bound for checking Euler parameters which might be only vv' specific */
-        ivsym += blksym(ctx, ctx->ixcom, ctx->jxcom); /* Add block symmetry (A,Bx,By,Bz) */
+        ivsym += blksym(ctx->ixcom, ctx->jxcom); /* Add block symmetry (A,Bx,By,Bz) */
 
         if (lastvv != ivcmp) { /* If vibrational pair changed, Euler denominators might need re-init */
           newblk = TRUE; lastvv = ivcmp;
@@ -205,7 +205,7 @@ int hamx(struct SpinvContext *ctx, const int iblk, const int nsize, const int np
             if (sznz < 0) /* If SzNz type needs finalization (from previous param processing) */
               sznzfix(ctx, sznz, ni, nj, ctx->ixcom, ctx->jxcom, ctx->iscom, ctx->jscom); /* Reset N values in ixcom/jxcom if changed by SzNz */
             /* Parse the BCD parameter ID into its components */
-            kl = idpars(ctx, spar_now, &ikq, &neuler, &lt, &ld, &kd, &ins,
+            kl = idpars(spar_now, &ikq, &neuler, &lt, &ld, &kd, &ins,
                         &si1, &si2, &sznz, &ifc, &alpha, &ldel, &kavg);
             if (sznz > 0) { /* If this is an SzNz type operator */
               sznz = sznzfix(ctx, sznz, ni, nj, ctx->ixcom, ctx->jxcom, ctx->iscom, ctx->jscom); /* Modify N in ixcom/jxcom, returns new sznz state */
@@ -238,7 +238,7 @@ int hamx(struct SpinvContext *ctx, const int iblk, const int nsize, const int np
               if (neuler != 0) { /* If Euler series operator */
                 /* Apply Euler series transformation to ctx->wk, idx, jdx */
                 /* par[ipar] is the Euler denominator 'a' or 'b' for this specific neuler type */
-                ncos = specop(ctx, neuler, &newblk, &nsqj, &ikq, kbgni, kbgnj,
+                ncos = specop(neuler, &newblk, &nsqj, &ikq, kbgni, kbgnj,
                               ni, nj, ncos, ctx->wk, ctx->idx, ctx->jdx, par[ipar]);
                 if (ncos == 0) continue; /* Euler op became zero */
               }
@@ -248,7 +248,7 @@ int hamx(struct SpinvContext *ctx, const int iblk, const int nsize, const int np
               if (sznz != 0) /* If SzNz type operator */
                 sznzop(ctx, ni, nj, kbgni, kbgnj, ctx->iscom, ctx->jscom, ncos, ctx->wk, ctx->idx, ctx->jdx); /* Apply SzNz scaling to wk */
               if (ikq > 0) { /* If K^2 dependent operator */
-                ncos = symksq(ctx, ikq, kbgni, kbgnj, ncos, ctx->wk, ctx->idx, ctx->jdx); /* Apply K^2 scaling */
+                ncos = symksq(ikq, kbgni, kbgnj, ncos, ctx->wk, ctx->idx, ctx->jdx); /* Apply K^2 scaling */
                 if (ncos == 0) continue;
               }
               /* Adjust indices if not in the first sub-block of the matrix */
@@ -280,14 +280,14 @@ int hamx(struct SpinvContext *ctx, const int iblk, const int nsize, const int np
                 if (ipar < 0) continue;
                 /* Calculate <psi| (dH_op / dP_current) |psi> using current eigenvectors t */
                 /* dbar stores this for each state, effectively (d H_matrix_element / dP) transformed by eigenvectors */
-                dpmake(ctx, nsize, dbar, t, ncos, ctx->wk, ctx->idx, ctx->jdx, isunit);
+                dpmake(nsize, dbar, t, ncos, ctx->wk, ctx->idx, ctx->jdx, isunit);
               }
             } /* End K-dependent part calculation (if ncos < 0) */
 
             if (si2 < 0 && nd == 0 && ni ==0) continue;  /* Avoids issues with commutator with N*N when N=0 */
 
             /* Calculate K-independent part of operator matrix element */
-            zpar = rmatrx(ctx, ld, lt, ctx->ixcom, ctx->jxcom); /* N-dependent corrections for reduced matrix elements */
+            zpar = rmatrx(ld, lt, ctx->ixcom, ctx->jxcom); /* N-dependent corrections for reduced matrix elements */
             tensor(ctx, &zpar, ctx->iscom, ctx->jscom, ctx->lscom, ctx->ismap, npair, alpha); /* Spin-dependent part (Clebsch-Gordan etc.) */
 
             if (sznz < 0) /* If SzNz type needs finalization from idpars */
@@ -356,14 +356,14 @@ int hamx(struct SpinvContext *ctx, const int iblk, const int nsize, const int np
         dcopy(nsize, t, nd, egy, 1); /* Copy diagonal elements of H to egy */
         for (i = 0; i < nsize; ++i) { /* Create identity eigenvector matrix */
           pt = &t[i * ndm];
-          dcopy(nsize, &ctx->zero, 0, pt, 1); /* Zero out column */
+          memset(pt, 0, sizeof(double) * nsize); /* Zero out column */
           pmix[i] = pt[i] = 1.;          /* Eigenvector is unit vector, pmix=1 */
         }
         if (ctx->glob.idiag == 4 && nsize == 1) /* Special case for K-sort of 1x1 */
           pmix[0] = (double) kbgni; /* pmix stores K value */
       } else { /* Diagonalization is requested and nsize > 1 */
         if (ctx->glob.idiag == 0) { /* Standard energy sort, check for K-roll before diagonalization */
-          roll = kroll(ctx, nsize, t, nsblk, ctx->ibkptr, ctx->ikmin);  /* Modifies t if roll-over found */
+          roll = kroll(nsize, t, nsblk, ctx->ibkptr, ctx->ikmin);  /* Modifies t if roll-over found */
         } else if (ctx->glob.idiag == 2 || ctx->glob.idiag == 5) { /* Sort by input H diagonal order */
           nd = nsize + 1;
           dcopy (nsize, t, nd, dbar, 1); /* Save original diagonal of H in dbar for later sorting */
@@ -414,8 +414,8 @@ int hamx(struct SpinvContext *ctx, const int iblk, const int nsize, const int np
         case 2: /* Energy sort within Wang sub-blocks, but ensure it follows original H diagonal order if energies are close */
           i = ordblk(nsize, nsize, ctx->iqnsep, t, egy, ctx->ibkptr, pmix, ctx->idx); /* Initial sort by energy within sub-blocks */
           if (ODD2(i)) { /* ODD2(i) might mean some degeneracy or near-degeneracy was handled by ordblk */
-            ordham(ctx, nsize, ctx->iqnsep, dbar, ctx->ibkptr, ctx->jdx); /* Get permutation jdx based on original H diagonal (dbar) */
-            fixham(ctx, nsize, nsize, t, egy, pmix, ctx->jdx);       /* Apply this permutation */
+            ordham(nsize, ctx->iqnsep, dbar, ctx->ibkptr, ctx->jdx); /* Get permutation jdx based on original H diagonal (dbar) */
+            fixham(nsize, nsize, t, egy, pmix, ctx->jdx);       /* Apply this permutation */
           }
           break;
         case 3: /* Sort by tau = Ka-Kc like proxy, within vibrational and spin sub-blocks */
@@ -438,8 +438,8 @@ int hamx(struct SpinvContext *ctx, const int iblk, const int nsize, const int np
           if ((i & 2) == 0 /* TODO INCLUDE?: && glob.idiag != 4 */) /* If no issues from ordblk, and not K-sort, we might be done */
             break;                            /* For idiag=4 (bestk), always proceed */
           if (ctx->glob.idiag == 5){ /* Sort by original H diagonal within vib groups */
-            ordham(ctx, nsize, ctx->iqnsep, dbar, vbkptr, ctx->idx); /* Get permutation based on H_diag (dbar) within vib groups */
-            fixham(ctx, nsize, nsize, t, egy, pmix, ctx->idx);       /* Apply permutation */
+            ordham(nsize, ctx->iqnsep, dbar, vbkptr, ctx->idx); /* Get permutation based on H_diag (dbar) within vib groups */
+            fixham(nsize, nsize, t, egy, pmix, ctx->idx);       /* Apply permutation */
             break;
           }
           /* For idiag=3 (tau) or idiag=4 (K) */
@@ -453,17 +453,17 @@ int hamx(struct SpinvContext *ctx, const int iblk, const int nsize, const int np
           }
           if (ctx->glob.idiag == 4) { /* Sort by K values */
             /* bestk calculates K expectation values into wk, gets permutation jdx, applies to t, egy, pmix */
-            bestk(ctx, nsize, nsize, ctx->iqnsep, vbkptr, ctx->idx, ctx->jdx, t, egy, pmix, ctx->wk);
+            bestk(nsize, nsize, ctx->iqnsep, vbkptr, ctx->idx, ctx->jdx, t, egy, pmix, ctx->wk);
             dcopy(nsize, ctx->wk, 1, pmix, 1);       /* Store K expectation values in pmix */
-            fixham(ctx, nsize, nsize, t, egy, pmix, ctx->jdx); /* Apply final permutation for K sort */
+            fixham(nsize, nsize, t, egy, pmix, ctx->jdx); /* Apply final permutation for K sort */
             break;
           }
           /* idiag == 3 (tau sort) */
           for (i = 0; i < nsize; ++i) { /* Copy tau keys from idx to wk (double) */
             ctx->wk[i] = (double)ctx->idx[i];
           }
-          ordham(ctx, nsize, ctx->iqnsep, ctx->wk, vbkptr, ctx->idx); /* Get permutation based on tau values (in wk) */
-          fixham(ctx, nsize, nsize, t, egy, pmix, ctx->idx);     /* Apply permutation */
+          ordham(nsize, ctx->iqnsep, ctx->wk, vbkptr, ctx->idx); /* Get permutation based on tau values (in wk) */
+          fixham(nsize, nsize, t, egy, pmix, ctx->idx);     /* Apply permutation */
           break;
         } /* end switch (glob.idiag) */
       } /* end else (diagonalization requested) */
@@ -482,7 +482,7 @@ int hamx(struct SpinvContext *ctx, const int iblk, const int nsize, const int np
                   /* More likely, this sums P * (d<H>/dP) if eigenvectors are identity (no diagonalization case). */
                   /* If roll=TRUE, it means KROLL modified the H matrix. The derivatives d(H_modified)/dP are being used. */
                   /* This will effectively give the expectation value of H_modified if par are the parameters. */
-      	dcopy(nsize, &ctx->zero, 0, egy, 1); /* Zero out energy array */
+      	memset(egy, 0, sizeof(double) * nsize); /* Zero out energy array */
 	      for (ipar = npar - 1; ipar >= 0; --ipar) { /* Loop over all parameters */
           i = ctx->ipder[ipar];                    /* Get derivative index */
           if (i >= 0) { /* If not a constrained parameter */
@@ -519,7 +519,7 @@ int hamx(struct SpinvContext *ctx, const int iblk, const int nsize, const int np
  * @param par Parameter value (aden or bden if neuler is odd).
  * @return int Number of non-zero elements after transformation (ncos), or 0 if transformation results in zero.
  */
-int specop(struct SpinvContext *ctx, const int neuler, BOOL *newblk, int *nsqj, int *ikq,
+int specop(const int neuler, BOOL *newblk, int *nsqj, int *ikq,
            const int ksi, const int ksj, const int ni, const int nj, const int ncos,
            double *wk, const short *ix, const short *jx, const double par)
 {
@@ -654,7 +654,7 @@ int specop(struct SpinvContext *ctx, const int neuler, BOOL *newblk, int *nsqj, 
  */
 int specfc(struct SpinvContext *ctx, const int ifc, const int iv, const int jv,
            const int kdel, const int ksi, const int ksj, const int ncos,
-           double *wk, const short *ix, const short *jx)
+           double *wk, const short *ix, const short *jx) // TODO: replace ctx parameter with glob.g12
 {
   static double pfac[MAXVIB];  /* Stores rho_v * pi/3 for each vibrational state v */
   static short ipfac[MAXVIB]; /* Stores sign flag for rho_v (1 if original rho_v was negative) */
@@ -748,7 +748,7 @@ int specfc(struct SpinvContext *ctx, const int ifc, const int iv, const int jv,
  *         Returns 0 (and does nothing) if the operation is invalid (e.g., N becomes <0).
  */
 int sznzfix(struct SpinvContext *ctx, const int sznz, const int ni, const int nj,
-            int *ixcom, int *jxcom, int *iscom, int *jscom)
+            int *ixcom, int *jxcom, int *iscom, int *jscom) // TODO remove ctx param with nspin
 {
   if (sznz <= 0) { /* Negative or zero sznz means reset N to original values */
     if (sznz <= -4) { /* Reset ket side (nj) */
@@ -812,7 +812,7 @@ int sznzfix(struct SpinvContext *ctx, const int sznz, const int ni, const int nj
  */
 int sznzop(struct SpinvContext *ctx, const int ni, const int nj, const int ksi,
            const int ksj, const int *iscom, const int *jscom, const int ncos,
-           double *wk, const short *ix, const short *jx)
+           double *wk, const short *ix, const short *jx) // TODO: replace ctx parameter with nspin
 {
   int iflg_n_change_type, i_elem, k_val, kk_val, n_bra_times_2, n_ket_times_2, n_bra_orig_times_2, n_ket_orig_times_2, j_qn_times_2, spin_qn_times_2; /* Renamed iflg, i, k, kk, nni, nnj, nni0, nnj0, jj, iis */
   double val_bra, val_ket, current_wk_element, sum_contrib; /* Renamed vali, valj, twk, sum */
@@ -887,7 +887,7 @@ int sznzop(struct SpinvContext *ctx, const int ni, const int nj, const int ksi,
  * @param jxcom_ket Quantum number block for the ket state.
  * @return double The N-dependent correction factor. Returns 0 if selection rules violated.
  */
-double rmatrx(struct SpinvContext *ctx, const int dir_cos_order, const int vib_tensor_order,
+double rmatrx(const int dir_cos_order, const int vib_tensor_order,
               const int *ixcom_bra, const int *jxcom_ket) /* Renamed ld, lv, ixcom, jxcom */
 {
   double delta_N_sq, n_sum_sq, N_val_as_double, n_sum_plus_1_as_double, factor;            /* Renamed dlsq, dnsq, dn, del, tmp */
@@ -1041,8 +1041,8 @@ int symnsq(struct SpinvContext *ctx, const int n_sq_power, const int n_s_power,
  * @param col_indices Array of column indices (relative to sub-block start). Renamed jx.
  * @return int Number of non-zero elements (num_elements if any K values are non-zero, 0 otherwise if all K=0).
  */
-int symksq(struct SpinvContext *ctx, const int k_sq_power, const int K_bra_start,
-           const int K_ket_start, const int num_elements, double *work_array_elements,
+int symksq(const int k_sq_power, const int K_bra_start, const int K_ket_start,
+           const int num_elements, double *work_array_elements,
            short *row_indices, short *col_indices) /* Renamed parameters */
 {
   double k_sq_bra_factor, k_sq_ket_factor, element_bra_part, element_ket_part; /* Renamed akisq, akjsq, xi, xj */
@@ -1116,8 +1116,8 @@ int symksq(struct SpinvContext *ctx, const int k_sq_power, const int K_bra_start
  *                   0 if Op is general sparse.
  * @return int Always 0.
  */
-int dpmake(struct SpinvContext *ctx, const int nsize, double *dp, const double *t,
-           const int n, const double *wk, const short *idx, const short *jdx, const int isunit)
+int dpmake(const int nsize, double *dp, const double *t, const int n,
+           const double *wk, const short *idx, const short *jdx, const int isunit)
 { /*  find derivative contribution from sub-diagonal */
   const double *pt;
   double ele, tz;
@@ -1148,7 +1148,7 @@ int dpmake(struct SpinvContext *ctx, const int nsize, double *dp, const double *
   }
   else
   {
-    dcopy(nsize, &ctx->zero, 0, dp, 1);
+    memset(dp, 0, nsize * sizeof(double));
     for (i = 0; i < n; ++i)
     {
       iz = idx[i];

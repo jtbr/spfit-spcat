@@ -4,7 +4,6 @@
 
 DpiEngine::DpiEngine() {
     // Initialize the context with default values
-    m_context.zero = 0.0;
     m_context.nvib = 1; // TODO These initializations seem to be made up, previously unset.
     m_context.iwhole = 0;
     m_context.isdgn = 1;

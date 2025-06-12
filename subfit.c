@@ -385,8 +385,6 @@ double *par, *fac;
   /*     LINE   = line counter for frequency derivatives */
   /*     PAR    = parameters */
   /*     FAC    = scaling values */
-  static double zero = 0.;
-
   SXLINE *xline;
   double f, dtmp, *deriv;
   long itmp;
@@ -407,7 +405,7 @@ double *par, *fac;
     /*  add energies subtracting effect of ignored derivatives */
     dtmp = egy[indx] - ddot(noff, &egyder[itmp], nsize, par, 1);
     if (initl < 0)
-      dcopy(noff, &zero, 0, &deriv[nparn], 1);
+      memset(&deriv[nparn], 0, noff * sizeof(double));
   } else {                      /* add energies */
     indx = indx - 1;
     dtmp = egy[indx];

@@ -13,7 +13,7 @@ static char card[82];
 
 int ftran(int nft, double *xpec, int pec, double *fc, int flg);
 static int rdinp(FILE * luin, int ndatm, int *nnatm, int *nx, double *wtx,
-                 double *dist, double *theta, double *phi, char *istau, 
+                 double *dist, double *theta, double *phi, char *istau,
                  char **xyztag);
 static int coords( /*@null@*/ FILE * lu, int noatm, double *coord, double *wt,
                   int *nx, double *dist, double *theta, double *phi);
@@ -29,7 +29,7 @@ static double xinterp(int n, double *tauval, double *xtrans);
   input file: name.inp
     first line => nstruct, angram, mu_top, mu_z, mu_y
                nstruct= number of structures vs tau
-               nstruct= -2 means two structures, non-cyclic vibration 
+               nstruct= -2 means two structures, non-cyclic vibration
                angram = angle to rotate from IAS to RIAS (degrees)
                mu_top = dipole moment of top perpendicular to z
                mu_z   = dipole moment parallel to z
@@ -231,15 +231,15 @@ char *argv[];
     } else if (i == 0) {
       dcopy(n3atm, coord, 1, xcoord, 1);
     } else {
-      for (iatm = 0; iatm < n3atm; ++iatm) 
+      for (iatm = 0; iatm < n3atm; ++iatm)
         dcoord[iatm] = xcoord[iatm] - coord[iatm];
       dcopy(n3atm,  coord, 1, &xcoord[ND3ATM], 1);
       dcopy(n3atm, dcoord, 1, &dcoord[ND3ATM], 1);
     }
   }
   nxyz = 0;
-  for (i = 0; i < nnatm; ++i) 
-    if (wt[i] >= 0.5) ++nxyz; 
+  for (i = 0; i < nnatm; ++i)
+    if (wt[i] >= 0.5) ++nxyz;
   /* read: nsym, maxm, maxv, nft */
   nsym = 1;
   maxm = 30;
@@ -310,7 +310,7 @@ char *argv[];
       ftran(NFT, &dcoord[iatm], ND3ATM, fc, 1);   /* synthesize derivative */
       ++pdbl;
     }
-  } 
+  }
   /*   get primitive constants vs tau */
   ia = ii = iatm = 0;
   for (itau = 0; itau < nftc; ++itau) {
@@ -502,7 +502,7 @@ char *argv[];
         mval = 0;
         if (i == 1)
           mval = 2;
-        if (i >= 17) 
+        if (i >= 17)
           mval = 1;
         fprintf(luout, "%8d %2d %2d %20.12E/ %s\n", idpar, nval,
                 mval, fc[ii], sparv[i].labl);
@@ -526,10 +526,10 @@ char **xyztag;
     /*@null@*/ char *symb;
     double wt;
     char *xyztag;
-  } swtv[] = { 
-    {"C", 12.,"C "}, 
-    {"H", 1.00782,"H "}, 
-    {"O", 15.99491,"O "}, 
+  } swtv[] = {
+    {"C", 12.,"C "},
+    {"H", 1.00782,"H "},
+    {"O", 15.99491,"O "},
     {"N", 14.00307,"N "},
     {"F", 18.9984,"F "},
     {"H2", 2.01409,"H "},
@@ -616,7 +616,7 @@ double *coord, *wt;
 int *nx;
 double *dist, *theta, *phi;
 {
-  double xcm[3], prcor[3], trans[9], xvectr[3], yvectr[3], cb, sb;
+  double xcm[3], prcor[3], trans[9] = {0}, xvectr[3], yvectr[3], cb, sb;
   double wtot, cth, rij, rik, ril, sth, tmp, sum, scale;
   int *nxx, i, j, iloop, ia, ib, ic, ii, iap, ibp, icp, ia3, ib3, ic3, ii3;
 

@@ -10,14 +10,12 @@
 #define MDIP   2
 #define MUSED  4
 #define MWN    8
- 
+
 typedef struct spar {
   double parval, parerr, parerrv;
   int  idval,mv,nv,iflg,v21;
   char labl[NLABL + 1];
 } SIPAR;
-
-static double zero = 0.;
 
 int main(argc, argv)
 int argc;
@@ -51,7 +49,7 @@ char *argv[];
     fin1 = infil1;
     puts("ENTER IAM INPUT FILE NAME");
     fgetstr(fin1, NFNAM, stdin);
-  }  
+  }
   if (argc >= 3){
     fin2 = argv[2];
   }else{
@@ -79,26 +77,27 @@ char *argv[];
   bcdpar[0] = (bcd_t) NDBCD;
   par0.parval = 0.; par0.parerr = 1.e+36; par0.parerrv = 0.;
   /* read old iam file */
-  if (fgetstr(buf, NDBUF, luin1) < 0) exit(EXIT_FAILURE);
-  dcopy(NDPAR1, &zero, 0, dval, 1);
+  if (fgetstr(buf, NDBUF, luin1) < 0)
+    exit(EXIT_FAILURE);
+  memset(dval, 0, sizeof(double) * NDPAR1);
   nval = pcard(buf, dval, NDPAR1, NULL) - 1;
-  rho = dval[0]; 
-  for (k = 0; k < nval; ++k) 
+  rho = dval[0];
+  for (k = 0; k < nval; ++k)
     ival[k] = (int) dval[k + 1];
   nvib2 = ival[4]; nsym = ival[0];
-  if (nval < 5) 
+  if (nval < 5)
     nvib2 = 0;
   npar -= nvib2;
   par = (SIPAR *)mallocq((size_t) (npar + 1) * sizeof(SIPAR));
   memcpy(par, &par0, sizeof(SIPAR));
   kmap = (short *)mallocq((size_t)(nvib2 * ND2TOP + 1) * sizeof(short));
-  kmap[0] = 0; 
+  kmap[0] = 0;
   ivv = 0;
   for (k = 0; k < nvib2; ++k) {
-    if (fgetstr(buf, NDBUF, luin1) < 0) break; 
-    dcopy(ND2TOP, &zero, 0, dval, 1);
+    if (fgetstr(buf, NDBUF, luin1) < 0) break;
+    memset(dval, 0, sizeof(double) * ND2TOP);
     if (pcard(buf,dval,ND2TOP,NULL) < 0) continue;
-    for (kk = 0; kk < ND2TOP; ++kk) { 
+    for (kk = 0; kk < ND2TOP; ++kk) {
       kmap[ivv] = (short) dval[kk];
       ++ivv;
     }
@@ -117,11 +116,11 @@ char *argv[];
   pref = 1.; kpar = 1;
   for (ipar = 1; ipar <= npar; ++ipar) {
     if (fgetstr(buf, NDBUF, luin1) < 0) break;
-    parp = &par[kpar]; 
+    parp = &par[kpar];
     parp->iflg = 0;
     dval[1] = 0.; dval[0] = 0.; dval[2] = 0.; dval[3] = 1.; dval[4] = 1.e+30;
     if (pcard(buf,dval,5,NULL) < 4) continue;
-    idtmp = (long) dval[0]; 
+    idtmp = (long) dval[0];
     parp->nv = (int) dval[1];
     mv = (int) dval[2]; parp->mv = mv;
     parp->parval = dval[3];
@@ -144,9 +143,9 @@ char *argv[];
       ivv = (int)(idtmp % 100); idtmp /= 100;
       parp->idval = (int) idtmp; parp->v21 = ivv;
       iv2 = ivv / 10; iv1 = ivv - iv2 * 10;
-      if (iv1 < 9 && iv1 > nxv) 
+      if (iv1 < 9 && iv1 > nxv)
         nxv = iv1;
-      if (iv2 < 9 && iv2 > nxv) 
+      if (iv2 < 9 && iv2 > nxv)
         nxv = iv2;
       if (parp->nv == 0 && iv1 == iv2) {
         if (mv == 2 && parp->idval == 0 && ifval[iv1] < 0)
@@ -190,17 +189,17 @@ char *argv[];
   ndecfac = 10;
   if (nvib > 9)
     ndecfac = 100;
-  ndec = ndecfac - 1; ndecfac *= ndecfac; 
+  ndec = ndecfac - 1; ndecfac *= ndecfac;
   for (ixpar = 0; ixpar < nxpar; ++ixpar) {
     if (fgetstr(buf, NDBUF, luin2) < 0) break;
     iend = getbcd(buf, bcdpar, NDBCD);
     if (NEGBCD(bcdpar[0]) != 0) continue;
     iv1 = bcd2i(bcdpar[1]); ifc = 5;
     if (nvib <= 9) {
-      iv2 = iv1 / 10; iv1 = iv1 - iv2 * 10; 
+      iv2 = iv1 / 10; iv1 = iv1 - iv2 * 10;
     } else {
       iv2 = bcd2i(bcdpar[2]); ++ifc;
-    } 
+    }
     mv = iv2;
     idtmp = (int)(bcdpar[ifc] & 0x0f);
     idtmp = bcd2i(bcdpar[ifc - 1]) + idtmp * 100;
@@ -211,12 +210,12 @@ char *argv[];
     nv += (int)(bcdpar[ifc + 1] & 0x0f) * 10;
     ipar = (nv - 1) / 10;
     nv -= (ipar >> 1) * 10;
-    if ((ipar & 1) != 0) 
+    if ((ipar & 1) != 0)
       nv = 10 - nv;
     kpar = (int) idtmp;
     for (ipar = 1; ipar < npar; ++ipar) {
       parp = &par[ipar];
-      if ((parp->iflg & (MDIP | MUSED)) != 0) continue; 
+      if ((parp->iflg & (MDIP | MUSED)) != 0) continue;
       if (parp->idval != kpar) continue;
       if (parp->mv != mv) continue;
       if (parp->nv != nv) continue;
@@ -228,11 +227,11 @@ char *argv[];
       if (idtmp == 2000 && nv == 0 && mv == 1) k = 1;
       if (k == 0 && idtmp == 0 && nv > 0 && mv == 0) k = 1;
       if (k == 0 && idtmp == 0 && nv == 0 && mv == 2) k = 1;
-      if (k != 0) {  
+      if (k != 0) {
         printf("%2d %3d %2d, new=%12.3f, change=%12.3f ", parp->v21,
                nv, mv, parp->parval, del);
         err = parp->parerrv;
-        if (fabs(err) < 1.e+08) 
+        if (fabs(err) < 1.e+08)
           printf("err= %12.3f", err);
         printf(" %s\n", parp->labl);
       }
@@ -243,7 +242,7 @@ char *argv[];
   /* resolve defaults */
   for (k = 0; k <= nxv; ++k) {
     ivv = irho[k];
-    if (ivv  < 0) ivv  = irho[9]; 
+    if (ivv  < 0) ivv  = irho[9];
     if (ivv >= 0) par[ivv].iflg &= (MNEG | MDIP); /* clear MUSED */
     irho[k] = ivv;
     if (icval[k] < 0) icval[k] = icval[9];
@@ -264,14 +263,14 @@ char *argv[];
       parc = &par[icval[k]];
       ptmp = &parc->parval;
       tmp = 0.5 / del; err *= (*ptmp) / del;
-      del = parc->parerrv; 
+      del = parc->parerrv;
       err = tmp * sqrt(err * err + del * del);
       if (fabs(err) > 1.e+08) err = 1.e+08;
       del = -tmp * (*ptmp); *ptmp = 1.e-06;
-      parc = &par[irho[k]]; 
+      parc = &par[irho[k]];
       ptmp = &parc->parval;
       tmp = (*ptmp) + del; *ptmp = tmp;
-      if (ivv == 0) 
+      if (ivv == 0)
         rho = tmp;
       printf("new rho(%2d)= %12.9f, change= %12.9f (%12.9f)\n", k, tmp, del, err);
     }
@@ -283,7 +282,7 @@ char *argv[];
     exit (EXIT_FAILURE);
   }
   fprintf(luout, "%12.9f ", rho);
-  for (k = 0; k < nval; ++k) 
+  for (k = 0; k < nval; ++k)
     fprintf(luout," %3d", ival[k]);
   fputc('\n',luout);
   ivv = 0;
@@ -305,7 +304,7 @@ char *argv[];
       } else  {
         pref = parp->parval;
       }
-       
+
     } else if ((parp->iflg & MNEG) != 0) {
       idtmp = -idtmp;
     }
@@ -314,9 +313,9 @@ char *argv[];
       parp->parval /= clight;
       parp->parerr /= -clight;
     }
-    fprintf(luout, "%12ld  %3d %2d %23.15e", 
+    fprintf(luout, "%12ld  %3d %2d %23.15e",
             idtmp, parp->nv, parp->mv, parp->parval);
-    if (parp->parerr < 1.e+30) 
+    if (parp->parerr < 1.e+30)
       fprintf(luout, "%12.3e ",parp->parerr);
     fprintf(luout, " /%s\n", parp->labl);
   }

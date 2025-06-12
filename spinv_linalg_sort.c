@@ -36,7 +36,7 @@ dclr(): Clears an array (very generic, but often used with matrices).
  * @param iswap Output array storing the permutation required to achieve the desired order.
  * @return int Always 0.
  */
-int ordham(struct SpinvContext *ctx, const int nn, short *mask, double *egy,
+int ordham(const int nn, short *mask, double *egy,
            const short *isblk, short *iswap)
 {
   /* subroutine to order eigenvalues within sub-block like diagonal of */                   /* Original comment */
@@ -94,7 +94,7 @@ int ordham(struct SpinvContext *ctx, const int nn, short *mask, double *egy,
  * @param iswap Permutation array from ordham or bestk. iswap[i] is the original index of the state that should go to position i.
  * @return int Always 0.
  */
-int fixham(struct SpinvContext *ctx, const int ndm, const int nn, double *t, double *egy, double *p, const short *iswap)
+int fixham(const int ndm, const int nn, double *t, double *egy, double *p, const short *iswap)
 {
   /* subroutine to order eigenvalues within sub-block like diagonal of */ /* Original comment (slightly misleading, it applies a pre-calculated order) */
   /*      Hamiltonian using permutation found with ordham */              /* Original comment */
@@ -128,7 +128,7 @@ int fixham(struct SpinvContext *ctx, const int ndm, const int nn, double *t, dou
  * @param kmin_values Array of minimum K values for each sub-block. Renamed kmin.
  * @return BOOL TRUE if roll-over was detected and corrected, FALSE otherwise.
  */
-BOOL kroll(struct SpinvContext *ctx, const int nsizd, double *t, const int nsblk, const short *sbkptr, const short *kmin)
+BOOL kroll(const int nsizd, double *t, const int nsblk, const short *sbkptr, const short *kmin)
 {
   /* subroutine to make sure that diagonal elements of the Hamiltonian */
   /*    are monotonically increasing (decreasing for oblate) */
@@ -137,6 +137,7 @@ BOOL kroll(struct SpinvContext *ctx, const int nsizd, double *t, const int nsblk
   long ndmt;
   int ibgn, iend, i, k, n, ixx;
   BOOL roll;
+  const double zero = 0.0;
 
   ndmt = nsizd + 1;
   roll = FALSE;
@@ -169,9 +170,9 @@ BOOL kroll(struct SpinvContext *ctx, const int nsizd, double *t, const int nsblk
     for (; i <= iend; ++i)
     {
       n = i - 1;
-      dcopy(n, &ctx->zero, 0, &t[i], nsizd);
+      dcopy(n, &zero, 0, &t[i], nsizd);
       n = nsizd - i;
-      dcopy(n, &ctx->zero, 0, &t[i * ndmt], 1);
+      memset(&t[i * ndmt], 0, n * sizeof(double));
       tlast += vall;
       *ptmp = tlast;
       ptmp += ndmt;
@@ -194,7 +195,7 @@ BOOL kroll(struct SpinvContext *ctx, const int nsizd, double *t, const int nsblk
  * @param wk Work array.
  * @return int Always 0.
  */
-int bestk(struct SpinvContext *ctx, const int ndm, const int nsize, short *iqnsep, short *ibkptr,
+int bestk(const int ndm, const int nsize, short *iqnsep, short *ibkptr,
           short *itau, short *iswap, double *t, double *egy, double *pmix, double *wk)
 {
 #define MAXNK 4
@@ -203,7 +204,7 @@ int bestk(struct SpinvContext *ctx, const int ndm, const int nsize, short *iqnse
   int i, iz, kd, k, ii, jj, ibgn, iend, iblk, is, iq, nk;
   short mcmp;
   ndml = ndm;
-  dcopy(nsize, &ctx->zero, 0, wk, 1);
+  memset(wk, 0, sizeof(double) * nsize);
   for (i = 0; (ibgn = ibkptr[i]) < nsize; ++i)
   {
     iend = ibkptr[i + 1] - 1;
@@ -357,20 +358,21 @@ int bestk(struct SpinvContext *ctx, const int ndm, const int nsize, short *iqnse
  * )
  * @return int Always 0.
  */
-int dclr(struct SpinvContext *ctx, const int n1, const int n2, double *vec, const int ix)
+int dclr(const int n1, const int n2, double *vec, const int ix)
 { /*  clear a N1*N2 block */            /* Original comment */
   static long nbig_chunk_size = 0x7ff0; /* Max elements for dcopy at once (approx 32k, for 16-bit int limit?) */
   long n_elements_to_clear;             /* Renamed nsq */
   double *current_vec_ptr;              /* Renamed pvec */
+  const double zero = 0.0;
 
   current_vec_ptr = vec;
   n_elements_to_clear = n1 * (long)n2;          /* Total number of elements to clear */
   while (n_elements_to_clear > nbig_chunk_size) /* If total exceeds chunk size for dcopy */
   {
-    dcopy((int)nbig_chunk_size, &ctx->zero, 0, current_vec_ptr, ix);
+    dcopy((int)nbig_chunk_size, &zero, 0, current_vec_ptr, ix);
     current_vec_ptr += nbig_chunk_size; /* <--- Ensure this simple advance is used */
     n_elements_to_clear -= nbig_chunk_size;
   }
-  dcopy((int)n_elements_to_clear, &ctx->zero, 0, current_vec_ptr, ix); /* Clear remaining elements */
+  dcopy((int)n_elements_to_clear, &zero, 0, current_vec_ptr, ix); /* Clear remaining elements */
   return 0;
 } /* dclr */

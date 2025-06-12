@@ -336,7 +336,7 @@ int idpari(struct SpinvContext *ctx, bcd_t *idval, int itp, SPAR *pspar)
  * @param k_avg_out Output: K_avg value if applicable. Renamed kavg.
  * @return int Flags from the pspar structure.
  */
-int idpars(struct SpinvContext *ctx, SPAR *pspar, int *ksq_out, int *itp_out,
+int idpars(SPAR *pspar, int *ksq_out, int *itp_out,
            int *tensor_order_N_out, int *dir_cos_order_out, int *k_delta_out,
            int *n_dot_s_power_out, int *spin1_idx_out, int *spin2_idx_out,
            int *sznz_type_out, int *fourier_coeff_idx_out, int *alpha_sym_out,
@@ -380,7 +380,7 @@ int idpars(struct SpinvContext *ctx, SPAR *pspar, int *ksq_out, int *itp_out,
  * @param output_factors_array Output: Array to store the calculated factors ff[K] = sqrt(N(N+1)-K(K-1)).
  * @return int Always 0.
  */
-int ffcal(struct SpinvContext *ctx, const int nff, const int kff, double *ff)
+int ffcal(const int nff, const int kff, double *ff)
 {
   static int nlast = -1;
   static int klast = 0;
@@ -478,7 +478,7 @@ int intens(struct SpinvContext *ctx, const int iblk, const int isiz, const int j
   alpha = 0;
   bijv3 = (bcd_t)0;
   /* clear dipole matrix */
-  dclr(ctx, isiz, jsiz, s, 1);
+  dclr(isiz, jsiz, s, 1);
   /* loop over sub-blocks */
   ndms = isiz;
   ndecv = ctx->glob.vibdec;
@@ -503,7 +503,7 @@ int intens(struct SpinvContext *ctx, const int iblk, const int isiz, const int j
       nx = ((nni > nnj) ? nni : nnj) >> 1;
       i = (ivv < jvv) ? ivv : jvv;
       ijv = (unsigned int)(ivv + jvv + i * ctx->glob.vibfac);
-      ijv = (ijv << 2) + blksym(ctx, ctx->ixcom, ctx->jxcom);
+      ijv = (ijv << 2) + blksym(ctx->ixcom, ctx->jxcom);
       bijv1 = (bcd_t)ijv;
       bijv2 = (bcd_t)(ijv >> 8);
       if (ndecv == 3)
@@ -580,7 +580,7 @@ int intens(struct SpinvContext *ctx, const int iblk, const int isiz, const int j
             dd *= k;
             break;
           case 4:
-            symksq(ctx, 1, kbgni, kbgnj, ncos, ctx->wk, ctx->idx, ctx->jdx);
+            symksq(1, kbgni, kbgnj, ncos, ctx->wk, ctx->idx, ctx->jdx);
             break;
           case 5:
           case 11:
@@ -614,7 +614,7 @@ int intens(struct SpinvContext *ctx, const int iblk, const int isiz, const int j
           }
           /*  correct for reduced matrix of N */
           if (ld != lv)
-            dd *= rmatrx(ctx, ld, lv, ctx->ixcom, ctx->jxcom);
+            dd *= rmatrx(ld, lv, ctx->ixcom, ctx->jxcom);
           /*  couple dipoles through the spins */
           tensor(ctx, &dd, ctx->iscom, ctx->jscom, ctx->lscom, ctx->ismap, npair, alpha);
           for (k = 0; k < ncos; ++k)
@@ -832,7 +832,7 @@ int dircos(struct SpinvContext *ctx, const int *xbra, const int *xket, const int
   else
   {
     k = kbra0 + ikdel + ((nsbra - 1) << 1);
-    ffcal(ctx, nbra, k, ff);
+    ffcal(nbra, k, ff);
     kkdel = ld;
   }
   kdel2 = kkdel + kkdel;

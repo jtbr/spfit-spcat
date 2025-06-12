@@ -21,7 +21,6 @@ struct SpinvContext {
   SDIP dipinfo0;                 /* Default/first dipole info structure */
   SDIP *dipinfo;                 /* Pointer to array of dipole info structures */
 
-  double zero;                   /* Static zero value */
   double zwk;                    /* Static zero for work array fallback */
   double spfac[MAXII];           /* Spin factors sqrt(I(I+1)(2I+1)) for quadrupole etc. */
   double spfac2[MAXII];          /* Spin factors for quadrupole, involving 1/sqrt((I-1/2)(I+3/2)) etc. */
@@ -55,7 +54,6 @@ struct SpinvContext {
   int nddip;  /* Number of dipole parameters currently allocated in dipinfo */
 
   /* Static short variables, often default/zero values or fallbacks for unallocated pointers */
-  short szero;   /* Static zero short value */
   short zidx;    /* Default/zero for idx fallback */
   short zjdx;    /* Default/zero for jdx fallback */
   short ziqnsep; /* Default/zero for iqnsep fallback */

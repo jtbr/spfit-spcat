@@ -309,7 +309,7 @@ int main(int argc, char *argv[])
     for (i = 0; i < nfit; ++i) { /* scale */
       if (i != 0) {
         pfit += ndfit;
-        dcopy(i, &zero, 0, pfit, 1);
+        memset(pfit, 0, sizeof(double) * i);
       }
       n = nfit - i;
       pfitd = pfit + i;
@@ -358,7 +358,7 @@ int main(int argc, char *argv[])
     var[0] = 0.;
     for (n = 1; n < nfit; ++n) {
       ++pfitb;
-      dcopy(n, &zero, 0, pfitb, 1);
+      memset(pfitb, 0, sizeof(double) * n);
       pvar += (n + 1);
       pfitb += n;
       *pfitb = 1. / (*pvar);
@@ -370,7 +370,7 @@ int main(int argc, char *argv[])
   }
   oldfit[0] = fitbgn[0];
   oldpar[0] = par[0];
-  dcopy(nfit, &zero, 0, delbgn, 1);
+  memset(delbgn, 0, sizeof(double) * nfit);
   lbufof(-nfit, nline);
   /* read lines */
   lulin = fopenq(fname[elin], "r");
@@ -621,7 +621,7 @@ int main(int argc, char *argv[])
     pfit = fit;
     for (k = 1; k < nfit; ++k) {
       pfit += ndfit;
-      dcopy(k, &zero, 0, pfit, 1);
+      memset(pfit, 0, sizeof(double) * k);
     }
     varv[0] = xsqt + nrj * xerrmx * xerrmx;
     marqlast = marqp[0];

@@ -142,7 +142,7 @@ int hamx_dpi(struct DpiContext *ctx, const int iblk, const int nsize, const int 
   nsq = nsize * nsize;
   for (i = 0; i <= NDPAR; ++i) {        /* ZERO DERIVATIVE W */
     if ((w = wp[i]) != NULL)
-      dcopy(nsq, &ctx->zero, 0, w, 1);
+      memset(w, 0, sizeof(double) * nsq);
   }
   for (i = 0; i < nsize; i += 2) {      /* SET UP FINE STRUCTURE TERMS */
     ii = i + 1;
@@ -357,8 +357,8 @@ int hamx_dpi(struct DpiContext *ctx, const int iblk, const int nsize, const int 
     } /* i loop */
   }
   /*  BRING H TOGETHER */
-  dcopy(nsq, &ctx->zero, 0, t, 1);
-  egy0 = ctx->zero;
+  memset(t, 0, nsq * sizeof(double));
+  egy0 = 0.0;
   kk = 0;
   for (ipar = 0, ibcd = 0; ipar < npar; ++ipar, ibcd += ndbcd) {
     if (NEGBCD(idpar[ibcd]) == 0)
@@ -380,11 +380,12 @@ int hamx_dpi(struct DpiContext *ctx, const int iblk, const int nsize, const int 
     }
   }
   if (ifdump) {                 /* special to dump Hamiltonian */
+    const double zero = 0.0;
     for (i = 0; i < nsize; ++i) {
       t[i + i * nsize] += egy0;
       egy[i] = t[i + i * nsize];
       pmix[i] = 0.;
-      dcopy(nfit, &ctx->zero, 0, &dedp[i], nsize);
+      dcopy(nfit, &zero, 0, &dedp[i], nsize);
     }
     return 0;
   }
@@ -411,7 +412,7 @@ int hamx_dpi(struct DpiContext *ctx, const int iblk, const int nsize, const int 
     if (NEGBCD(idpar[ibcd]) == 0) {
       if (ipar != 0)
         pd += nsize;
-      dcopy(nsize, &ctx->zero, 0, pd, 1);
+      memset(pd, 0, nsize * sizeof(double));
       kk = ipar;
     } else {
       ab = par[ipar];
@@ -473,6 +474,7 @@ int intens_dpi(struct DpiContext *ctx, const int iblk, const int isiz, const int
   int idgn, jdgn, i, j, k, fi, fj, ix, jx, idif, jji, jjj, ii;
   int iv, jv, kdip, ibcd;
   bcd_t ivb, jvb;
+  const double zero = 0.0;
 
   /* START OF INTENSITY CALCULATION */
   if (((iblk + jblk) & 1) == 0)
@@ -510,7 +512,7 @@ int intens_dpi(struct DpiContext *ctx, const int iblk, const int isiz, const int
   jx += 2 - ix;
   ii = ctx->isdgn - 1;
   for (i = 0; i < isiz; ++i) {
-    dcopy(jsiz, &ctx->zero, 0, &s[i], isiz);
+    dcopy(jsiz, &zero, 0, &s[i], isiz);
     k = i & 1;
     omeg = k + 0.5;
     jji = ix + i - k;
