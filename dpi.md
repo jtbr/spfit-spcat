@@ -1,6 +1,6 @@
 # Documentation for DPFIT and DPCAT
 
-These programs which use the subroutine DPLC are used to calculate $^2\Pi$ energies and intensities with one nuclear spin using Hund’s case (a).
+These programs which use the subroutine DPLC are used to calculate $^2\Pi$ energies and intensities with one nuclear spin using Hund’s case (a). These programs are no longer separate executables. Instead, use SPCAT and SPFIT with the `--dpi` command-line argument. The `dpcat` and `dpfit` shell scripts can be used as before, as they will do this for you (on Unix or Mac).
 
 ## Format of Quantum Numbers
 
