@@ -33,6 +33,7 @@ set(SOURCE_FILES
     spinv_utils.c
     spinit.c
     CalFit.cpp
+    CalFitIO.cpp
     SpinvEngine.cpp
     DpiEngine.cpp
     calcat.cpp
@@ -94,12 +95,11 @@ endmacro()
 # Define executables
 set(DEFAULT_EXECUTABLES spfit spcat)
 set(OPTIONAL_EXECUTABLES calmrg moiam stark termval sortn calbak reassign sortegy iambak)
-if(BUILD_ALL)
+if(BUILD_ALL)  # NOT WORKING? EVEN IF OFF, INCLUDES OPTIONAL_EXECUTABLES!
     set(EXECUTABLES ${DEFAULT_EXECUTABLES} ${OPTIONAL_EXECUTABLES})
 else()
     set(EXECUTABLES ${DEFAULT_EXECUTABLES})
 endif()
-
 
 if(NOT DEFINED EXECUTABLES)
   set(EXECUTABLES ${DEFAULT_EXECUTABLES})
@@ -110,6 +110,7 @@ if("spfit" IN_LIST EXECUTABLES)
   add_executable_plus(spfit TRUE # This target uses BLAS
     calfit.cpp
     CalFit.cpp
+    CalFitIO.cpp
     subfit.c
     spinv_setup.c
     spinv_spin_symmetry.c

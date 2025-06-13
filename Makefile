@@ -25,7 +25,7 @@ SPINV_OBJFILES=spinv_setup.o spinv_spin_symmetry.o spinv_linalg_sort.o spinv_ham
 OBJFILES=dpi.o spinit.o $(SPLIB_OBJFILES) $(SPINV_OBJFILES) SpinvEngine.o DpiEngine.o
 # dpfit: calfit.o subfit.o dpi.o splib.a; gcc -o $@ $^ $(BLASLIB) -lm
 # dpcat: calcat.o sortsub.o dpi.o splib.a; gcc -o $@ $^ $(BLASLIB) -lm
-spfit: calfit.o CalFit.o subfit.o $(OBJFILES); g++ -o $@ $^ $(BLASLIB) -lm
+spfit: calfit.o CalFit.o CalFitIO.o subfit.o $(OBJFILES); g++ -o $@ $^ $(BLASLIB) -lm
 spcat: calcat.o sortsub.o $(OBJFILES); g++ -o $@ $^ $(BLASLIB) -lm
 calmrg: calmrg.o splib.a; gcc -o $@ $^ $(BLASLIB) -lm
 calbak: calbak.o splib.a; gcc -o $@ $^ $(BLASLIB) -lm
@@ -47,8 +47,7 @@ splib.a: ulib.o cnjj.o slibgcc.o catutil.o lsqfit.o $(LBLAS)
 # 	ar r libspinv.a $^
 # 	ranlib libspinv.a
 
-calfit.o:calfit.cpp calpgm.h SpinvEngine.hpp
-#	gcc -c calfit.cpp $(CFLAGS)
+calfit.o:calfit.cpp calpgm.h SpinvEngine.hpp DpiEngine.hpp CalFit.hpp CalFitIO.hpp lsqfit.h
 subfit.o:subfit.c calpgm.h
 lsqfit.o:lsqfit.c lsqfit.h
 calcat.o:calcat.cpp calpgm.h DpiEngine.hpp
@@ -78,6 +77,5 @@ sortsub.o: sortsub.c
 dblas.o: dblas.c
 util.o:util.c
 calbak.o:calbak.c
-#cnvwn.o:cnvwn.c
 CalFit.o: CalFit.cpp CalFit.hpp CalculationEngine.hpp
-#	g++ -c CalFit.cpp $(CFLAGS)
+CalFitIO.o: CalFitIO.cpp CalFitIO.hpp CalFit.hpp CalculationEngine.hpp

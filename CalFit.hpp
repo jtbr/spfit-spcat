@@ -8,10 +8,10 @@
 #ifndef CALFIT_HPP
 #define CALFIT_HPP
 
+#include <cstdio>
 #include <string>
 #include <vector>
 #include <memory>
-#include <cstdio>
 #include "CalculationEngine.hpp"
 
 #define MAXQN 10
@@ -55,31 +55,6 @@ struct CalFitOutput {
     double xsqbest;             // Best RMS error after fitting
     int itr;                    // Number of iterations performed
     // Additional output data will be added as needed
-};
-
-/**
- * @brief Utility class for handling I/O operations for CalFit
- */
-class CalFitIO {
-  public:
-    /**
-     * @brief Read input data from files
-     * @param parFile Path to parameter file
-     * @param linFile Path to line file
-     * @param input Output parameter for input data
-     * @return True if reading is successful, false otherwise
-     */
-    static bool readInput(const std::string& parFile, const std::string& linFile, CalFitInput& input);
-
-    /**
-     * @brief Write output data to files
-     * @param fitFile Path to fit output file
-     * @param bakFile Path to backup file
-     * @param varFile Path to variance file
-     * @param output Output data to write
-     * @return True if writing is successful, false otherwise
-     */
-    static bool writeOutput(const std::string& fitFile, const std::string& bakFile, const std::string& varFile, const CalFitOutput& output);
 };
 
 /**
