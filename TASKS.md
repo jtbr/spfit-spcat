@@ -84,6 +84,8 @@ This document outlines the prioritized tasks for modernizing the SPFIT/SPCAT sof
         - Debug current issues in reproducing correct functionality (spfit exits with error 1 after messages about "No option lines found, using default values", and "Unable to open line input file", followed by "Fitting process failed")
         - Make full use of `CalFitIO` and remove use of scratch files.
         - Refactor `calcat.cpp` into a `CalCat` class following the same modularization pattern.
+        - Note that some input/output files are shared between `fit` and `cal` and it may make sense that IO is modularized by file type and shared between `CalCat` and `CalFit`. This needs to be explored first.
+        - we may need to refactor linein and getlin and possibly other code to remove dependencies on file IO and separate that from the logic
     - **Details**: The refactoring has focused on disentangling file I/O from calculation logic within the `CalFit` class. Temporary file placeholders are in use until full I/O separation is achieved.
     - **Plan**:
         1.  **Spfit/Spcat Class Structure:**

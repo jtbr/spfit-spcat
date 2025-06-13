@@ -41,7 +41,7 @@ struct CalFitInput {
     std::string title;     // Title from parameter file
     int nfit;              // Number of fitted parameters
     int inpcor;            // Flag for input correlation/variance
-    // Additional input data for parameters and lines will be added as needed
+    std::vector<std::string> lineData;    // Raw line data read from input file for in-memory processing
 };
 
 /**

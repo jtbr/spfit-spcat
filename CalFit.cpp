@@ -240,26 +240,31 @@ bool CalFit::initializeParameters(const CalFitInput& input) {
  * @return True if processing is successful, false otherwise
  */
 bool CalFit::processLines(const CalFitInput& input) {
-    // Since CalFitIO handles file reading, we process lines directly from input data
-    // In a complete implementation, line data would be stored in CalFitInput
-    // For now, we'll simulate reading from input data until linein is fully adapted
+    // Process lines directly from input.lineData using an in-memory temporary file
     int nline = input.limlin;
     int iqnfmt = input.nfmt;
 
-    // Instead of using a temporary file, we will eventually process line data from input.lineData
-    // TODO: Implement direct data processing from input.lineData vector or similar structure
-    // For now, as a transition, we still use a temporary file but acknowledge the need for change
-    FILE *luin = fopen("temp.lin", "r"); // Temporary until linein is updated to use input directly
+    // Create a temporary in-memory file to write line data for compatibility with linein
+    FILE *luin = tmpfile();
     if (!luin) {
-        puts("Unable to open line input file - ensure temp.lin is created or update to use direct input data");
+        puts("Unable to create temporary in-memory file for line data");
         return false;
     }
+
+    // Write line data from input to the temporary in-memory file
+    for (const auto& line : input.lineData) {
+        std::string trimmedLine = line;
+        trimmedLine.erase(0, trimmedLine.find_first_not_of(" \t"));
+        fputs(trimmedLine.c_str(), luin);
+        fputc('\n', luin);
+    }
+    rewind(luin); // Reset the file pointer to the beginning for reading
 
     int mxqn = linein(luin, &nline, iqnfmt);
     fclose(luin);
 
     if (nline <= 0) {
-        puts("No lines read from input file");
+        puts("No lines read from input data");
         return false;
     }
 

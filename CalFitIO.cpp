@@ -35,7 +35,7 @@ bool CalFitIO::readInput(const std::string& parFile, const std::string& linFile,
         fclose(lubak);
         return false;
     }
-    printf("Successfully opened line file '%s' for reading.\n", linFile.c_str());
+    printf("Successfully opened line file '%s' for reading.\n", parFile.c_str());
 
     char card[NDCARD];
     // Read title of .par file
@@ -103,6 +103,12 @@ bool CalFitIO::readInput(const std::string& parFile, const std::string& linFile,
                 input.namfil = std::string(namfil);
             }
         } else {
+            // Skip empty lines and comments
+            std::string trimmedCard = card;
+            trimmedCard.erase(0, trimmedCard.find_first_not_of(" \t\n\r"));
+            if (trimmedCard.empty() || trimmedCard[0] == '!') {
+                continue;
+            }
             // Non-option line, push back to file or handle as parameter start
             // For simplicity, we'll assume parameters start here and break
             break;
@@ -149,9 +155,13 @@ bool CalFitIO::readInput(const std::string& parFile, const std::string& linFile,
     inpcor = getvar(lubak, nfit, NULL, idpar, erp, inpcor); // Assuming var allocation in CalFit
     input.inpcor = inpcor;
 
-    // Read lines (will call linein in CalFit, but we need to pass the file)
-    // For now, store the file path or handle in input if needed, or process directly in CalFit
-    // Since linein is a member function, we'll handle it in CalFit::processLines
+    // Read lines from the line file into input.lineData for in-memory processing
+    input.lineData.clear();
+    char lineBuffer[NDCARD];
+    while (fgetstr(lineBuffer, NDCARD, lulin) > 0) {
+        input.lineData.push_back(std::string(lineBuffer));
+    }
+    printf("Read %zu lines from line file '%s' into memory.\n", input.lineData.size(), linFile.c_str());
 
     fclose(lubak);
     fclose(lulin);
