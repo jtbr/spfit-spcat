@@ -49,49 +49,123 @@
 int main(int argc, char *argv[])
 {
 #define NFILE 5
-  static const char *ext[NFILE] = { "par", "lin", "fit", "bak", "var" };
-  enum efile {epar, elin, efit, ebak, evar};
-  char *fname[NFILE+1];
-  std::string engineType = "spinv";
+  static const char *ext[NFILE] = {"par", "lin", "fit", "bak", "var"};
+  enum efile
+  {
+    epar,
+    elin,
+    efit,
+    ebak,
+    evar
+  };
+  char *fname[NFILE + 1];
+  std::string engineType = "spinv"; // Default
 
   // Choose the calculation engine based on the first argument
-  if (argc > 1) {
-    if (strcasecmp(argv[1], "--dpi") == 0) {
+  if (argc > 1)
+  {
+    if (strcasecmp(argv[1], "--dpi") == 0)
+    {
       engineType = "dpi";
-      char *name = *argv; argv++; *argv = name; argc--; // Remove first argument
-    } else if (strcasecmp(argv[1], "--spinv") == 0) {
-      char *name = *argv; argv++; *argv = name; argc--; // Remove first argument
+      if (argc > 2)
+      { // Ensure there's a base filename after --dpi
+        char *name = *argv;
+        argv++;
+        *argv = name;
+        argc--; // Remove --dpi
+      }
+      else
+      {
+        // Handle case where only --dpi is provided without filename.
+        // For now, assume filget handles it or prints usage.
+      }
+    }
+    else if (strcasecmp(argv[1], "--spinv") == 0)
+    {
+      // engineType is already spinv (default)
+      if (argc > 2)
+      {
+        char *name = *argv;
+        argv++;
+        *argv = name;
+        argc--; // Remove --spinv
+      }
     }
   }
 
-  // Open read and write files
-  filget(argc, argv, NFILE, fname, ext);
+  // Get filenames
+  filget(argc, argv, NFILE, fname, ext); // fname[epar]="base.par", etc.
 
-  // Create CalFit instance with the selected engine
-  CalFit calFit(engineType);
+  // Backup .par file to .bak file
+  // Original: filbak(fname[epar], fname[ebak]);
+  // fname[ebak] is "base.bak"
+  // This means "base.par" is copied to "base.bak"
+  // The program then reads from "base.par" (which is now fname[ebak] in original logic if lubak was fname[ebak])
+  // And writes the new .par to fname[epar].
+  // Let's stick to: read from original fname[epar], backup fname[epar] to fname[ebak].
+  // CalFitIO::writeOutput will write to a new fname[epar].
+
+  if (!filbak(fname[epar], fname[ebak]))
+  { // filbak returns 0 on success in some implementations
+    printf("Warning: Failed to create backup file %s from %s. Proceeding without backup.\n", fname[ebak], fname[epar]);
+    // Or exit if backup is critical
+  }
+  else
+  {
+    printf("Backup of %s to %s created successfully.\n", fname[epar], fname[ebak]);
+  }
+
+  // Open the main .fit output stream
+  FILE *lufit_stream = fopen(fname[efit], "w");
+  if (!lufit_stream)
+  {
+    printf("Error: Unable to open fit output file '%s'.\n", fname[efit]);
+    return EXIT_FAILURE;
+  }
+  printf("Successfully opened fit output file '%s' for writing.\n", fname[efit]);
+
+  // Create CalFit instance with the selected engine and lufit stream
+  CalFit calFit(engineType, lufit_stream);
 
   // Prepare input and output structures
   CalFitInput input;
   CalFitOutput output;
 
   // Read input data using CalFitIO
-  if (!CalFitIO::readInput(fname[epar], fname[elin], input)) {
-    puts("Failed to read input files");
+  // We read from the original .par file (fname[epar])
+  if (!CalFitIO::readInput(fname[epar], fname[elin], input, lufit_stream))
+  {
+    printf("Failed to read input files using CalFitIO::readInput.\n");
+    fclose(lufit_stream);
     return EXIT_FAILURE;
   }
+  printf("CalFitIO::readInput completed.\n");
 
   // Run the fitting process
-  if (!calFit.run(input, output)) {
-    puts("Fitting process failed");
+  if (!calFit.run(input, output))
+  {
+    printf("Fitting process failed in CalFit::run.\n");
+    fclose(lufit_stream); // Close lufit before exiting on error
     return EXIT_FAILURE;
   }
+  printf("CalFit::run completed.\n");
+
+  // Close the main .fit output stream (owned by main)
+  fclose(lufit_stream);
+  printf("Closed fit output file '%s'.\n", fname[efit]);
 
   // Write output data using CalFitIO
-  if (!CalFitIO::writeOutput(fname[efit], fname[ebak], fname[evar], output)) {
-    puts("Failed to write output files");
+  // CalFitIO::writeOutput writes to:
+  // - fname[epar] (new parameter file)
+  // - fname[evar] (new variance file)
+  // fname[ebak] (the backup of the original .par) is kept.
+  if (!CalFitIO::writeOutput(fname[epar], fname[ebak], fname[evar], output, input))
+  {
+    printf("Failed to write output files using CalFitIO::writeOutput.\n");
     return EXIT_FAILURE;
   }
+  printf("CalFitIO::writeOutput completed.\n");
 
-  puts("FIT COMPLETE");
+  puts("FIT COMPLETE (from main)");
   return 0;
-}                               /* MAIN */
+} // main
