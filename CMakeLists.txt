@@ -32,7 +32,9 @@ set(SOURCE_FILES
     spinv_hamiltonian.c
     spinv_utils.c
     spinit.c
+    CalFit.cpp
     SpinvEngine.cpp
+    DpiEngine.cpp
     calcat.cpp
     sortsub.c
     calmrg.c
@@ -107,6 +109,7 @@ endif()
 if("spfit" IN_LIST EXECUTABLES)
   add_executable_plus(spfit TRUE # This target uses BLAS
     calfit.cpp
+    CalFit.cpp
     subfit.c
     spinv_setup.c
     spinv_spin_symmetry.c

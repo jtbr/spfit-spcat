@@ -25,7 +25,7 @@ SPINV_OBJFILES=spinv_setup.o spinv_spin_symmetry.o spinv_linalg_sort.o spinv_ham
 OBJFILES=dpi.o spinit.o $(SPLIB_OBJFILES) $(SPINV_OBJFILES) SpinvEngine.o DpiEngine.o
 # dpfit: calfit.o subfit.o dpi.o splib.a; gcc -o $@ $^ $(BLASLIB) -lm
 # dpcat: calcat.o sortsub.o dpi.o splib.a; gcc -o $@ $^ $(BLASLIB) -lm
-spfit: calfit.o subfit.o $(OBJFILES); g++ -o $@ $^ $(BLASLIB) -lm
+spfit: calfit.o CalFit.o subfit.o $(OBJFILES); g++ -o $@ $^ $(BLASLIB) -lm
 spcat: calcat.o sortsub.o $(OBJFILES); g++ -o $@ $^ $(BLASLIB) -lm
 calmrg: calmrg.o splib.a; gcc -o $@ $^ $(BLASLIB) -lm
 calbak: calbak.o splib.a; gcc -o $@ $^ $(BLASLIB) -lm
@@ -79,3 +79,5 @@ dblas.o: dblas.c
 util.o:util.c
 calbak.o:calbak.c
 #cnvwn.o:cnvwn.c
+CalFit.o: CalFit.cpp CalFit.hpp CalculationEngine.hpp
+#	g++ -c CalFit.cpp $(CFLAGS)

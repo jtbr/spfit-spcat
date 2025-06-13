@@ -65,14 +65,60 @@ This document outlines the prioritized tasks for modernizing the SPFIT/SPCAT sof
             - Modify the `main` functions in `calfit.c` and `calcat.c` to use the `CalculationEngine` interface.
         - **Step 5: Preliminary simplifications**:
             - Remove `zero` and `szero` from `SpinvContext` and `DpiContext`, use `memset` instead of `dcopy()` where simple, remove context parameter from functions that don't need it.
-        - **Step 6: Refactor `calfit.c` and `calcat.c`**:
-            - Refactor `calfit.c` and `calcat.c` to be more modular.
+        - **Step 6: Refactor `calfit.cpp` and `calcat.cpp`**:
+            - Refactor `calfit.cpp` and `calcat.cpp` to be more modular.
             - This will involve creating `Spfit` and `Spcat` classes and moving the logic from the `main` functions into these classes.
             In this step we'll need to:
               - **Define Clear C++ APIs**: Create well-defined C++ class interfaces (e.g., `Spfit`, `Spcat`) with methods that encapsulate core functionalities. These methods should take C++ data structures as input and return C++ data structures as output.
               - **Separate I/O from Logic**: Modify core calculation functions to operate on in-memory data structures (passed via the new C++/C structs/classes) rather than directly performing file I/O. Create separate C++ utility functions or methods for reading from and writing to files.
               - **Leverage C++ Features**: Utilize RAII (Resource Acquisition Is Initialization) with `std::unique_ptr` and `std::vector` for robust memory management within the new C++ interface layer.
-    - **Progress**: Steps 1-5 are complete. We are now on Step 6.
+    - **Progress**: Steps 1-5 are complete. Step 6 is partially complete with significant progress on `CalFit` class (renamed from `Spfit` for clarity).
+      - **Completed in Step 6**:
+        - Created `CalFit` class with methods for parameter initialization (`initializeParameters`), spectral line processing (`processLines`), and formatting (`parer`, `qnfmt2`).
+        - Implemented core logic for reading and processing spectral lines (`linein`, `lineix`, `getblk`).
+        - Updated `calfit.cpp` to use the `CalFit` class integrated with the calculation engine.
+        - Implemented iterative fitting logic in `performIteration` using the Marquardt-Levenberg algorithm.
+        - Implemented error calculation and statistics in `calculateErrors`.
+        - Completed I/O separation by implementing `readInput` and `writeOutput` in `CalFitIO` for handling file operations (these are not fully utilized yet; there are still scratch files being used.)
+      - **Remaining in Step 6**:
+        - Debug current issues in reproducing correct functionality (spfit exits with error 1 after messages about "No option lines found, using default values", and "Unable to open line input file", followed by "Fitting process failed")
+        - Make full use of `CalFitIO` and remove use of scratch files.
+        - Refactor `calcat.cpp` into a `CalCat` class following the same modularization pattern.
+    - **Details**: The refactoring has focused on disentangling file I/O from calculation logic within the `CalFit` class. Temporary file placeholders are in use until full I/O separation is achieved.
+    - **Plan**:
+        1.  **Spfit/Spcat Class Structure:**
+            *   Create `Spfit` (implemented as `CalFit`) and `Spcat` classes.
+            *   These classes will encapsulate the core fitting and catalog generation logic, respectively.
+            *   Each class will have a `run` method that performs the main calculation.
+
+        2.  **Input/Output Data Structures:**
+            *   Define C++ structs or classes to hold input parameters and output results. These structures should be compatible with potential Python bindings (e.g., using standard data types).
+            *   These data structures will be used to pass data between the `Spfit`/`Spcat` classes and the calling code.
+            *   This will allow the software to be run without files, by passing data directly to the `run` method.
+
+        3.  **Separation of I/O and Calculation Logic:**
+            *   Create separate functions or classes for reading input data from files and writing output data to files.
+            *   The `Spfit`/`Spcat` classes will operate on in-memory data structures, not directly on files.
+            *   This will involve modifying the `SpinvEngine`, `DpiEngine`, `spinv_*.c`, and `dpi.c` files to separate I/O from calculation.
+
+        4.  **C++ Interface Design:**
+            *   Design a clear and simple C++ API for the `Spfit` and `Spcat` classes.
+            *   The API should expose all current functionality, but with sensible defaults to make it easy to use.
+            *   The API should allow the user to specify input parameters and output options.
+
+        5.  **File-Based Execution:**
+            *   Maintain the existing ability to run `spfit` and `spcat` using a set of input files.
+            *   The `main` function will parse command-line arguments and call the appropriate I/O functions to read input data from files.
+            *   The input data will then be passed to the `Spfit`/`Spcat` classes for calculation.
+
+        6.  **Amortization of Startup Costs:**
+            *   Design the `Spfit` and `Spcat` classes to minimize startup costs.
+            *   This may involve caching data structures or pre-calculating values that are used repeatedly.
+            *   This will allow the software to be used efficiently in situations where it is called multiple times.
+
+        7.  **Testing and Validation:**
+            *   Leverage the existing test suite (input files and expected outputs) for validation.
+            *   Add unit tests as needed to cover specific functionality.
     - **Expected Outcome**: A highly modular codebase with a clean C++ API, enabling easy programmatic integration and future Python bindings.
     - **Constraint**: Quantitative results must remain unchanged, and current functionality must be retained.
 
@@ -92,6 +138,7 @@ This document outlines the prioritized tasks for modernizing the SPFIT/SPCAT sof
         - **Return Error Codes**: Modify functions to return explicit error codes or status indicators instead of calling `exit()`, allowing the calling program/script to handle errors gracefully.
         - **Informative Logging**: Implement a simple, configurable logging mechanism to output detailed error messages, warnings, and debug information to `stderr` or a log file, providing context for issues.
         - **Input Validation**: Add comprehensive checks at function boundaries to validate input parameters and data structures, preventing crashes due to malformed data.
+        - Consider adding more user-friendly features or command line arguments
     - **Constraint**: Quantitative results must remain unchanged, and current functionality must be retained.
 
 - [ ] **Task 8: Memory Management Refinement**
@@ -99,6 +146,16 @@ This document outlines the prioritized tasks for modernizing the SPFIT/SPCAT sof
     - **Implementation Plan**:
         - As part of the modularization effort (Task 3), ensure clear ownership and lifecycle management of dynamically allocated memory. This might involve designing APIs where callers provide buffers, or where modules explicitly manage their internal memory and provide cleanup functions.
     - **Constraint**: Quantitative results must remain unchanged, and current functionality must be retained.
+
+- [ ] - **Task 9: Python interface and example usage**
+    - Create an example for using the C++ interface from C++, showcasing important features and optimizations for using it
+    - Create a python interface based upon the C++ interface (`pybind11`),
+    - Create example code for setting up and using the library from python
+
+- [ ] **Task 10: Documentation Improvement**:
+    - Enhance code documentation
+    - Create better user documentation
+    - Document the scientific principles and algorithms
 
 ## Implementation Plan
 
