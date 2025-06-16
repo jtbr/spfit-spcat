@@ -92,7 +92,7 @@ CalFit::~CalFit()
   // lufit is owned by main, so CalFit does not close it.
 }
 
-// Dummy run method for now
+// CalFit::run method updated to call these stubs
 bool CalFit::run(const CalFitInput &input, CalFitOutput &output)
 {
   if (!lufit)
@@ -104,55 +104,40 @@ bool CalFit::run(const CalFitInput &input, CalFitOutput &output)
   if (!initializeParameters(input))
   {
     puts("CalFit::initializeParameters failed.");
+    fprintf(lufit, "ERROR: Parameter initialization failed.\n");
     return false;
   }
   puts("CalFit::initializeParameters successful.");
+  fprintf(lufit, "Parameter initialization successful.\n");
 
-  // Placeholder for subsequent steps
-  // if (!processLinesAndSetupBlocks(input)) return false;
-  // if (!performIteration(input, output)) return false;
-  // if (!finalizeOutputData(input, output)) return false;
+  if (!processLinesAndSetupBlocks(input))
+  {
+    puts("CalFit::processLinesAndSetupBlocks failed.");
+    fprintf(lufit, "ERROR: Line processing and block setup failed.\n");
+    return false;
+  }
+  puts("CalFit::processLinesAndSetupBlocks successful.");
+  fprintf(lufit, "Line processing and block setup successful (STUBBED).\n");
 
-  // Populate some dummy output for testing CalFitIO::writeOutput
-  output.title_for_output = input.title;
-  output.optionLines_for_output = input.optionLines;
-  output.npar_final = m_npar;
-  output.limlin_final = m_limlin;                 // This should be actual lines read
-  output.nitr_final = 0;                           // Dummy
-  output.nxpar_final_for_header = m_nxpar_actual; // This is the index, original needs count
-                                                  // Original output: nxpar = npar - nxpar (where nxpar was threshold)
-                                                  // So, input.nxpar_from_file is the count for output.
-  output.nxpar_final_for_header = input.nxpar_from_file;
-  output.marqlast_final = input.marqp0; // Dummy
-  output.xerrmx_final = m_xerrmx;
-  output.parfac_final_for_header = m_parfac0;
-  output.fqfacq_final = m_fqfacq;
-  output.nfit_final = m_nfit;
-  if (m_npar > 0 && par)
-  { // Check if par was allocated
-    output.par.assign(par, par + m_npar);
-  }
-  if (m_npar > 0 && erpar)
-  {                                             // Check if erpar was allocated
-    output.erpar.assign(erpar, erpar + m_npar); // Dummy errors
-  }
-  if (m_npar > 0 && erp)
+  if (!performIteration(input, output))
   {
-    output.erp_original_for_output.assign(erp, erp + m_npar);
+    puts("CalFit::performIteration failed.");
+    fprintf(lufit, "ERROR: Iterative fitting failed.\n");
+    return false;
   }
-  if (idpar)
-  {
-    size_t idpar_actual_size = ((size_t)m_npar * m_ndbcd + m_ndbcd + 3);
-    output.idpar_final_for_output.assign(idpar, idpar + idpar_actual_size);
-  }
-  if (parlbl)
-  {
-    size_t parlbl_actual_size = (LBLEN * (size_t)m_npar + 1);
-    output.parlbl_final_for_output_flat.assign(parlbl, parlbl + parlbl_actual_size);
-  }
-  // var_final_for_output and dpar_final_for_putvar would be filled after fitting
+  puts("CalFit::performIteration successful.");
+  fprintf(lufit, "Iterative fitting successful (STUBBED).\n");
 
-  puts("CalFit::run completed (stubbed).");
+  if (!finalizeOutputData(input, output))
+  {
+    puts("CalFit::finalizeOutputData failed.");
+    // Don't write to lufit here as it might be part of finalization logic that failed
+    return false;
+  }
+  puts("CalFit::finalizeOutputData successful.");
+  fprintf(lufit, "Output data finalization successful (STUBBED).\n");
+
+  puts("CalFit::run completed.");
   return true;
 }
 
@@ -621,37 +606,322 @@ bool CalFit::initializeParameters(const CalFitInput &input)
 
 // --- Stubs for remaining main logic methods ---
 
+/* method responsible for:
+1. Setting up the CalculationEngine:
+  - Calling calc->setopt(...) to process option lines.
+  - Calling calc->setfmt(...) to set the quantum number format.
+2. Processing Experimental Lines:
+  - Reading lines from input.lineData_raw. Since linein (now CalFit::linein) expects a FILE*, we'll need to write input.lineData_raw to an in-memory temporary file (tmpfile()).
+  - Calling this->linein(...) with this temporary file.
+  - Storing the returned maxf (max F quantum number) and actual number of lines read.
+3. Setting up Hamiltonian Blocks:
+  - Initializing m_nblkpf_actual (blocks per F) using m_maxf_from_linein.
+  - Initializing m_maxdm_actual (max Hamiltonian dimension) using m_nsize_p (max memory allowed).
+  - Calling calc->setblk(...) to define the block structure. This updates m_nblkpf_actual and m_maxdm_actual.
+4. Setting Parameter Labels:
+  - Calling getlbl(...) (this is a global C function from ulib.c or similar, not a CalFit method based on original code structure) to populate this->parlbl.
+5. Converting Lines and Setting up Links:
+  - Calling this->lineix(...) to process lines according to the block structure.
+6. Allocating Memory for Fitting:
+  - Allocating this->teig and this->pmix based on m_maxdm_actual and m_nfit
+*/
 bool CalFit::processLinesAndSetupBlocks(const CalFitInput &input)
 {
-  if (!lufit)
+  if (!calc)
   {
-    puts("lufit is NULL in processLinesAndSetupBlocks");
+    if (lufit)
+      fprintf(lufit, "ERROR: CalculationEngine is null in processLinesAndSetupBlocks.\n");
+    puts("ERROR: CalculationEngine is null in processLinesAndSetupBlocks.");
     return false;
   }
-  puts("CalFit::processLinesAndSetupBlocks called (STUB).");
-  // This is where Step 2 will go:
-  // 1. Call calc->setopt
-  // 2. Call calc->setfmt
-  // 3. Read lines from input.lineData_raw (using a temporary in-memory file for linein_internal)
-  // 4. Call calc->setblk
-  // 5. Call getlbl
-  // 6. Call lineix_internal
-  // 7. Allocate teig, pmix
-  m_nline = 0; // Placeholder
-  return true;
-}
+  if (!lufit)
+  { // Should have been caught earlier, but good check
+    puts("ERROR: lufit stream is null in processLinesAndSetupBlocks.");
+    return false;
+  }
 
-bool CalFit::performIteration(const CalFitInput &input, CalFitOutput &output)
-{
-  if (!lufit)
+  // 1. Set up CalculationEngine options
+  // The original `calc->setopt` took `lubak`. We have `input.optionLines`.
+  // `setopt` needs to be adapted or we write options to a temp file for it.
+  // For now, let's assume `calc->setopt` can take a FILE* and we'll write options to a temp file.
+  // Alternatively, if setopt can take char**, we could prepare that.
+  // Or, better, if setopt is modified to take std::vector<std::string>.
+  // Simplest for now: write to temp file.
+
+  FILE *temp_opt_file = tmpfile();
+  if (!temp_opt_file)
   {
-    puts("lufit is NULL in performIteration");
+    if (lufit)
+      fprintf(lufit, "ERROR: Unable to create temporary file for options.\n");
+    puts("ERROR: Unable to create temporary file for options.");
     return false;
   }
-  puts("CalFit::performIteration called (STUB).");
-  // This is where Step 3 (the main fitting loop) will go.
-  output.xsqbest = 1.0; // Dummy
-  output.itr = 0;       // Dummy
+  for (const auto &opt_line : input.optionLines)
+  {
+    fputs(opt_line.c_str(), temp_opt_file);
+    // Ensure newline, as fgetstr in original setopt would expect it
+    if (!opt_line.empty() && opt_line.back() != '\n')
+    {
+      fputc('\n', temp_opt_file);
+    }
+  }
+  rewind(temp_opt_file);
+
+  char namfil_buffer[NDCARD] = {0}; // setopt might populate this
+  if (!input.namfil_from_options.empty())
+  { // Pre-populate if CalFitIO parsed it
+    strncpy(namfil_buffer, input.namfil_from_options.c_str(), NDCARD - 1);
+  }
+
+  // Call calc->setopt. It updates nfmt, itd, ndbcd by pointer, and namfil char array.
+  // We already have these from CalFitInput, but setopt might refine them or set engine state.
+  // We need to pass addresses of temporary variables that mirror what CalFit already has from input.
+  int nfmt_for_setopt = m_nfmt;
+  int itd_for_setopt = m_itd;
+  int ndbcd_for_setopt = m_ndbcd;
+
+  int noptn_read_by_setopt = calc->setopt(temp_opt_file, &nfmt_for_setopt, &itd_for_setopt, &ndbcd_for_setopt, namfil_buffer);
+  fclose(temp_opt_file);
+
+  if (noptn_read_by_setopt <= 0 && !input.optionLines.empty())
+  { // setopt returns num options read or error
+    if (lufit)
+      fprintf(lufit, "Warning: calc->setopt reported issues or read no options, though options were provided.\n");
+    // Depending on setopt's return, this might be an error.
+    // For now, we'll proceed using values parsed by CalFitIO or defaults.
+  }
+  // Update CalFit members if setopt changed them, and if those changes are authoritative.
+  // Original main used values *after* setopt.
+  m_nfmt = nfmt_for_setopt;
+  m_itd = itd_for_setopt;
+  m_ndbcd = ndbcd_for_setopt; // This is critical if getpar relied on a default that setopt changes.
+                              // However, initializeParameters already used ndbcd_from_options for malloc.
+                              // If setopt changes ndbcd, there could be a mismatch.
+                              // This highlights that setopt should ideally be called *before* getpar.
+                              // For now, we assume ndbcd used for mallocs was correct.
+  std::string namfil_from_setopt = namfil_buffer;
+
+  // 2. Set quantum number format in CalculationEngine
+  // `setfmt` takes `iqnfmt*` (output) and `iflg` (input).
+  // `iqnfmt` is a packed format specifier. `nqn` is the number of quanta.
+  // Original: nqn = calc->setfmt(&iqnfmt, 1);
+  //           if (nqn > MAXCAT) catqn = nqn;
+  //           nqn = nqn + nqn; // for pairs
+  int iqnfmt_val_from_setfmt = 0;                            // This will be populated by setfmt
+  int nqn_actual = calc->setfmt(&iqnfmt_val_from_setfmt, 1); // iflg=1 usually means primary format
+  if (nqn_actual <= 0)
+  {
+    if (lufit)
+      fprintf(lufit, "ERROR: calc->setfmt failed to set quantum number format.\n");
+    puts("ERROR: calc->setfmt failed.");
+    return false;
+  }
+  // m_nfmt (from options or default MAXCAT) might be related to iqnfmt_val_from_setfmt.
+  // The iqnfmt_val_from_setfmt is what linein and lineix will use.
+  // Let's store it if it's different from m_nfmt or if m_nfmt was just a placeholder.
+  // The member m_nfmt should probably become this iqnfmt_val_from_setfmt.
+  m_nfmt = iqnfmt_val_from_setfmt;
+
+  // Print summary from original main (adjust to use member variables)
+  fprintf(lufit, "LINES REQUESTED=%5d NUMBER OF PARAMETERS=%3d", m_limlin, m_npar);
+  fprintf(lufit, " NUMBER OF ITERATIONS=%3d\n  MARQUARDT PARAMETER =", input.nitr); // input.nitr as m_nitr not set yet
+  fprintf(lufit, "%11.4E max (OBS-CALC)/ERROR =%10.4E\n", input.marqp0, m_xerrmx);  // input.marqp0 for initial
+  fflush(lufit);                                                                    // stdout was also flushed in original, do we need to replicate console output here?
+
+  // 3. Process Experimental Lines
+  // Write input.lineData_raw to a temporary in-memory file for CalFit::linein
+  FILE *temp_line_file = tmpfile();
+  if (!temp_line_file)
+  {
+    if (lufit)
+      fprintf(lufit, "ERROR: Unable to create temporary file for line data.\n");
+    puts("ERROR: Unable to create temporary file for line data.");
+    return false;
+  }
+  for (const auto &line_str : input.lineData_raw)
+  {
+    fputs(line_str.c_str(), temp_line_file);
+    // Ensure newline, as fgetstr in linein (via getlin) would expect it
+    if (!line_str.empty() && line_str.back() != '\n')
+    {
+      fputc('\n', temp_line_file);
+    }
+  }
+  rewind(temp_line_file);
+
+  m_nline = m_limlin;                                                  // Initialize m_nline with requested max, linein will update it to actual
+  m_maxf_from_linein = this->linein(temp_line_file, &m_nline, m_nfmt); // Call CalFit's linein method
+  fclose(temp_line_file);
+  fflush(stdout); // As in original after linein
+
+  if (m_nline <= 0)
+  {
+    if (lufit)
+      fprintf(lufit, "No lines read from input data or linein failed. NLINE = %d\n", m_nline);
+    puts("No lines read from input data or linein failed.");
+    return false;
+  }
+  if (m_limlin > m_nline)
+  {                     // From original main
+    m_limlin = m_nline; // Adjust m_limlin to actual number of lines if fewer were read
+  }
+
+  // 4. Initialize block structure in CalculationEngine
+  m_nblkpf_actual = m_maxf_from_linein; // Initial guess for blocks per F
+                                        // If m_maxf_from_linein is 0, this needs a default (e.g., 1)
+  if (m_nblkpf_actual <= 0)
+    m_nblkpf_actual = 1;
+
+  m_maxdm_actual = (int)m_nsize_p; // Max Hamiltonian dimension from maxmem
+                                   // setblk can reduce this based on actual blocks.
+
+  // `idpar` and `par` should be populated from initializeParameters
+  // `k` is an output from setblk, original uses it for getlbl
+  int k_from_setblk = calc->setblk(lufit, m_npar, this->idpar, this->par, &m_nblkpf_actual, &m_maxdm_actual);
+
+  // 5. Set parameter labels using getlbl (global C function)
+  // `parlbl` was allocated in initializeParameters.
+  // `namfil_from_setopt` is the filename string.
+  // `k_from_setblk` is `kpar` argument for `getlbl`.
+  if (this->parlbl && this->idpar)
+  { // Ensure pointers are valid
+    // Check if namfil_from_setopt is empty, if so, pass nullptr or empty string.
+    const char *namfil_cstr = namfil_from_setopt.empty() ? nullptr : namfil_from_setopt.c_str();
+    getlbl(m_npar, this->idpar, this->parlbl, namfil_cstr, k_from_setblk, LBLEN);
+  }
+  else
+  {
+    if (lufit)
+      fprintf(lufit, "Warning: parlbl or idpar is null, skipping getlbl.\n");
+  }
+
+  // 6. Convert lines and set up links for fitting
+  // `lineix` takes `nitr` as `flg` for detailed output control.
+  int bad_lines = this->lineix(lufit, input.nitr, m_nline, m_nblkpf_actual, m_nfmt);
+  if (bad_lines > 0)
+  {
+    printf("%d bad lines\n", bad_lines); // To console
+    if (lufit)
+      fprintf(lufit, "%d bad lines reported by lineix.\n", bad_lines);
+  }
+  fflush(stdout); // As in original
+
+  // 7. Allocate memory for teig (eigenvectors output from hamx) and the pmix_block (pmix_scratch, egy, egyder)
+  if (m_maxdm_actual > m_nsize_p)
+  {
+    if (lufit)
+      fprintf(lufit, "ERROR: Hamiltonian dimension (%d) is too big for available memory (%ld).\n", m_maxdm_actual, m_nsize_p);
+    printf("Hamiltonian dimension is too big: %d %ld\n", m_maxdm_actual, m_nsize_p);
+    return false;
+  }
+
+  if (m_nfit > 0)
+  {
+    size_t maxdm_sq = (size_t)m_maxdm_actual * (size_t)m_maxdm_actual;
+    teig = (double *)mallocq(maxdm_sq * sizeof(double));
+    if (!teig)
+    { /* ... error ... */
+      return false;
+    }
+
+    // pmix_block contains: pmix_scratch_for_hamx (m_maxdm_actual doubles),
+    //                     egy (m_maxdm_actual doubles),
+    //                     egyder (m_maxdm_actual * m_nfit doubles)
+    size_t pmix_block_elements = (size_t)m_maxdm_actual * (2 + (size_t)m_nfit);
+    pmix = (double *)mallocq(pmix_block_elements * sizeof(double));
+    if (!pmix)
+    { /* ... error ... */
+      free(teig);
+      teig = nullptr;
+      return false;
+    }
+
+    if (pmix_block_elements > 0)
+      pmix[0] = 1.0; // Initialize first element as in original
+  }
+  else
+  { // m_nfit == 0
+    teig = nullptr;
+    pmix = nullptr;
+    // If m_nfit is 0, but iterations might still run (e.g. just to calculate lines),
+    // then egy might still be needed. The original logic for hamx call needs to be checked.
+    // For now, assuming if nfit=0, these aren't used extensively.
+    // Original main still calls hamx even if nfit=0, if iterations are > 0 for calc-only.
+    // So, egy and teig might still be needed. pmix_scratch too. egyder would be 0 length.
+    // Let's ensure allocation for hamx call even if nfit=0.
+
+    size_t maxdm_sq = (size_t)m_maxdm_actual * (size_t)m_maxdm_actual;
+    teig = (double *)mallocq(maxdm_sq * sizeof(double));
+    if (!teig)
+    { /* ... error ... */
+      return false;
+    }
+
+    size_t pmix_block_elements_nfit0 = (size_t)m_maxdm_actual * 2; // pmix_scratch + egy
+    pmix = (double *)mallocq(pmix_block_elements_nfit0 * sizeof(double));
+    if (!pmix)
+    { /* ... error ... */
+      free(teig);
+      teig = nullptr;
+      return false;
+    }
+    if (pmix_block_elements_nfit0 > 0)
+      pmix[0] = 1.0;
+  }
+
+  // pmix stores [eigenvectors (maxdm x maxdm)], [egy (maxdm)], [egyder (maxdm x nfit)]
+  // Original: nl = nlsq * (size_t)(nfit + 2); where nlsq was maxdm. This is incorrect.
+  // egy is maxdm, egyder is maxdm * nfit.
+  // pmix itself is used as scratch for eigenvectors in hamx, so it is maxdm * maxdm.
+  // Then egy and egyder are laid out after it.
+  // pmix_size_elements = maxdm*maxdm (for eigenvectors) + maxdm (for egy) + maxdm*nfit (for egyder)
+  size_t pmix_eigenvector_elements = (size_t)m_maxdm_actual * (size_t)m_maxdm_actual;
+  size_t egy_elements = (size_t)m_maxdm_actual;
+  size_t egyder_elements = (size_t)m_maxdm_actual * (size_t)m_nfit; // Derivatives for each of m_nfit params
+  size_t total_pmix_elements = pmix_eigenvector_elements + egy_elements + egyder_elements;
+
+  // Original calculation for pmix allocation in main.c:
+  // nlsq = (size_t) maxdm;
+  // nl = nlsq * sizeof(double); // bytes for one vector of length maxdm
+  // nlsq *= nl; // bytes for maxdm * maxdm matrix (teig)
+  // teig = (double *) mallocq(nlsq);
+  // nl *= (size_t) (nfit + 2); // This was for pmix, egy, egyder combined
+  //                             // (maxdm_bytes) * (nfit_derivatives + 1_energy + 1_something_else_or_pmix_itself_if_maxdm_long?)
+  // Let's re-evaluate original pmix usage:
+  // pmix[0] = 1.;
+  // egy = pmix + maxdm;
+  // egyder = egy + maxdm;
+  // calc->hamx(..., egy, teig, egyder, pmix, FALSE);
+  // This implies pmix is a scratch space of at least maxdm doubles for hamx, OR hamx uses pmix as eigenvector output (maxdm*maxdm).
+  // If pmix is eigenvector output from hamx: it's maxdm*maxdm.
+  // Then egy is after it, egyder is after egy.
+  // So total allocation: maxdm*maxdm (for pmix_eigenvectors) + maxdm (for egy) + maxdm*nfit (for egyder)
+  // This matches total_pmix_elements logic.
+
+  pmix = (double *)mallocq(total_pmix_elements * sizeof(double));
+  if (!pmix)
+  {
+    if (lufit)
+      fprintf(lufit, "ERROR: mallocq for pmix failed.\n");
+    perror("mallocq for pmix failed");
+    return false;
+  }
+
+    // Original: pmix[0] = 1.; This might be a placeholder or specific initialization if pmix is small scratch.
+    // If pmix is the eigenvector matrix maxdm*maxdm, then pmix[0]=1.0 is just setting the first element.
+    // This is fine. The actual eigenvector content will be filled by hamx.
+    if (total_pmix_elements > 0)
+      pmix[0] = 1.0;
+  }
+  else
+  { // m_nfit == 0
+    teig = nullptr;
+    pmix = nullptr;
+  }
+
+  // Original: rqexit(1); // Initialize/reset interrupt flag system
+  rqexit(1);
+
   return true;
 }
 
