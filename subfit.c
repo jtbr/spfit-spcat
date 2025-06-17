@@ -127,12 +127,14 @@ char *fbak;
   char cline[NCARD];
 
   lu = fopenq(flu, "r");
+  if (!lu) return 1;
   lubak = fopenq(fbak, "w");
+  if (!lubak) return 1;
   while (fgets(cline, NCARD, lu)) {
     fputs(cline, lubak);
   }
   fclose(lu);
-  rewind(lubak);
+  rewind(lubak);  /* TODO: pointless? */
   fclose(lubak);
   return 0;
 }                               /* filbak */

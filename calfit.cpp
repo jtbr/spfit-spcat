@@ -116,8 +116,8 @@ int main(int argc, char *argv[])
   // Let's stick to: read from original fname[epar], backup fname[epar] to fname[ebak].
   // CalFitIO::writeOutput will write to a new fname[epar].
 
-  if (!filbak(fname[epar], fname[ebak]))
-  { // filbak returns 0 on success in some implementations TODO
+  if (filbak(fname[epar], fname[ebak]))
+  { // filbak returns 0 on success
     printf("Warning: Failed to create backup file %s from %s. Proceeding without backup.\n", fname[ebak], fname[epar]);
     // Or exit if backup is critical
   }
@@ -135,9 +135,6 @@ int main(int argc, char *argv[])
   }
 //  printf("Successfully opened fit output file '%s' for writing.\n", fname[efit]);
 
-  // Create CalFit instance with the selected engine and lufit stream
-  CalFit calFit(calc_engine, lufit_stream);
-
   // Prepare input and output structures
   CalFitInput input;
   CalFitOutput output;
@@ -151,6 +148,10 @@ int main(int argc, char *argv[])
     return EXIT_FAILURE;
   }
   printf("CalFitIO::readInput completed.\n");
+
+  // Create CalFit instance with the selected engine and lufit stream
+  // (calFit takes ownership of calc_engine from here)
+  CalFit calFit(calc_engine, lufit_stream);
 
   // Run the fitting process
   if (!calFit.run(input, output))
@@ -177,6 +178,6 @@ int main(int argc, char *argv[])
   }
   printf("CalFitIO::writeOutput completed.\n");
 
-  puts("FIT COMPLETE (from main)");
+  puts("FIT COMPLETE");
   return 0;
 } // main
