@@ -116,7 +116,7 @@ bcd_t i2bcd(int i);
 //            int *nblkpf, int *negy);
 
 /************** SUBFIT interfaces ***********************************/
-int getlbl(int npar, bcd_t *idpar, /*@out@*/ char *parlbl, char *fil, int idiv,
+int getlbl(int npar, bcd_t *idpar, /*@out@*/ char *parlbl, const char *fil, int idiv,
            int len);
 //int getblk(/*@out@*/ int *iblk, /*@out@*/ int *indx, short *iqnum,
 //           int nblkpf, int ipos, int nqn);
@@ -125,7 +125,7 @@ int prcorr(FILE *lufit, int npar, double *cor, int ndcor, double *err);
 SXLINE * lbufof(int iflg, int ipos);
 void dnuadd(int npar, int nparx, int initl, int indx,
             int ifac, double *egy, double *egyder, int nsize,
-            int line, double *par, double *fac);
+            int line, const double *par, const double *fac);
 double dnuget(int iflg, int npar, double f, int line, double *dvec);
 int getdbk(int *link, /*@out@*/ int *iblk, /*@out@*/ int *indx,
            /*@out@*/ int *initl, /*@out@*/ int *ifac);

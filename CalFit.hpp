@@ -27,9 +27,10 @@
  */
 struct CalFitInput
 {
-  std::string title;
-  std::vector<std::string> optionLines;
+  // From .par file header/early lines
+  std::string title;   // 1st line
 
+  // 2nd line
   int npar;   // Number of parameters
   int limlin; // Max requested lines from file, can be updated by linein
   int nitr;   // Number of iterations
@@ -39,23 +40,30 @@ struct CalFitInput
   double parfac_initial; // The parfac from the second line of .par
   double fqfacq;         // IR frequency scaling factor
 
-  std::string namfil_from_options; // Name file for parameter labels
-  int nfmt_from_options;  // Format for quantum numbers
-  int itd_from_options;   // ITD option
-  int ndbcd_from_options; // Number of BCD digits for parameters
-  int noptn_count;
+  std::vector<std::string> raw_option_lines_from_par;
 
+  // From CalculationEngine::setopt (called by CalFitIO)
+  int nfmt_cat_from_setopt; // Catalog-related nfmt output by setopt
+  int itd_from_setopt;            // ICD option
+  int ndbcd_from_setopt;          // Number of BCD digits for parameters
+  std::string namfil_from_setopt; // Name file for parameter labels
+  int noptn_read_by_setopt; // Number of option lines successfully processed by setopt
+
+  // From getpar (called by CalFitIO)
   int nfit;   // #/fitted parameters (return from getpar)
   int inpcor; // flag for input correlation/variance (return from getpar, updated by getvar)
-
   std::vector<unsigned char> idpar_data; // bcd_t is unsigned char
   std::vector<double> par_initial;
   std::vector<double> erp_initial;
   std::vector<char> parlbl_data_flat;
+
+  // From getvar (called by CalFitIO)
   std::vector<double> var_initial_from_getvar;
 
+  // From .lin file
   std::vector<std::string> lineData_raw;
 };
+
 
 /**
  * @brief Output data structure for CalFit class
@@ -74,19 +82,20 @@ struct CalFitOutput
   std::vector<std::string> optionLines_for_output;
   int npar_final;
   int limlin_final;
-  int nitr_final;             // actual iterations done
-  int nxpar_final_for_header; // actual nxpar used for file output
+  int nitr_final_actual;  // actual iterations done
+  int nxpar_for_header;   // actual nxpar used for file output
   double marqlast_final;
   double xerrmx_final;
-  double parfac_final_for_header; // parfac0 from original
+  double parfac_for_header; // parfac0 from original
   double fqfacq_final;
   int nfit_final;
-  std::vector<unsigned char> idpar_final_for_output;
-  std::vector<char> parlbl_final_for_output_flat;
-  std::vector<double> erp_original_for_output; // erp from initial read for .par file
-  std::vector<double> var_final_for_output;
-  std::vector<double> dpar_final_for_putvar; // dpar array for putvar
+  std::vector<unsigned char> idpar_final_for_output; // this->idpar (m_npar * m_ndbcd + ...)
+  std::vector<char> parlbl_final_for_output_flat; // this->parlbl
+  std::vector<double> erp_original_for_output; // this->erp from initial read for .par file (a priori errors)
+  std::vector<double> var_final_for_output;  // this->var (packed, m_nfit elements)
+  std::vector<double> dpar_final_for_putvar; // this->dpar array for putvar ((m_nfit elements, from lsqfit's enorm, scaled for error)
 };
+
 
 /**
  * @brief Main class for spectroscopic parameter fitting
@@ -99,10 +108,10 @@ class CalFit
 public:
   /**
    * @brief Constructor for CalFit
-   * @param engineType Type of calculation engine to use ("spinv" or "dpi")
+   * @param calc_engine Calculation Engine implementation object (currently either SpinvEngine or DpiEngine)
    * @param final_lufit_stream The file stream for the main .fit output log.
    */
-  CalFit(const std::string &engineType, FILE *final_lufit_stream);
+  CalFit(std::unique_ptr<CalculationEngine> &calc_engine, FILE *final_lufit_stream);
 
   /**
    * @brief Destructor for CalFit
@@ -129,7 +138,7 @@ private:
   int *iperm;
   bcd_t *idpar; // bcd_t is unsigned char
 
-  // Scalar state variables
+  // Scalar state variables, set from CalFitInput
   int m_npar; // Actual number of parameters after getpar
   int m_nfit;
   int ndfit, ndiag;
@@ -146,11 +155,23 @@ private:
   int m_itd;
   int m_nline;  // Number of lines after linein
   int m_limlin; // Max lines requested
+  int m_nitr_requested; // #/ iterations requested
   int m_maxf_from_linein;
   int m_nblkpf_actual;
   int m_maxdm_actual;
   int m_ndfree0;
   double m_tiny = 1.5e-38; // from original main
+
+  char m_namfil_buffer[NDCARD]; // To store namfil if needed, though input has it
+
+  // State for iteration loop
+  int m_itr; // Current iteration count
+  double m_xsqbest;
+  double m_marqlast; // Last Marquardt parameter for output
+  double m_marqp[3]; // Marquardt parameters for lsqfit
+//  double m_parfac0;  // Original parfac for scaling logic
+  // m_parfac is already a member, potentially scaled
+  int m_nqn_for_iteration;
 
   // Methods for breaking down the fitting process
   bool initializeParameters(const CalFitInput &input);

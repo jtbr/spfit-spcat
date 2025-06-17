@@ -20,14 +20,18 @@ class CalFitIO
 public:
   /**
    * @brief Static method to read input data from files
-   * @param parFile Path to parameter file
+   * @param parFile Path to parameter backup file
    * @param linFile Path to line file
-   * @param input Output parameter for input data (will be populated)
-   * @param lufit_for_getpar File stream for getpar to write its log.
+   * @param input Output parameter for input data (will be fully populated)
+   * @param calc_enging_for_setup Calculation Engine to use
+   * @param lubak_stream_for_par_context
+   * @param lufit_for_logging File stream for getpar to write its log.
    * @return True if reading is successful, false otherwise
    */
   static bool readInput(const std::string &parFile, const std::string &linFile,
-                        CalFitInput &input, FILE *lufit_for_getpar);
+                        CalFitInput &input,
+                        std::unique_ptr<CalculationEngine> &calc_engine_for_setup,
+                        FILE *lufit_for_logging);
 
   /**
    * @brief Static method to write output data to files

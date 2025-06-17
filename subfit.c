@@ -19,7 +19,8 @@
 int getlbl(npar, idpar, parlbl, fil, idiv, lblen)
 int npar, idiv, lblen;
 bcd_t *idpar;
-char *parlbl, *fil;
+char *parlbl;
+const char* fil;
 {
 
   static int ipwr[] = {0, 100, 10000};
@@ -27,7 +28,8 @@ char *parlbl, *fil;
   size_t nlbl;
   int kbgn, kend, jdiv, i, k, ibcd, idec, jdec, ibgn, ndbcd, nflg;
   bcd_t *idcmp;
-  char buf[NCARD], *parx, *pstr, *pname;
+  char buf[NCARD], *parx, *pstr;
+  const char *pname;
 
   /*  gets parameter label from user file */
 
@@ -371,7 +373,7 @@ void dnuadd(npar, nparx, initl, indx, ifac, egy, egyder, nsize, line, par,
 int npar, nparx, initl, indx, ifac;
 double *egy, *egyder;
 int nsize, line;
-double *par, *fac;
+const double *par, *fac;
 {                               /*     subroutine to add energies and derivatives to frequency lists */
   /*  ON INPUT: */
   /*     NPAR   = number of parameters */

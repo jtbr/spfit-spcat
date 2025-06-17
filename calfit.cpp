@@ -93,6 +93,17 @@ int main(int argc, char *argv[])
     }
   }
 
+  std::unique_ptr<CalculationEngine> calc_engine;
+  if (engineType == "dpi")
+  {
+    calc_engine = std::make_unique<DpiEngine>();
+  }
+  else
+  {
+    calc_engine = std::make_unique<SpinvEngine>();
+  }
+  printf("Using %s engine.\n", engineType.c_str());
+
   // Get filenames
   filget(argc, argv, NFILE, fname, ext); // fname[epar]="base.par", etc.
 
@@ -106,7 +117,7 @@ int main(int argc, char *argv[])
   // CalFitIO::writeOutput will write to a new fname[epar].
 
   if (!filbak(fname[epar], fname[ebak]))
-  { // filbak returns 0 on success in some implementations
+  { // filbak returns 0 on success in some implementations TODO
     printf("Warning: Failed to create backup file %s from %s. Proceeding without backup.\n", fname[ebak], fname[epar]);
     // Or exit if backup is critical
   }
@@ -122,10 +133,10 @@ int main(int argc, char *argv[])
     printf("Error: Unable to open fit output file '%s'.\n", fname[efit]);
     return EXIT_FAILURE;
   }
-  printf("Successfully opened fit output file '%s' for writing.\n", fname[efit]);
+//  printf("Successfully opened fit output file '%s' for writing.\n", fname[efit]);
 
   // Create CalFit instance with the selected engine and lufit stream
-  CalFit calFit(engineType, lufit_stream);
+  CalFit calFit(calc_engine, lufit_stream);
 
   // Prepare input and output structures
   CalFitInput input;
@@ -133,7 +144,7 @@ int main(int argc, char *argv[])
 
   // Read input data using CalFitIO
   // We read from the original .par file (fname[epar])
-  if (!CalFitIO::readInput(fname[epar], fname[elin], input, lufit_stream))
+  if (!CalFitIO::readInput(fname[ebak], fname[elin], input, calc_engine, lufit_stream))
   {
     printf("Failed to read input files using CalFitIO::readInput.\n");
     fclose(lufit_stream);

@@ -21,27 +21,20 @@
 
 /**
  * @brief Constructor for CalFit
- * @param engineType Type of calculation engine to use ("spinv" or "dpi")
+ * @param cal_engine SpinvEngine or DpiEngine object
  * @param final_lufit_stream The file stream for the main .fit output log.
  */
-CalFit::CalFit(const std::string &engineType, FILE *final_lufit_stream) : lufit(final_lufit_stream), // Initializer list
-                                                                          parlbl(nullptr), par(nullptr), erp(nullptr), oldpar(nullptr), erpar(nullptr),
-                                                                          dpar(nullptr), delbgn(nullptr), fitbgn(nullptr), var(nullptr), oldfit(nullptr),
-                                                                          fit(nullptr), teig(nullptr), pmix(nullptr), iperm(nullptr), idpar(nullptr),
-                                                                          m_npar(0), m_nfit(0), ndfit(0), ndiag(0), m_nsize_p(0), m_nxpar_actual(0), m_nxfit(0),
-                                                                          m_inpcor(0), m_xerrmx(0.0), m_parfac(0.0), m_parfac0(0.0), m_fqfacq(0.0),
-                                                                          m_ndbcd(0), m_nfmt(0), m_itd(0), m_nline(0), m_limlin(0), m_maxf_from_linein(0),
-                                                                          m_nblkpf_actual(0), m_maxdm_actual(0), m_ndfree0(0)
+CalFit::CalFit(std::unique_ptr<CalculationEngine> &calc_engine, FILE *final_lufit_stream) :
+    calc(std::move(calc_engine)),
+    lufit(final_lufit_stream), // Initializer list
+    parlbl(nullptr), par(nullptr), erp(nullptr), oldpar(nullptr), erpar(nullptr),
+    dpar(nullptr), delbgn(nullptr), fitbgn(nullptr), var(nullptr), oldfit(nullptr),
+    fit(nullptr), teig(nullptr), pmix(nullptr), iperm(nullptr), idpar(nullptr),
+    m_npar(0), m_nfit(0), ndfit(0), ndiag(0), m_nsize_p(0), m_nxpar_actual(0), m_nxfit(0),
+    m_inpcor(0), m_xerrmx(0.0), m_parfac(0.0), m_parfac0(0.0), m_fqfacq(0.0),
+    m_ndbcd(0), m_nfmt(0), m_itd(0), m_nline(0), m_limlin(0), m_maxf_from_linein(0),
+    m_nblkpf_actual(0), m_maxdm_actual(0), m_ndfree0(0)
 {
-
-  if (engineType == "dpi")
-  {
-    calc = std::make_unique<DpiEngine>();
-  }
-  else
-  { // Default to spinv
-    calc = std::make_unique<SpinvEngine>();
-  }
   if (!lufit)
   {
     // Handle error: lufit stream is essential.
@@ -148,38 +141,82 @@ bool CalFit::run(const CalFitInput &input, CalFitOutput &output)
  */
 bool CalFit::initializeParameters(const CalFitInput &input)
 {
-  // Transfer scalar values from input to member variables
+  // --- 1. Transfer scalar control parameters ---
   m_npar = input.npar;
-  m_limlin = input.limlin; // This is the requested number of lines. m_nline will be actual.
-  // Note: original main does: if (dvec[1] < 0.) { catqn = MAXQN; dvec[1] = -dvec[1]; }
-  // input.limlin from CalFitIO already handles the sign if it was negative.
-  // The catqn = MAXQN logic might be tied to nfmt.
+  m_limlin = input.limlin;
   if (input.limlin < 0)
-  { // If original file had negative line count
-    // This implies catqn = MAXQN; The actual line count will be abs(input.limlin)
-    // This logic will be handled later when setting nfmt for CalculationEngine
+  {
     m_limlin = -input.limlin;
   }
-
+  m_nitr_requested = input.nitr;
   m_fqfacq = input.fqfacq;
-  m_ndbcd = input.ndbcd_from_options;
-  m_nfmt = input.nfmt_from_options; // Will be used by calc->setfmt
-  m_itd = input.itd_from_options;   // Will be used by calc->setopt
-
+  m_ndbcd = input.ndbcd_from_setopt;
+  m_itd = input.itd_from_setopt;
+  if (!input.namfil_from_setopt.empty())
+  {
+    strncpy(m_namfil_buffer, input.namfil_from_setopt.c_str(), NDCARD - 1);
+    m_namfil_buffer[NDCARD - 1] = '\0';
+  }
+  else
+  {
+    m_namfil_buffer[0] = '\0';
+  }
   m_nfit = input.nfit;
-  m_inpcor = input.inpcor; // This is the value *after* getvar has potentially updated it
+  m_inpcor = input.inpcor;
   m_xerrmx = input.xerrmx;
-  m_parfac0 = input.parfac_initial; // Store the original parfac from file
-  m_parfac = input.parfac_initial;  // This m_parfac can be scaled later
-
+  m_parfac0 = input.parfac_initial;
+  m_parfac = input.parfac_initial;
   if (m_xerrmx < m_tiny)
-    m_xerrmx = 1e6; // From original main
+    m_xerrmx = 1e6;
 
-  // --- Allocate C-style member arrays ---
+  // --- 2. Allocate C-style member arrays ---
+  // Free any existing memory first
+  if (parlbl)
+    free(parlbl);
+  parlbl = nullptr;
+  if (par)
+    free(par);
+  par = nullptr;
+  if (erp)
+    free(erp);
+  erp = nullptr;
+  if (oldpar)
+    free(oldpar);
+  oldpar = nullptr;
+  if (erpar)
+    free(erpar);
+  erpar = nullptr;
+  if (dpar)
+    free(dpar);
+  dpar = nullptr;
+  if (delbgn)
+    free(delbgn);
+  delbgn = nullptr;
+  if (fitbgn)
+    free(fitbgn);
+  fitbgn = nullptr;
+  if (var)
+    free(var);
+  var = nullptr;
+  if (oldfit)
+    free(oldfit);
+  oldfit = nullptr;
+  if (fit)
+    free(fit);
+  fit = nullptr;
+  if (iperm)
+    free(iperm);
+  iperm = nullptr;
+  if (idpar)
+    free(idpar);
+  idpar = nullptr;
+
   size_t parlbl_actual_size = (LBLEN * (size_t)m_npar + 1);
   parlbl = (char *)mallocq(parlbl_actual_size);
   if (!parlbl)
   {
+    if (lufit)
+      fprintf(lufit, "ERROR: mallocq for parlbl failed.\n");
     perror("mallocq for parlbl failed");
     return false;
   }
@@ -187,25 +224,49 @@ bool CalFit::initializeParameters(const CalFitInput &input)
   par = (double *)mallocq((size_t)m_npar * sizeof(double));
   if (!par)
   {
+    if (lufit)
+      fprintf(lufit, "ERROR: mallocq for par failed.\n");
     perror("mallocq for par failed");
+    free(parlbl);
+    parlbl = nullptr;
     return false;
   }
+
   oldpar = (double *)mallocq((size_t)m_npar * sizeof(double));
   if (!oldpar)
   {
+    if (lufit)
+      fprintf(lufit, "ERROR: mallocq for oldpar failed.\n");
     perror("mallocq for oldpar failed");
+    free(parlbl);
+    free(par);
+    parlbl = nullptr;
+    par = nullptr;
     return false;
   }
+
   erp = (double *)mallocq((size_t)m_npar * sizeof(double));
   if (!erp)
   {
+    if (lufit)
+      fprintf(lufit, "ERROR: mallocq for erp failed.\n");
     perror("mallocq for erp failed");
+    free(parlbl);
+    free(par);
+    free(oldpar); /*... set null ...*/
     return false;
   }
-  erpar = (double *)mallocq((size_t)m_npar * sizeof(double)); // Will be sized for fitted params later if different
+
+  erpar = (double *)mallocq((size_t)m_npar * sizeof(double));
   if (!erpar)
   {
+    if (lufit)
+      fprintf(lufit, "ERROR: mallocq for erpar failed.\n");
     perror("mallocq for erpar failed");
+    free(parlbl);
+    free(par);
+    free(oldpar);
+    free(erp);
     return false;
   }
 
@@ -213,11 +274,18 @@ bool CalFit::initializeParameters(const CalFitInput &input)
   idpar = (bcd_t *)mallocq(idpar_actual_size * sizeof(bcd_t));
   if (!idpar)
   {
+    if (lufit)
+      fprintf(lufit, "ERROR: mallocq for idpar failed.\n");
     perror("mallocq for idpar failed");
+    free(parlbl);
+    free(par);
+    free(oldpar);
+    free(erp);
+    free(erpar);
     return false;
   }
 
-  // --- Copy data from input vectors to C-style member arrays ---
+  // --- 3. Copy data from input's vectors ---
   if (input.parlbl_data_flat.size() >= parlbl_actual_size)
   {
     memcpy(parlbl, input.parlbl_data_flat.data(), parlbl_actual_size);
@@ -225,386 +293,352 @@ bool CalFit::initializeParameters(const CalFitInput &input)
   else if (!input.parlbl_data_flat.empty())
   {
     memcpy(parlbl, input.parlbl_data_flat.data(), input.parlbl_data_flat.size());
-    parlbl[input.parlbl_data_flat.size()] = '\0'; // Ensure null term if short
+    parlbl[input.parlbl_data_flat.size()] = '\0';
+    if (lufit)
+      fprintf(lufit, "Warning: parlbl_data_flat size from input (%zu) was smaller than expected (%zu).\n", input.parlbl_data_flat.size(), parlbl_actual_size);
   }
-  else
+  else if (m_npar > 0)
   {
-    *parlbl = '\0'; // Empty
+    *parlbl = '\0';
+    if (lufit)
+      fprintf(lufit, "Warning: parlbl_data_flat from input was empty for m_npar = %d.\n", m_npar);
   }
 
   if (input.par_initial.size() == (size_t)m_npar)
   {
     std::copy(input.par_initial.begin(), input.par_initial.end(), par);
-    std::copy(input.par_initial.begin(), input.par_initial.end(), oldpar); // oldpar starts same as par
+    std::copy(input.par_initial.begin(), input.par_initial.end(), oldpar);
   }
-  else
+  else if (m_npar > 0)
   {
-    fprintf(stderr, "Warning: par_initial size mismatch.\n"); /* Handle error or fill with 0s */
+    if (lufit)
+      fprintf(lufit, "ERROR: par_initial size mismatch. Expected %d, got %zu.\n", m_npar, input.par_initial.size());
+    return false;
   }
 
   if (input.erp_initial.size() == (size_t)m_npar)
   {
     std::copy(input.erp_initial.begin(), input.erp_initial.end(), erp);
   }
-  else
+  else if (m_npar > 0)
   {
-    fprintf(stderr, "Warning: erp_initial size mismatch.\n");
-  }
-
-  if (input.idpar_data.size() >= idpar_actual_size)
-  {
-    memcpy(idpar, input.idpar_data.data(), idpar_actual_size * sizeof(bcd_t));
-  }
-  else
-  {
-    fprintf(stderr, "Warning: idpar_data size mismatch.\n");
-  }
-
-  // --- Initialize fitting matrices based on m_nfit ---
-  // These are sized based on m_nfit (number of parameters actually being fitted)
-  if (m_nfit <= 0)
-  {
-    // No parameters to fit, some arrays might not be needed or fitting loop skipped.
-    // For now, let's assume m_nfit > 0 if we proceed.
-    if (m_npar > 0 && m_nfit == 0)
-    {
-      fprintf(lufit, "No parameters marked for fitting.\n");
-    }
-    // If m_nfit is 0, many subsequent allocations are problematic.
-    // The original code might proceed and just not do much in lsqfit.
-    // For safety, ensure m_nfit is at least 1 for array indexing logic if code relies on it.
-    // Or, have checks throughout. For now, we assume if m_nfit is 0, parts of the iteration are skipped.
-  }
-
-  ndfit = m_nfit + 1;
-  ndiag = ndfit + 1;
-
-  size_t nl_maxmem;               // For maxmem call
-  m_nsize_p = maxmem(&nl_maxmem); // maxmem from calpgm.h
-  if (ndfit > m_nsize_p && m_nfit > 0)
-  { // Check m_nfit > 0 to avoid false positive if nfit is 0
-    printf("number of independent parameters is too big: %d %d\n", m_nfit, (int)m_nsize_p - 1);
+    if (lufit)
+      fprintf(lufit, "ERROR: erp_initial size mismatch. Expected %d, got %zu.\n", m_npar, input.erp_initial.size());
     return false;
   }
 
-  if (m_nfit > 0)
-  { // Only allocate these if there are parameters to fit
+  if (input.idpar_data.size() == idpar_actual_size)
+  {
+    memcpy(idpar, input.idpar_data.data(), idpar_actual_size * sizeof(bcd_t));
+  }
+  else if (m_npar > 0)
+  {
+    if (lufit)
+      fprintf(lufit, "ERROR: idpar_data size mismatch. Expected %zu, got %zu.\n", idpar_actual_size, input.idpar_data.size());
+    return false;
+  }
+
+  // --- Initialize fitting matrices and related arrays (sized by m_nfit) ---
+  if (m_nfit <= 0)
+  {
+    if (lufit && m_npar > 0)
+    {
+      fprintf(lufit, "No parameters marked for fitting (nfit = %d).\n", m_nfit);
+    }
+    iperm = nullptr;
+    dpar = nullptr;
+    delbgn = nullptr;
+    fitbgn = nullptr;
+    var = nullptr;
+    oldfit = nullptr;
+    fit = nullptr;
+    ndfit = 0;
+    ndiag = 0;
+  }
+  else
+  {
+    ndfit = m_nfit + 1;
+    ndiag = ndfit + 1;
+
+    size_t nl_maxmem_dummy;
+    m_nsize_p = maxmem(&nl_maxmem_dummy);
+    if (ndfit > m_nsize_p)
+    {
+      if (lufit)
+        fprintf(lufit, "ERROR: Number of independent parameters + 1 (%d) is too big for memory segment (%ld).\n", ndfit, m_nsize_p);
+      printf("Number of independent parameters + 1 (%d) is too big: %ld\n", ndfit, m_nsize_p);
+      return false;
+    }
+
     iperm = (int *)mallocq((size_t)m_nfit * sizeof(int));
     if (!iperm)
     {
+      if (lufit)
+        fprintf(lufit, "ERROR: mallocq for iperm failed.\n");
       perror("mallocq for iperm failed");
       return false;
     }
-    // erpar was allocated based on m_npar, if m_nfit is different, it's used for m_nfit elements
-    // The erpar array in main seemed to be used for all m_npar at the end.
-    // For lsqfit, it needs space for m_nfit. Let's assume m_npar >= m_nfit.
-    // The erpar for non-fitted params are derived.
-    // For now, erpar is sized for m_npar.
 
-    dpar = (double *)mallocq((size_t)ndfit * sizeof(double)); // dpar stores parameter shifts + 1 extra
+    dpar = (double *)mallocq((size_t)ndfit * sizeof(double));
     if (!dpar)
     {
+      if (lufit)
+        fprintf(lufit, "ERROR: mallocq for dpar failed.\n");
       perror("mallocq for dpar failed");
       return false;
     }
-    delbgn = (double *)mallocq((size_t)m_nfit * sizeof(double)); // Delta begin for trust region
+
+    delbgn = (double *)mallocq((size_t)m_nfit * sizeof(double));
     if (!delbgn)
     {
+      if (lufit)
+        fprintf(lufit, "ERROR: mallocq for delbgn failed.\n");
       perror("mallocq for delbgn failed");
       return false;
     }
 
-    size_t nlsq_fit_matrices;
-    if ((m_nfit & 1) == 0)
-    { // even
-      nlsq_fit_matrices = (size_t)((unsigned)m_nfit >> 1) * (size_t)ndfit;
-    }
-    else
-    { // odd
-      nlsq_fit_matrices = (size_t)((unsigned)ndfit >> 1) * (size_t)m_nfit;
-    }
-    // This nlsq_fit_matrices is for elements, not bytes yet.
+    size_t standard_packed_elements = ((size_t)m_nfit * ((size_t)m_nfit + 1)) / 2;
 
-    fitbgn = (double *)mallocq(nlsq_fit_matrices * sizeof(double));
+    fitbgn = (double *)mallocq(standard_packed_elements * sizeof(double));
     if (!fitbgn)
     {
+      if (lufit)
+        fprintf(lufit, "ERROR: mallocq for fitbgn failed.\n");
       perror("mallocq for fitbgn failed");
       return false;
     }
 
-    size_t nlsq_var_count = ((size_t)m_nfit * ((size_t)m_nfit + 1)) / 2;
-    var = (double *)mallocq(nlsq_var_count * sizeof(double));
+    var = (double *)mallocq(standard_packed_elements * sizeof(double));
     if (!var)
     {
+      if (lufit)
+        fprintf(lufit, "ERROR: mallocq for var failed.\n");
       perror("mallocq for var failed");
       return false;
     }
-    if (input.var_initial_from_getvar.size() == nlsq_var_count)
+
+    if (input.var_initial_from_getvar.size() == standard_packed_elements)
     {
       std::copy(input.var_initial_from_getvar.begin(), input.var_initial_from_getvar.end(), var);
     }
     else if (!input.var_initial_from_getvar.empty())
     {
-      fprintf(stderr, "Warning: var_initial_from_getvar size mismatch.\n");
+      if (lufit)
+        fprintf(lufit, "ERROR: var_initial_from_getvar size mismatch. Expected %zu (std packed), got %zu.\n", standard_packed_elements, input.var_initial_from_getvar.size());
+      return false;
     }
     else if (m_nfit > 0)
-    { // If var_initial is empty but we need it. This shouldn't happen if getvar works.
-      fprintf(stderr, "Error: var_initial_from_getvar is empty but m_nfit > 0.\n");
-      // This indicates an issue in CalFitIO or getvar logic.
-      // For robustness, one might try to reconstruct a diagonal var from erp here,
-      // but it's better to fix the source.
+    {
+      if (lufit)
+        fprintf(lufit, "ERROR: var_initial_from_getvar is empty for nfit > 0.\n");
       return false;
     }
 
-    size_t oldfit_elements = nlsq_fit_matrices + (size_t)m_nfit; // oldfit = fitbgn + dpar structure in original
+    size_t oldfit_elements = standard_packed_elements + (size_t)m_nfit;
     oldfit = (double *)mallocq(oldfit_elements * sizeof(double));
     if (!oldfit)
     {
+      if (lufit)
+        fprintf(lufit, "ERROR: mallocq for oldfit failed.\n");
       perror("mallocq for oldfit failed");
       return false;
     }
 
-    fit = (double *)mallocq((size_t)m_nfit * (size_t)ndfit * sizeof(double)); // Full fit matrix for lsqfit
+    fit = (double *)mallocq((size_t)m_nfit * (size_t)ndfit * sizeof(double));
     if (!fit)
     {
+      if (lufit)
+        fprintf(lufit, "ERROR: mallocq for fit failed.\n");
       perror("mallocq for fit failed");
       return false;
     }
-  }
 
-  // Fixup supplied values (nxpar related logic from original main)
-  m_nxpar_actual = input.nxpar_from_file; // This is the count of params at end of list *not* to auto-exclude
-  if (m_nxpar_actual > m_npar || m_nxpar_actual < 0)
-    m_nxpar_actual = 0;
+    // --- 4. Initialize fitbgn, dpar, oldfit, delbgn based on m_inpcor and this->var ---
+    m_ndfree0 = 0;
+    double current_scale_factor; // Renamed from 'scale'
 
-  if (m_nxpar_actual > 0 && lufit)
-  {
-    fprintf(lufit, "NUMBER OF PARAMETERS EXCLUDED IF INDEX < 0 =%5d\n", m_nxpar_actual);
-  }
-  m_nxpar_actual = m_npar - m_nxpar_actual; // This now becomes the threshold index
-                                            // Parameters from m_nxpar_actual to m_npar-1 are checked.
+    if (m_inpcor > 0)
+    { // "Supplied variance" path
+      // Assume 'var' is standard packed LOWER Cholesky factor L of Covariance.
+      // (If getvar truly gives UPPER, then var is U, and fit=U. Logic might need U^T U.)
+      // For now, proceed as if var = L_packed_lower.
 
-  m_nxfit = m_nfit;
-  for (int i_par = m_npar - 1; i_par >= m_nxpar_actual; --i_par)
-  {
-    int ibcd_idx = i_par * m_ndbcd;
-    // Check array bounds for idpar: idpar_actual_size must be >= ibcd_idx + m_ndbcd
-    if (idpar && (size_t)ibcd_idx < idpar_actual_size)
-    {                                   // Basic check
-      if (NEGBCD(idpar[ibcd_idx]) == 0) // NEGBCD expects pointer to the BCD block
-        --m_nxfit;
+      // 4.1. Form full lower triangular `fit` matrix (L) from `var` (L_packed_lower).
+      double *pvar_ptr = var;
+      double *pfit_col_start = fit;
+      for (int j_col = 0; j_col < m_nfit; ++j_col)
+      { // Iterate columns of fit
+        // Zero out column (especially upper part for L)
+        for (int i_row = 0; i_row < m_nfit; ++i_row)
+        {
+          pfit_col_start[i_row] = 0.0;
+        }
+        // Copy elements from packed var to current column of fit (lower triangular part)
+        for (int i_row = j_col; i_row < m_nfit; ++i_row)
+        {                                      // L_ij for i >= j
+          pfit_col_start[i_row] = *pvar_ptr++; // L_ij from var (assuming var stores L column-wise)
+        }
+        pfit_col_start += ndfit; // Advance to start of next column in 'fit'
+      }
+      // Now 'fit' is lower triangular (L).
+
+      // 4.2. Normalize columns of `fit` (L), similar to lsqfit's prep.
+      // `dpar` will store inverse norms (D_inv). `this->erpar` will store 1.0s (like ediag).
+      pfit_col_start = fit;
+      for (int k_col = 0; k_col < m_nfit; ++k_col)
+      { // For each column k_col
+        // Norm of L(k_col:end, k_col) -- elements from diagonal down
+        double *diag_element_ptr = pfit_col_start + k_col;
+        int elements_in_col_from_diag = m_nfit - k_col;
+        double val_norm = dnrm2(elements_in_col_from_diag, diag_element_ptr, 1);
+
+        if (val_norm < m_tiny)
+        {
+          this->erpar[k_col] = 0.0; // Like ediag in lsqfit
+          dpar[k_col] = 1.0;        // Like enorm in lsqfit (inverse norm)
+                                    // Column is zero, no scaling needed or dscal by 1.0
+        }
+        else
+        {
+          this->erpar[k_col] = 1.0;
+          dpar[k_col] = current_scale_factor = 1.0 / val_norm;
+          dscal(elements_in_col_from_diag, current_scale_factor, diag_element_ptr, 1);
+        }
+        pfit_col_start += ndfit; // Move to next column
+      }
+      // Now 'fit' contains L_s = L * D_inv. `dpar` has D_inv. `erpar` has diag_flags.
+
+      // 4.3. `dqrfac` on L_s.
+      // `this->erpar` (diag_flags) is passed as `wk`. dqrfac uses it for pivoting and overwrites it.
+      int n_rank = dqrfac(fit, ndfit, m_nfit, m_nfit, 0, this->erpar, iperm);
+      if (m_nfit > n_rank && lufit)
+      { /* singular warning */
+      }
+      // `fit` now contains F (lower factor of L_s * P). `this->erpar` has diag of F.
+
+      // 4.4. `dqrsolv` to get (F P^T)^-1 in `fit`.
+      dqrsolv(fit, ndfit, n_rank, m_nfit, 0, iperm);
+      // `fit` now contains (F P^T)^-1. This should be lower triangular.
+
+      // 4.5. Unscale `fit`. We want L_inv = D_inv * (F P^T)^-1 (if F came from L D_inv P).
+      // Original lsqfit unscaled solution vectors. Here we unscale the inverse factor.
+      // Each column k of (F P^T)^-1 should be scaled by dpar[k] (D_inv_kk).
+      // (F P^T)^-1 is lower triangular. Scale L_inv_column_k by D_inv_kk.
+      pfit_col_start = fit;
+      for (int k_col = 0; k_col < m_nfit; ++k_col)
+      {
+        current_scale_factor = dpar[k_col]; // D_inv_kk
+        // Scale L_inv(k_col:end, k_col)
+        dscal(m_nfit - k_col, current_scale_factor, pfit_col_start + k_col, 1);
+        pfit_col_start += ndfit;
+      }
+      // Now `fit` should contain L_inv (lower triangular).
+
+      // 4.6. Store Cov_inv = L_inv^T * L_inv in `fitbgn` (standard packed lower).
+      //    First, form full Cov_inv in `fit` (or a temp matrix).
+      //    fit (L_inv) is m_nfit x m_nfit (in m_nfit x ndfit storage).
+      //    Temp_Symm = L_inv^T * L_inv.
+      //    This requires a dsyrk call if L_inv is available: C = alpha*A^T*A + beta*C or C = alpha*A*A^T + beta*C
+      //    cblas_dsyrk(CblasColMajor, CblasUpper/Lower, CblasTrans/NoTrans, N, K, alpha, A, lda, beta, C, ldc)
+      //    To compute L_inv^T * L_inv (result lower triangle stored in fit):
+      //    Use a temporary matrix for L_inv^T if needed, or compute elements directly.
+      //    Or, more simply, if `fit` from `dqrsolv` after unscaling is *already* the symmetric inv_covariance matrix
+      //    (which `lsqfit`'s `dkold` save implies for the derivative part `dk(0:nr-1,0:nr-1)`), then just pack it.
+      //    The original code: `dcopy(nt, pdk, 1, pdkold, 1);` saves the full solution block.
+      //    The `dcopy(n,pfit,ndfit,pfitb,1)` from `main.c`'s "Supplied Variance" implies `fit` had the symmetric matrix.
+      //    Let's assume `fit` after unscaling IS the symmetric Inverse Covariance.
+      double *pfitb_ptr = fitbgn;
+      pfit_col_start = fit; // `fit` is m_nfit x ndfit (contains symmetric InvCov)
+      for (int j_col_idx = 0; j_col_idx < m_nfit; ++j_col_idx)
+      { // For each column j
+        // Pack lower triangle: elements from row j_col_idx down to m_nfit-1
+        for (int i_row_idx = j_col_idx; i_row_idx < m_nfit; ++i_row_idx)
+        {
+          *pfitb_ptr++ = pfit_col_start[i_row_idx]; // fit[i_row_idx, j_col_idx]
+        }
+        pfit_col_start += ndfit; // Next column in 'fit'
+      }
     }
     else
+    { // "No supplied variance"
+      // `var` is standard packed upper, diagonal elements are sigma_i^2 from getvar.
+      // `fitbgn` needs to be standard packed upper, 1/sigma_i^2 on diagonal, 0 off-diagonal.
+      memset(fitbgn, 0, standard_packed_elements * sizeof(double));
+      double *pvar_ptr = var;
+      double *pfitb_ptr = fitbgn;
+      for (int j_col = 0; j_col < m_nfit; ++j_col)
+      {
+        for (int i_row = 0; i_row <= j_col; ++i_row)
+        {
+          if (i_row == j_col)
+          { // Diagonal element
+            if (*pvar_ptr == 0.0)
+            {
+              *pfitb_ptr = 1.0 / (m_tiny * m_tiny);
+            }
+            else
+            {
+              *pfitb_ptr = 1.0 / (*pvar_ptr);
+            }
+            if (*pfitb_ptr < 1.e-15)
+              --m_ndfree0;
+          } // Off-diagonals in fitbgn remain 0 from memset
+          pvar_ptr++;
+          pfitb_ptr++;
+        }
+      }
+      memset(var, 0, standard_packed_elements * sizeof(double)); // Zero out var
+    }
+
+    if (m_nfit > 0)
     {
-      fprintf(stderr, "Error: Index out of bounds for idpar in nxfit calculation.\n");
+      if (oldpar && par)
+        oldpar[0] = par[0]; // Only first element? Original did this.
+      if (oldfit && fitbgn)
+        oldfit[0] = fitbgn[0];
+      if (delbgn)
+        memset(delbgn, 0, sizeof(double) * m_nfit);
     }
   }
 
-  if (fabs(m_fqfacq - 1.) >= 1e-10 && lufit)
+  // --- 5. Calculate m_nxpar_actual and m_nxfit ---
+  m_nxpar_actual = input.nxpar_from_file;
+  if (m_nxpar_actual > m_npar || m_nxpar_actual < 0)
+    m_nxpar_actual = 0;
+  if (m_nxpar_actual > 0 && lufit)
+  {
+    fprintf(lufit, "NUMBER OF PARAMETERS EXCLUDED IF INDEX < 0 =%5d\n", input.nxpar_from_file);
+  }
+  m_nxpar_actual = m_npar - m_nxpar_actual; // Convert count from end to starting index
+
+  m_nxfit = m_nfit;
+  for (int i_par_idx = m_npar - 1; i_par_idx >= m_nxpar_actual; --i_par_idx)
+  {
+    int ibcd_offset = i_par_idx * m_ndbcd;
+    if (idpar && (size_t)ibcd_offset < idpar_actual_size)
+    {                                      // Check bounds
+      if (NEGBCD(idpar[ibcd_offset]) == 0) // If parameter is fitted (not fixed)
+        --m_nxfit;
+    }
+    else if (m_npar > 0)
+    {
+      if (lufit)
+        fprintf(lufit, "ERROR: Index out of bounds for idpar in nxfit calculation (param %d).\n", i_par_idx);
+      // This could be critical, consider returning false
+      printf("ERROR: Index out of bounds for idpar in nxfit calculation (param %d).\n", i_par_idx);
+    }
+  }
+
+  // --- 6. Call lbufof ---
+  lbufof(-m_nfit, m_limlin);
+
+  if (lufit && fabs(m_fqfacq - 1.) >= 1e-10)
   {
     fprintf(lufit, " IR Frequencies Scaled by %12.10f\n", m_fqfacq);
   }
-
-  m_ndfree0 = 0; // For degrees of freedom adjustment
-
-  // Initialize fitbgn, fit, oldfit, dpar, delbgn based on m_inpcor (return from getvar)
-  if (m_nfit > 0)
-  { // Only if fitting
-    if (m_inpcor > 0)
-    { // If getvar read variance from file (m_inpcor is getvar's return value)
-      // "supplied variance" path
-      double *pvar_ptr = var;
-      double *pfit_ptr = fit;
-      for (int n_idx = 1; n_idx <= m_nfit; ++n_idx)
-      {
-        dcopy(n_idx, pvar_ptr, 1, pfit_ptr, ndfit);
-        pvar_ptr += n_idx;
-        pfit_ptr++; // Advance by 1 for packed upper to full matrix column start
-      }
-      // The dcopy above is tricky. 'fit' is a full matrix, 'var' is packed upper.
-      // Original code: dcopy(n, pvar, 1, pfit, ndfit); pvar += n; ++pfit;
-      // This copies the n elements of the current column of var (which is a column of the Cholesky factor L stored packed)
-      // into the n elements of the current column of fit (full matrix representation of L).
-      // This seems correct if 'fit' is being built as lower triangular initially.
-
-      fit[0] = var[0]; // Assuming var[0] is L_00^2 or L_00 depending on getvar
-      dpar[0] = 1.0;   // dpar used for scaling factors
-
-      pfit_ptr = fit;
-      double current_scale;
-      for (int i_s = 0; i_s < m_nfit; ++i_s)
-      { // Scale loop
-        if (i_s != 0)
-        {
-          pfit_ptr += ndfit; // Move to next column in 'fit' matrix
-                             // If 'fit' is representing L (lower triangular), elements above diagonal are 0.
-                             // If symmetric A, then upper elements are copies.
-                             // The dqrfac implies 'fit' is treated as a general matrix to be factored.
-                             // Let's assume memset for upper part if it's meant to be lower triangular input.
-                             // Original doesn't explicitly zero upper part here. dqrfac might handle it.
-        }
-        int n_val_scale = m_nfit - i_s;
-        double *pfitd_ptr = pfit_ptr + i_s; // Diagonal element of current submatrix
-        double val_norm = dnrm2(n_val_scale, pfitd_ptr, 1);
-        if (val_norm < m_tiny)
-        {
-          dpar[i_s] = 1.0;
-          current_scale = 0.0;
-        }
-        else
-        {
-          dpar[i_s] = current_scale = 1.0 / val_norm;
-        }
-        dscal(n_val_scale, current_scale, pfitd_ptr, 1);
-      }
-
-      // erpar here seems to be temporary storage for diagonal elements of scaled A^T A (or L^T L)
-      pfit_ptr = fit;
-      for (int i_er = 0; i_er < m_nfit; ++i_er)
-      {
-        int n_er = i_er + 1;
-        // erpar[i_er] = ddot(n_er, pfit_ptr, ndfit, pfit_ptr, ndfit); // This seems to be for A^T A_ii
-        // The original code has erpar[i] = ddot(n, pfit, ndfit, pfit, ndfit); ++pfit;
-        // This implies pfit iterates column-wise on 'fit' which is lower triangular (L)
-        // and computes sum of squares of elements in that column.
-        erpar[i_er] = ddot(m_nfit - i_er /* num elements from diagonal down */,
-                           pfit_ptr + i_er /* diagonal of current column */, 1,
-                           pfit_ptr + i_er, 1);
-        // No, this is simpler: erpar[i] = ddot(i+1, column_i_of_L, 1, column_i_of_L, 1) assuming L is column major
-        // Or: erpar[i] = ddot(N-(i), &L(i,i), N) if L is row major.
-        // Let's re-verify ddot usage from original:
-        // pfit = fit; for (i=0 to nfit-1) { n = i+1; erpar[i] = ddot(n, pfit, ndfit, pfit, ndfit); ++pfit;}
-        // This means 'pfit' points to the start of columns in a full matrix, and 'ndfit' is leading dim.
-        // It calculates sum_j (L_ji)^2 for j=0..i. This does not seem right for A=LL^T decomposition.
-        // The `dqrfac` implies QR decomposition. `fit` becomes R.
-        // Let's assume `erpar` is used as scratch by `dqrfac`.
-        // The line `erpar[i] = ddot(n, pfit, ndfit, pfit, ndfit);` seems to be calculating something else,
-        // perhaps related to diagonal preconditioning before `dqrfac`.
-        // Given `dqrfac(fit, ndfit, nfit, nfit, 0, erpar, iperm);`
-        // `erpar` is likely an output of `dqrfac` (e.g. diagonal elements of R or permutation info).
-        // Let's defer populating erpar until after dqrfac if it's an output.
-        // The original lines before dqrfac for erpar are likely specific pre-computation.
-        // For now, let's skip the erpar loop before dqrfac. It's populated by lsqfit later.
-      }
-
-      int n_rank = dqrfac(fit, ndfit, m_nfit, m_nfit, 0, erpar, iperm); // erpar is scratch/output here
-      if (m_nfit > n_rank && lufit)
-      {
-        fputs("supplied variance is singular\n", lufit);
-      }
-      dqrsolv(fit, ndfit, n_rank, m_nfit, 0, iperm); // fit becomes (R^-1 Q^T) or similar
-
-      pfit_ptr = fit;
-      for (int n_un = 0; n_un < m_nfit; ++n_un)
-      {                                              // Unscale, iterate through columns
-        current_scale = dpar[n_un];                  // Scaling factor for this column
-        dscal(n_un + 1, current_scale, pfit_ptr, 1); // Scale first n_un+1 elements of column n_un
-                                                     // if fit is lower triangular (e.g. Cholesky factor of inverse)
-        // Original: for (n=1; i <= nfit; ++n) { scale=dpar[n-1]; dscal(n,scale,pfit,ndfit); ++pfit;}
-        // This means pfit points to columns, dscal(n, scale, column_start, 1) if ndfit=N,
-        // or dscal(n, scale, column_start, N) if matrix is column major.
-        // Assuming 'fit' is column-major or treat pfit_ptr as start of column and dscal operates on contiguous elements.
-        // If fit is (R^-1 Q^T), it's dense.
-        // Let's assume dscal(m_nfit - n_un, current_scale, pfit_ptr + n_un, ndfit) for upper R^-1
-        // Or dscal(n_un+1, current_scale, pfit_ptr, 1) if pfit_ptr points to a column of L_inv and applying scaling.
-        // The original unscale is: for (n = 1; i <= nfit; ++n) { scale = dpar[n-1]; dscal(n, scale, pfit, ndfit); ++pfit; }
-        // This implies pfit points to the start of the n-th column (0-indexed n-1).
-        // dscal(n, scale, &fit(0,n-1), 1) -- if ndfit is used as stride, it's different.
-        // If fit is lower triangular by columns:
-        dscal(m_nfit - n_un, current_scale, pfit_ptr + n_un, ndfit); // Scales from diagonal down
-                                                                     // This applies D^-1 * L_inv
-        pfit_ptr++;                                                  // This doesn't make sense if pfit_ptr is start of matrix.
-      }
-      // Correct unscaling if 'fit' is (D^-1 L_inv) where L was from Cholesky of scaled matrix.
-      // Iterate columns of (D^-1 L_inv). For each column j, multiply by dpar[j].
-      pfit_ptr = fit;
-      for (int j_col = 0; j_col < m_nfit; ++j_col)
-      {
-        dscal(m_nfit, dpar[j_col], pfit_ptr, 1); // Scale entire column j_col
-        pfit_ptr += ndfit;                       // Move to next column
-      }
-
-      // Store in fitbgn (packed lower triangle of the inverted, unscaled covariance matrix)
-      double *pfitb_ptr = fitbgn;
-      pfit_ptr = fit;
-      for (int i_fb = 0; i_fb < m_nfit; ++i_fb)
-      {
-        int n_fb = m_nfit - i_fb;
-        dcopy(n_fb, pfit_ptr + i_fb, ndfit, pfitb_ptr, 1); // Copy from diagonal down
-        pfitb_ptr += n_fb;
-        pfit_ptr += ndfit; // Next column
-      }
-      // The original logic:
-      // pfit = fit; pfitb = fitbgn;
-      // for (i=0; i<nfit; ++i) { if (i!=0) pfit+=ndiag; n=nfit-i; dcopy(n, pfit, ndfit, pfitb,1); pfitb+=n;}
-      // This copies from row i (starting at diagonal) of 'fit' (if 'fit' is row-major lower triangular)
-      // or from column i (starting at diagonal) of 'fit' (if 'fit' is col-major lower triangular)
-      // into packed 'fitbgn'. Let's assume fit is lower triangular, stored by columns.
-      pfit_ptr = fit; // Start of matrix
-      pfitb_ptr = fitbgn;
-      for (int col_idx = 0; col_idx < m_nfit; ++col_idx)
-      {
-        int num_to_copy = m_nfit - col_idx;                      // Elements from diagonal down in this column
-        dcopy(num_to_copy, pfit_ptr + col_idx, 1, pfitb_ptr, 1); // Assumes contiguous column elements
-        pfitb_ptr += num_to_copy;
-        pfit_ptr += ndfit; // Move to the start of the next column
-      }
-    }
-    else
-    { // "no supplied variance" path (m_inpcor <= 0 from getvar)
-      double *pvar_ptr = var;
-      double *pfitb_ptr = fitbgn;
-      if (var[0] == 0.0)
-      { // Avoid division by zero if error was tiny
-        fitbgn[0] = 1.0 / (m_tiny * m_tiny);
-      }
-      else
-      {
-        fitbgn[0] = 1.0 / var[0]; // var[0] is sigma_0^2
-      }
-      var[0] = 0.0; // Modified as in original
-      m_ndfree0 = 0;
-      for (int n_idx = 1; n_idx < m_nfit; ++n_idx)
-      {
-        pfitb_ptr++;                                  // Advance in packed array fitbgn
-        memset(pfitb_ptr, 0, sizeof(double) * n_idx); // Zero out off-diagonal elements for this row/col
-        pvar_ptr += (n_idx + 1);                      // Advance in packed array var to next diagonal
-        pfitb_ptr += n_idx;                           // Advance in packed array fitbgn to next diagonal
-        if (*pvar_ptr == 0.0)
-        {
-          *pfitb_ptr = 1.0 / (m_tiny * m_tiny);
-        }
-        else
-        {
-          *pfitb_ptr = 1.0 / (*pvar_ptr);
-        }
-        if (*pfitb_ptr < 1.e-15)
-          --m_ndfree0;   // From original
-        *pvar_ptr = 0.0; // Modified as in original
-      }
-    }
-
-    if (m_nfit > 0 && oldpar && par && oldfit && fitbgn && delbgn)
-    {                        // Check pointers
-      oldpar[0] = par[0];    // oldpar needs full m_npar
-      oldfit[0] = fitbgn[0]; // oldfit is sized based on m_nfit related nlsq_fit_matrices
-      memset(delbgn, 0, sizeof(double) * m_nfit);
-    }
-    else if (m_nfit > 0)
-    {
-      fprintf(stderr, "Error: One or more fitting arrays are null in initializeParameters.\n");
-      return false;
-    }
-  } // end if (m_nfit > 0)
-
-  // Call lbufof to initialize line buffer system
-  // The number of lines here is the max requested, linein will update actual.
-  lbufof(-m_nfit, m_limlin);
-
   return true;
-}
+} // initializeParamaters
 
-// --- Stubs for remaining main logic methods ---
 
 /* method responsible for:
 1. Setting up the CalculationEngine:
@@ -625,111 +659,56 @@ bool CalFit::initializeParameters(const CalFitInput &input)
 6. Allocating Memory for Fitting:
   - Allocating this->teig and this->pmix based on m_maxdm_actual and m_nfit
 */
+// In CalFit.cpp
+
 bool CalFit::processLinesAndSetupBlocks(const CalFitInput &input)
 {
   if (!calc)
   {
     if (lufit)
       fprintf(lufit, "ERROR: CalculationEngine is null in processLinesAndSetupBlocks.\n");
-    puts("ERROR: CalculationEngine is null in processLinesAndSetupBlocks.");
+    puts("ERROR: CalculationEngine is null.");
     return false;
   }
   if (!lufit)
-  { // Should have been caught earlier, but good check
+  {
     puts("ERROR: lufit stream is null in processLinesAndSetupBlocks.");
     return false;
   }
 
-  // 1. Set up CalculationEngine options
-  // The original `calc->setopt` took `lubak`. We have `input.optionLines`.
-  // `setopt` needs to be adapted or we write options to a temp file for it.
-  // For now, let's assume `calc->setopt` can take a FILE* and we'll write options to a temp file.
-  // Alternatively, if setopt can take char**, we could prepare that.
-  // Or, better, if setopt is modified to take std::vector<std::string>.
-  // Simplest for now: write to temp file.
+  // 1. Engine setup (setopt) was DONE by CalFitIO.
+  //    Member variables like m_itd, m_ndbcd are set. m_namfil_buffer has content.
 
-  FILE *temp_opt_file = tmpfile();
-  if (!temp_opt_file)
+  // 2. Set quantum number format in CalculationEngine (calc->setfmt)
+  int iqnfmt_val_from_setfmt = 0;
+  // m_nfmt (member) will store the iqnfmt value for linein/lineix.
+  // Initialize with a default or value from input if appropriate (e.g. input.nfmt_cat_from_setopt if it's the same kind of nfmt)
+  // The original main did: iqnfmt = 0; ... nqn = calc->setfmt(&iqnfmt, 1);
+  // So, iqnfmt_val_from_setfmt is the primary output.
+  int nqn_engine_actual = calc->setfmt(&iqnfmt_val_from_setfmt, 1); // iflg=1 usually means primary format
+  if (nqn_engine_actual <= 0)
   {
     if (lufit)
-      fprintf(lufit, "ERROR: Unable to create temporary file for options.\n");
-    puts("ERROR: Unable to create temporary file for options.");
+      fprintf(lufit, "ERROR: calc->setfmt failed to set quantum number format (returned %d).\n", nqn_engine_actual);
+    printf("ERROR: calc->setfmt failed (returned %d).\n", nqn_engine_actual);
     return false;
   }
-  for (const auto &opt_line : input.optionLines)
-  {
-    fputs(opt_line.c_str(), temp_opt_file);
-    // Ensure newline, as fgetstr in original setopt would expect it
-    if (!opt_line.empty() && opt_line.back() != '\n')
-    {
-      fputc('\n', temp_opt_file);
-    }
-  }
-  rewind(temp_opt_file);
+  m_nfmt = iqnfmt_val_from_setfmt; // Store the iqnfmt for line processing by CalFit methods
+  // Original main also had: if (nqn > MAXCAT) catqn = nqn; nqn = nqn + nqn; (for pairs)
+  // This `nqn_engine_actual` is used later in main iteration loop's qnfmt2 call. Store if needed.
+  // For now, m_nfmt (the iqnfmt itself) is the key part for linein/lineix.
+  m_nqn_for_iteration = nqn_engine_actual; // Store this for later use with qnfmt2
 
-  char namfil_buffer[NDCARD] = {0}; // setopt might populate this
-  if (!input.namfil_from_options.empty())
-  { // Pre-populate if CalFitIO parsed it
-    strncpy(namfil_buffer, input.namfil_from_options.c_str(), NDCARD - 1);
+  // Log initial parameters from input (as in original main)
+  if (lufit)
+  { // Ensure lufit is valid before fprintf
+    fprintf(lufit, "LINES REQUESTED=%5d NUMBER OF PARAMETERS=%3d", m_limlin, m_npar);
+    fprintf(lufit, " NUMBER OF ITERATIONS=%3d\n  MARQUARDT PARAMETER =", m_nitr_requested);
+    fprintf(lufit, "%11.4E max (OBS-CALC)/ERROR =%10.4E\n", input.marqp0, m_xerrmx); // Use input.marqp0 for initial display
+    fflush(lufit);
   }
 
-  // Call calc->setopt. It updates nfmt, itd, ndbcd by pointer, and namfil char array.
-  // We already have these from CalFitInput, but setopt might refine them or set engine state.
-  // We need to pass addresses of temporary variables that mirror what CalFit already has from input.
-  int nfmt_for_setopt = m_nfmt;
-  int itd_for_setopt = m_itd;
-  int ndbcd_for_setopt = m_ndbcd;
-
-  int noptn_read_by_setopt = calc->setopt(temp_opt_file, &nfmt_for_setopt, &itd_for_setopt, &ndbcd_for_setopt, namfil_buffer);
-  fclose(temp_opt_file);
-
-  if (noptn_read_by_setopt <= 0 && !input.optionLines.empty())
-  { // setopt returns num options read or error
-    if (lufit)
-      fprintf(lufit, "Warning: calc->setopt reported issues or read no options, though options were provided.\n");
-    // Depending on setopt's return, this might be an error.
-    // For now, we'll proceed using values parsed by CalFitIO or defaults.
-  }
-  // Update CalFit members if setopt changed them, and if those changes are authoritative.
-  // Original main used values *after* setopt.
-  m_nfmt = nfmt_for_setopt;
-  m_itd = itd_for_setopt;
-  m_ndbcd = ndbcd_for_setopt; // This is critical if getpar relied on a default that setopt changes.
-                              // However, initializeParameters already used ndbcd_from_options for malloc.
-                              // If setopt changes ndbcd, there could be a mismatch.
-                              // This highlights that setopt should ideally be called *before* getpar.
-                              // For now, we assume ndbcd used for mallocs was correct.
-  std::string namfil_from_setopt = namfil_buffer;
-
-  // 2. Set quantum number format in CalculationEngine
-  // `setfmt` takes `iqnfmt*` (output) and `iflg` (input).
-  // `iqnfmt` is a packed format specifier. `nqn` is the number of quanta.
-  // Original: nqn = calc->setfmt(&iqnfmt, 1);
-  //           if (nqn > MAXCAT) catqn = nqn;
-  //           nqn = nqn + nqn; // for pairs
-  int iqnfmt_val_from_setfmt = 0;                            // This will be populated by setfmt
-  int nqn_actual = calc->setfmt(&iqnfmt_val_from_setfmt, 1); // iflg=1 usually means primary format
-  if (nqn_actual <= 0)
-  {
-    if (lufit)
-      fprintf(lufit, "ERROR: calc->setfmt failed to set quantum number format.\n");
-    puts("ERROR: calc->setfmt failed.");
-    return false;
-  }
-  // m_nfmt (from options or default MAXCAT) might be related to iqnfmt_val_from_setfmt.
-  // The iqnfmt_val_from_setfmt is what linein and lineix will use.
-  // Let's store it if it's different from m_nfmt or if m_nfmt was just a placeholder.
-  // The member m_nfmt should probably become this iqnfmt_val_from_setfmt.
-  m_nfmt = iqnfmt_val_from_setfmt;
-
-  // Print summary from original main (adjust to use member variables)
-  fprintf(lufit, "LINES REQUESTED=%5d NUMBER OF PARAMETERS=%3d", m_limlin, m_npar);
-  fprintf(lufit, " NUMBER OF ITERATIONS=%3d\n  MARQUARDT PARAMETER =", input.nitr); // input.nitr as m_nitr not set yet
-  fprintf(lufit, "%11.4E max (OBS-CALC)/ERROR =%10.4E\n", input.marqp0, m_xerrmx);  // input.marqp0 for initial
-  fflush(lufit);                                                                    // stdout was also flushed in original, do we need to replicate console output here?
-
-  // 3. Process Experimental Lines
-  // Write input.lineData_raw to a temporary in-memory file for CalFit::linein
+  // 3. Process Experimental Lines (using this->linein)
   FILE *temp_line_file = tmpfile();
   if (!temp_line_file)
   {
@@ -741,7 +720,6 @@ bool CalFit::processLinesAndSetupBlocks(const CalFitInput &input)
   for (const auto &line_str : input.lineData_raw)
   {
     fputs(line_str.c_str(), temp_line_file);
-    // Ensure newline, as fgetstr in linein (via getlin) would expect it
     if (!line_str.empty() && line_str.back() != '\n')
     {
       fputc('\n', temp_line_file);
@@ -749,44 +727,46 @@ bool CalFit::processLinesAndSetupBlocks(const CalFitInput &input)
   }
   rewind(temp_line_file);
 
-  m_nline = m_limlin;                                                  // Initialize m_nline with requested max, linein will update it to actual
-  m_maxf_from_linein = this->linein(temp_line_file, &m_nline, m_nfmt); // Call CalFit's linein method
+  int current_nline_val = m_limlin;                                        // Pass current max line count, linein updates it
+  m_maxf_from_linein = this->linein(temp_line_file, &current_nline_val, m_nfmt); // Call CalFit's linein
+  m_nline = current_nline_val;                                             // Update m_nline with actual lines read
   fclose(temp_line_file);
   fflush(stdout); // As in original after linein
 
   if (m_nline <= 0)
   {
     if (lufit)
-      fprintf(lufit, "No lines read from input data or linein failed. NLINE = %d\n", m_nline);
-    puts("No lines read from input data or linein failed.");
+      fprintf(lufit, "No lines read (NLINE = %d) or linein failed.\n", m_nline);
+    puts("No lines read or linein failed.");
+    // It's possible to have 0 lines and proceed if only calculation is needed,
+    // but typically for fitting this is an issue. Let's return false.
     return false;
   }
   if (m_limlin > m_nline)
-  {                     // From original main
-    m_limlin = m_nline; // Adjust m_limlin to actual number of lines if fewer were read
+  {                     // From original main logic
+    m_limlin = m_nline; // Adjust m_limlin to actual if fewer were read
   }
 
-  // 4. Initialize block structure in CalculationEngine
-  m_nblkpf_actual = m_maxf_from_linein; // Initial guess for blocks per F
-                                        // If m_maxf_from_linein is 0, this needs a default (e.g., 1)
-  if (m_nblkpf_actual <= 0)
-    m_nblkpf_actual = 1;
+  // 4. Initialize block structure in CalculationEngine (calc->setblk)
+  m_nblkpf_actual = (m_maxf_from_linein > 0) ? m_maxf_from_linein : 1;
+  m_maxdm_actual = (int)m_nsize_p; // m_nsize_p from initializeParameters
+                                   // This is max Hamiltonian dimension allowed by memory.
+                                   // setblk can reduce m_maxdm_actual based on actual blocks.
 
-  m_maxdm_actual = (int)m_nsize_p; // Max Hamiltonian dimension from maxmem
-                                   // setblk can reduce this based on actual blocks.
-
-  // `idpar` and `par` should be populated from initializeParameters
-  // `k` is an output from setblk, original uses it for getlbl
+  // Ensure idpar and par are valid before passing to setblk
+  if (!this->idpar || !this->par)
+  {
+    if (lufit)
+      fprintf(lufit, "ERROR: idpar or par is null before calc->setblk.\n");
+    puts("ERROR: idpar or par is null before calc->setblk.");
+    return false;
+  }
   int k_from_setblk = calc->setblk(lufit, m_npar, this->idpar, this->par, &m_nblkpf_actual, &m_maxdm_actual);
 
-  // 5. Set parameter labels using getlbl (global C function)
-  // `parlbl` was allocated in initializeParameters.
-  // `namfil_from_setopt` is the filename string.
-  // `k_from_setblk` is `kpar` argument for `getlbl`.
+  // 5. Set parameter labels (getlbl - global C function)
   if (this->parlbl && this->idpar)
-  { // Ensure pointers are valid
-    // Check if namfil_from_setopt is empty, if so, pass nullptr or empty string.
-    const char *namfil_cstr = namfil_from_setopt.empty() ? nullptr : namfil_from_setopt.c_str();
+  { // parlbl allocated in initializeParameters
+    const char *namfil_cstr = (m_namfil_buffer[0] == '\0') ? nullptr : m_namfil_buffer;
     getlbl(m_npar, this->idpar, this->parlbl, namfil_cstr, k_from_setblk, LBLEN);
   }
   else
@@ -795,18 +775,25 @@ bool CalFit::processLinesAndSetupBlocks(const CalFitInput &input)
       fprintf(lufit, "Warning: parlbl or idpar is null, skipping getlbl.\n");
   }
 
-  // 6. Convert lines and set up links for fitting
-  // `lineix` takes `nitr` as `flg` for detailed output control.
-  int bad_lines = this->lineix(lufit, input.nitr, m_nline, m_nblkpf_actual, m_nfmt);
+  // 6. Convert lines and set up links for fitting (this->lineix)
+  // lineix takes nitr as flg for detailed output control.
+  int bad_lines = this->lineix(lufit, m_nitr_requested, m_nline, m_nblkpf_actual, m_nfmt);
   if (bad_lines > 0)
   {
-    printf("%d bad lines\n", bad_lines); // To console
+    printf("%d bad lines\n", bad_lines);
     if (lufit)
       fprintf(lufit, "%d bad lines reported by lineix.\n", bad_lines);
   }
-  fflush(stdout); // As in original
+  fflush(stdout);
 
-  // 7. Allocate memory for teig (eigenvectors output from hamx) and the pmix_block (pmix_scratch, egy, egyder)
+  // 7. Allocate teig and pmix_block
+  if (m_maxdm_actual <= 0)
+  {
+    if (lufit)
+      fprintf(lufit, "ERROR: m_maxdm_actual is %d, cannot allocate Hamiltonian matrices.\n", m_maxdm_actual);
+    printf("ERROR: m_maxdm_actual is %d, cannot allocate Hamiltonian matrices.\n", m_maxdm_actual);
+    return false;
+  }
   if (m_maxdm_actual > m_nsize_p)
   {
     if (lufit)
@@ -815,195 +802,1014 @@ bool CalFit::processLinesAndSetupBlocks(const CalFitInput &input)
     return false;
   }
 
-  if (m_nfit > 0)
+  // Free previous if any (shouldn't happen in single run)
+  if (teig)
+    free(teig);
+  teig = nullptr;
+  if (pmix)
+    free(pmix);
+  pmix = nullptr;
+
+  size_t maxdm_sq_elements = (size_t)m_maxdm_actual * (size_t)m_maxdm_actual;
+  teig = (double *)mallocq(maxdm_sq_elements * sizeof(double));
+  if (!teig)
   {
-    size_t maxdm_sq = (size_t)m_maxdm_actual * (size_t)m_maxdm_actual;
-    teig = (double *)mallocq(maxdm_sq * sizeof(double));
-    if (!teig)
-    { /* ... error ... */
-      return false;
-    }
+    if (lufit)
+      fprintf(lufit, "ERROR: mallocq for teig failed.\n");
+    perror("mallocq for teig failed");
+    return false;
+  }
 
-    // pmix_block contains: pmix_scratch_for_hamx (m_maxdm_actual doubles),
-    //                     egy (m_maxdm_actual doubles),
-    //                     egyder (m_maxdm_actual * m_nfit doubles)
-    size_t pmix_block_elements = (size_t)m_maxdm_actual * (2 + (size_t)m_nfit);
-    pmix = (double *)mallocq(pmix_block_elements * sizeof(double));
-    if (!pmix)
-    { /* ... error ... */
-      free(teig);
-      teig = nullptr;
-      return false;
-    }
-
-    if (pmix_block_elements > 0)
-      pmix[0] = 1.0; // Initialize first element as in original
+  size_t pmix_block_elements;
+  if (m_nfit > 0)
+  { // Number of fitted parameters
+    pmix_block_elements = (size_t)m_maxdm_actual * (2 + (size_t)m_nfit);
   }
   else
-  { // m_nfit == 0
-    teig = nullptr;
-    pmix = nullptr;
-    // If m_nfit is 0, but iterations might still run (e.g. just to calculate lines),
-    // then egy might still be needed. The original logic for hamx call needs to be checked.
-    // For now, assuming if nfit=0, these aren't used extensively.
-    // Original main still calls hamx even if nfit=0, if iterations are > 0 for calc-only.
-    // So, egy and teig might still be needed. pmix_scratch too. egyder would be 0 length.
-    // Let's ensure allocation for hamx call even if nfit=0.
-
-    size_t maxdm_sq = (size_t)m_maxdm_actual * (size_t)m_maxdm_actual;
-    teig = (double *)mallocq(maxdm_sq * sizeof(double));
-    if (!teig)
-    { /* ... error ... */
-      return false;
-    }
-
-    size_t pmix_block_elements_nfit0 = (size_t)m_maxdm_actual * 2; // pmix_scratch + egy
-    pmix = (double *)mallocq(pmix_block_elements_nfit0 * sizeof(double));
-    if (!pmix)
-    { /* ... error ... */
-      free(teig);
-      teig = nullptr;
-      return false;
-    }
-    if (pmix_block_elements_nfit0 > 0)
-      pmix[0] = 1.0;
+  { // nfit == 0, still need space for egy and pmix_scratch for hamx
+    pmix_block_elements = (size_t)m_maxdm_actual * 2;
   }
-
-  // pmix stores [eigenvectors (maxdm x maxdm)], [egy (maxdm)], [egyder (maxdm x nfit)]
-  // Original: nl = nlsq * (size_t)(nfit + 2); where nlsq was maxdm. This is incorrect.
-  // egy is maxdm, egyder is maxdm * nfit.
-  // pmix itself is used as scratch for eigenvectors in hamx, so it is maxdm * maxdm.
-  // Then egy and egyder are laid out after it.
-  // pmix_size_elements = maxdm*maxdm (for eigenvectors) + maxdm (for egy) + maxdm*nfit (for egyder)
-  size_t pmix_eigenvector_elements = (size_t)m_maxdm_actual * (size_t)m_maxdm_actual;
-  size_t egy_elements = (size_t)m_maxdm_actual;
-  size_t egyder_elements = (size_t)m_maxdm_actual * (size_t)m_nfit; // Derivatives for each of m_nfit params
-  size_t total_pmix_elements = pmix_eigenvector_elements + egy_elements + egyder_elements;
-
-  // Original calculation for pmix allocation in main.c:
-  // nlsq = (size_t) maxdm;
-  // nl = nlsq * sizeof(double); // bytes for one vector of length maxdm
-  // nlsq *= nl; // bytes for maxdm * maxdm matrix (teig)
-  // teig = (double *) mallocq(nlsq);
-  // nl *= (size_t) (nfit + 2); // This was for pmix, egy, egyder combined
-  //                             // (maxdm_bytes) * (nfit_derivatives + 1_energy + 1_something_else_or_pmix_itself_if_maxdm_long?)
-  // Let's re-evaluate original pmix usage:
-  // pmix[0] = 1.;
-  // egy = pmix + maxdm;
-  // egyder = egy + maxdm;
-  // calc->hamx(..., egy, teig, egyder, pmix, FALSE);
-  // This implies pmix is a scratch space of at least maxdm doubles for hamx, OR hamx uses pmix as eigenvector output (maxdm*maxdm).
-  // If pmix is eigenvector output from hamx: it's maxdm*maxdm.
-  // Then egy is after it, egyder is after egy.
-  // So total allocation: maxdm*maxdm (for pmix_eigenvectors) + maxdm (for egy) + maxdm*nfit (for egyder)
-  // This matches total_pmix_elements logic.
-
-  pmix = (double *)mallocq(total_pmix_elements * sizeof(double));
+  pmix = (double *)mallocq(pmix_block_elements * sizeof(double));
   if (!pmix)
   {
     if (lufit)
       fprintf(lufit, "ERROR: mallocq for pmix failed.\n");
     perror("mallocq for pmix failed");
+    free(teig);
+    teig = nullptr;
     return false;
   }
 
-    // Original: pmix[0] = 1.; This might be a placeholder or specific initialization if pmix is small scratch.
-    // If pmix is the eigenvector matrix maxdm*maxdm, then pmix[0]=1.0 is just setting the first element.
-    // This is fine. The actual eigenvector content will be filled by hamx.
-    if (total_pmix_elements > 0)
-      pmix[0] = 1.0;
-  }
-  else
-  { // m_nfit == 0
-    teig = nullptr;
-    pmix = nullptr;
-  }
+  if (pmix_block_elements > 0)
+    pmix[0] = 1.0; // As in original main
 
-  // Original: rqexit(1); // Initialize/reset interrupt flag system
-  rqexit(1);
+  rqexit(1); // Initialize/reset interrupt flag system (from calpgm.h, ulib.c)
 
   return true;
 }
 
-bool CalFit::finalizeOutputData(const CalFitInput &input, CalFitOutput &output)
+
+// Define FORMAT STRINGS (these were macros in original main)
+#define FMT_xbgnMW_STR "%5d: %s%14.5f%14.5f %10.5f %10.5f %9.5f"
+#define FMT_xblnMW_STR "%14.5f %10.5f %6.4f\n"
+#define FMT_xbgnIR_STR "%5d: %s%14.7f%14.7f %10.7f %10.7f %9.7f"
+#define FMT_xblnIR_STR "%14.7f %10.7f %6.4f\n"
+#define PR_DELAY 6 // From original main
+
+
+bool CalFit::performIteration(const CalFitInput &input, CalFitOutput &output)
 {
   if (!lufit)
   {
-    puts("lufit is NULL in finalizeOutputData");
+    puts("ERROR: lufit stream is null in performIteration.");
     return false;
   }
-  puts("CalFit::finalizeOutputData called (STUB).");
+  if (m_nline <= 0 && m_nfit > 0)
+  { // No lines to fit but parameters exist
+    fprintf(lufit, "WARNING: No lines available to perform iteration, but nfit > 0.\n");
+    // Set some default output and return, or handle as error if fitting is expected.
+    output.itr = 0;
+    output.xsqbest = 0.0;
+    // Populate output.par and output.erpar with initial values
+    if (m_npar > 0 && this->par)
+      output.par.assign(this->par, this->par + m_npar);
+    if (m_npar > 0 && this->erpar)
+      output.erpar.assign(this->erpar, this->erpar + m_npar);
+    return true; // Or false if this is an unrecoverable state for fitting
+  }
+  if (m_nfit <= 0)
+  {
+    fprintf(lufit, "No parameters to fit (nfit = %d). Skipping iteration loop.\n", m_nfit);
+    // Perform a "calculation only" if nitr requested it (e.g. negative nitr in original)
+    // For now, just set output and return.
+    output.itr = 0;
+    output.xsqbest = 0.0;
+    if (m_npar > 0 && this->par)
+      output.par.assign(this->par, this->par + m_npar);
+    if (m_npar > 0 && this->erpar)
+      output.erpar.assign(this->erpar, this->erpar + m_npar);
+    return true;
+  }
 
-  // This method will populate CalFitOutput with all necessary data for CalFitIO::writeOutput.
-  // It involves:
-  // - Copying final parameters, errors.
-  // - Computing correlation matrix (prcorr).
-  // - Preparing data for .par and .var files.
+  // Pointers for hamx arguments, derived from this->pmix allocation
+  // Assumes pmix_block: [pmix_scratch (m_maxdm_actual)], [egy (m_maxdm_actual)], [egyder (m_maxdm_actual * m_nfit)]
+  double *hamx_pmix_scratch = this->pmix;
+  double *hamx_egy = this->pmix + m_maxdm_actual;
+  double *hamx_egyder = this->pmix + m_maxdm_actual + m_maxdm_actual;
 
-  // Based on the CalFit::run stub, some fields are already populated.
-  // More comprehensive population will happen here.
-  output.title_for_output = input.title;             // Already in run stub
-  output.optionLines_for_output = input.optionLines; // Already in run stub
+  // Local variables from original main's iteration loop
+  static double zero_static = 0.; // To avoid repeated initialization if loop is re-entered (not in this design)
+  double fqfac[4];
+  double varv[5];                                                                          // For lsqfit
+  double adif, cerr_calc, afrq, rerr_line, cwid;                                           // Renamed cerr to cerr_calc
+  double xsqir, xsqmw, avgmw, avgir, xerr_line, xfrq_line, xsqt, current_scale_iter, xwid; // Renamed scale, xerr, xfrq
+  double fqfacq_local = m_fqfacq;                                                          // Use member
+  double xerrmx_local = m_xerrmx;                                                          // Use member
+  double dif_par, frq_calc, val_iter, xwt_line;                                            // Renamed val, dif
+
+  double bigd, bigf, bigdIR, bigfIR, bigdMW, bigfMW;
+  int ifac, iblk, lblk = 0, iflg_line, line_idx, icnt_progress, nfir;
+  int lstf = 0, nitr_actual;
+  int k_loop, iblnd, lblnd, initl_getdbk, noptn_dummy, ibase, nf_fitted_lines, itd_dummy; // Renamed n, nfmt, etc.
+  int maxf_dummy, nrj;
+  int marqflg_lsqfit;
+  int nsize_block; // Renamed nsize
+  int ndfree;
+  short qnum_line[2 * MAXQN]; // MAXQN from lsqfit.h or calpgm.h
+  char ch_par, pare_str[64], aqnum_str[6 * MAXQN + 2], card_iter_log[NDCARD];
+  int idx_getdbk_local; // Local variable for 'indx' output from getdbk
+
+  bigdIR = 9.9999999;
+  bigdMW = 100. * bigdIR;
+  bigfIR = 99999.9999999;
+  bigfMW = 100. * bigfIR;
+
+  fqfac[0] = 1.0;
+  fqfac[1] = -1.0;
+  fqfac[2] = fqfacq_local / 29979.2458;
+  fqfac[3] = -fqfac[2];
+
+  m_marqp[0] = input.marqp0; // Initial Marquardt parameter from input file
+  m_marqp[1] = -1.0;         // Trust region, -1 means find max initially
+  m_marqp[2] = 1.0;          // Trust region ratio
+  if (m_marqp[0] < 0.0)
+    m_marqp[0] = 0.0;
+
+  m_xsqbest = zero_static; // Best RMS error
+  m_marqlast = m_marqp[0]; // Store initial marqp for output if no iterations
+  m_itr = 0;               // Iteration count
+
+  if (this->dpar)
+    this->dpar[0] = 0.0; // First element of dpar (parameter shifts) often treated specially
+
+  nitr_actual = (m_nitr_requested < 0) ? -m_nitr_requested : m_nitr_requested;
+  if (nitr_actual == 0 && m_nitr_requested <= 0)
+  { // if nitr=0, or e.g. -1 to mean calc only
+    // If just calculation, may not need full iteration, but original did one pass.
+    // For now, let's assume if nitr_actual is 0, we might do one pass for calc if m_nitr_requested < 0
+  }
+
+  // --- START ITERATION LOOP ---
+  do
+  {
+    // 1. Set up dpar with current parameter values for derivative calculations
+    //    dpar is also used to store parameter *shifts* later.
+    //    Original: k=0; ibcd=nxpar*ndbcd; for(i=nxpar;i<npar;++i,ibcd+=ndbcd){ if(NEGBCD(idpar[ibcd])==0) dpar[k++]=par[i];}
+    //    This copies values of *fitted* parameters (from m_nxpar_actual onwards) into the start of dpar array.
+    //    This dpar is then passed to dnuadd. This usage seems to mix parameter values and shifts.
+    //    Let's use a temporary array for passing current fitted parameter values to dnuadd.
+    if (m_nxfit <= 0 && m_nfit > 0)
+    { // Should not happen if nxfit correctly calculated
+      fprintf(lufit, "Warning: m_nxfit is %d while m_nfit is %d. Problem with parameter exclusion logic.\n", m_nxfit, m_nfit);
+    }
+    std::vector<double> current_fitted_params(m_nfit); // Max possible needed for dnuadd
+    k_loop = 0;
+    int ibcd_idx = m_nxpar_actual * m_ndbcd; // Start check from m_nxpar_actual
+    for (int i_par = m_nxpar_actual; i_par < m_npar; ++i_par, ibcd_idx += m_ndbcd)
+    {
+      if (this->idpar && (size_t)ibcd_idx < ((size_t)m_npar * m_ndbcd + m_ndbcd + 3))
+      { // Bounds check
+        if (NEGBCD(this->idpar[ibcd_idx]) == 0)
+        { // If parameter i_par is fitted
+          if (k_loop < m_nfit)
+          { // Check bounds for current_fitted_params
+            current_fitted_params[k_loop++] = this->par[i_par];
+          }
+          else
+          { /* error, too many fitted params for m_nfit */
+            break;
+          }
+        }
+      }
+      else if (m_npar > 0)
+      { /* error, idpar bounds */
+        break;
+      }
+    }
+    // Fill remaining (if any) from start of parameter list for parameters not in the "nxpar tail"
+    ibcd_idx = 0;
+    for (int i_par = 0; i_par < m_nxpar_actual; ++i_par, ibcd_idx += m_ndbcd)
+    {
+      if (this->idpar && (size_t)ibcd_idx < ((size_t)m_npar * m_ndbcd + m_ndbcd + 3))
+      {
+        if (NEGBCD(this->idpar[ibcd_idx]) == 0)
+        {
+          if (k_loop < m_nfit)
+          {
+            current_fitted_params[k_loop++] = this->par[i_par];
+          }
+          else
+          { /* error */
+            break;
+          }
+        }
+      }
+      else if (m_npar > 0)
+      { /* error */
+        break;
+      }
+    }
+    // k_loop should now equal m_nfit if all went well.
+
+    // 2. Loop through Hamiltonian blocks (getdbk)
+    int lnext_getdbk = 0;                                              // Controls getdbk loop
+    lblk = 0;                                                          // Last block processed
+    lstf = 0;                                                          // Last F quantum number printed for progress
+    // Call getdbk to initialize/get the first set of parameters.
+    // idx_getdbk_local will be set by this first call.
+    getdbk(&lnext_getdbk, &iblk, &idx_getdbk_local, &initl_getdbk, &ifac);
+
+    do
+    {
+      // On subsequent calls, getdbk uses lnext_getdbk to advance and sets outputs.
+      line_idx = getdbk(&lnext_getdbk, &iblk, &idx_getdbk_local, &initl_getdbk, &ifac); // Get next line info
+      if (iblk != lblk)
+      { // New block
+        if (rqexit(0) != 0)
+          break; // Check for user interrupt
+
+        // Get block quantum numbers and size
+        calc->getqn(iblk, 0, 0, qnum_line, &nsize_block); // qnum_line gets some ID, nsize_block is dim
+        if (nsize_block == 0)
+          continue; // Skip empty blocks
+
+        lblk = iblk;
+        if (nsize_block > m_maxdm_actual)
+        {
+          if (lufit)
+            fprintf(lufit, "ERROR: Size of block %d (%d) exceeds max dimension %d.\n", iblk, nsize_block, m_maxdm_actual);
+          printf("ERROR: Size of block %d (%d) exceeds max dimension %d.\n", iblk, nsize_block, m_maxdm_actual);
+          return false; // Fatal error
+        }
+
+        k_loop = (iblk - 1) / m_nblkpf_actual; // Assuming m_nblkpf_actual is F step
+        if (lstf != k_loop && caldelay(PR_DELAY) != 0)
+        {
+          printf("Starting Quantum %3d\n", k_loop);
+          fflush(stdout);
+          lstf = k_loop;
+        }
+
+        // Calculate energies and derivatives for this block
+        // Pointers hamx_egy, hamx_egyder, hamx_pmix_scratch are set up from this->pmix
+        // this->teig is the eigenvector output matrix
+        calc->hamx(iblk, nsize_block, m_npar, this->idpar, this->par,
+                   hamx_egy, this->teig, hamx_egyder, hamx_pmix_scratch, FALSE);
+      }
+      // Accumulate derivatives for the current line
+      // dnuadd needs array of current *fitted* parameter values.
+      // Original used `dpar` for this, which was confusing. We use `current_fitted_params`.
+      dnuadd(m_nfit, m_nxfit, initl_getdbk, idx_getdbk_local, ifac,
+             hamx_egy, hamx_egyder, nsize_block, line_idx,
+             current_fitted_params.data(), fqfac);
+
+    } while (lnext_getdbk != 0); // Repeat until no more energies needed for lines
+
+    if (rqexit(0) != 0 && lnext_getdbk != 0)
+    { // Exited loop due to interrupt but not finished
+      if (lufit)
+        fprintf(lufit, "Iteration interrupted by user.\n");
+      printf("Iteration interrupted.\n");
+      // Decide how to handle: break outer loop, return error, etc.
+      // For now, break outer loop.
+      break;
+    }
+    if (lblk > 0)
+    { // Check if any blocks were processed
+      k_loop = (lblk - 1) / m_nblkpf_actual;
+      printf("Finished Quantum %3d\n", k_loop);
+      fflush(stdout);
+    }
+
+    // 3. Initialize least-squares matrix (fit) and RHS vector (last col of fit)
+    xsqir = xsqmw = avgmw = avgir = 0.0;
+    double *pfitb_ptr = this->fitbgn;
+    double *pfit_ptr = this->fit;
+    double *pfitd_rhs_ptr = this->fit + m_nfit; // Start of RHS vector (ndfit-th column conceptually)
+
+    // dcopy(m_nfit, &zero_static, 0, pfitd_rhs_ptr, ndfit); // Zero out RHS using dcopy
+    // Original used steps of ndfit. If pfitd_rhs_ptr is start of that conceptual column.
+    for (int i = 0; i < m_nfit; ++i)
+      pfitd_rhs_ptr[i * ndfit] = 0.0; // Zero out the actual RHS part
+
+    // Copy from fitbgn (initial covariance part) and delbgn (previous iteration's parameter changes)
+    for (int n_ls = 1; n_ls <= m_nfit; ++n_ls)
+    {                                             // n_ls is 1-based index for matrix size
+      dcopy(n_ls, pfitb_ptr, 1, pfit_ptr, ndfit); // Copy L_ii block from fitbgn to fit
+      val_iter = this->delbgn[n_ls - 1];
+      // daxpy for RHS: fit_rhs = fit_rhs + val_iter * fitbgn_col
+      // Original: daxpy(n, val, pfitb, 1, pfitd, ndfit);
+      // This means pfitd was start of RHS, ndfit was stride for RHS.
+      // If RHS is stored contiguously after main matrix block:
+      daxpy(n_ls, val_iter, pfitb_ptr, 1, &pfitd_rhs_ptr[(n_ls - 1) * ndfit], 1); // Assuming RHS also has structure
+                                                                                  // This needs to be RHS_vector[i] += val * L_block_vector[i]
+
+      // The RHS vector (parameter * differences) is dpar[nfit] effectively.
+      // The original calculation of xsqt uses dpar[nfit] as RHS.
+      // Let's use dpar directly for RHS accumulation.
+      // Original: dcopy(nfit, &zero,0,pfitd,ndfit); where pfitd = fit + nfit
+      // This zeros the (nfit)-th "column" of fit, which is the RHS.
+      // Then: daxpy(n, val, pfitb,1,pfitd, ndfit) -> this means pfitd is start of actual RHS vector
+      // which is at fit[0*ndfit + nfit], fit[1*ndfit+nfit], etc.
+      // Let this->dpar be the RHS vector directly.
+      // Initialize dpar[0...m_nfit-1] from delbgn contributions.
+      // dpar[m_nfit] will be -(obs-calc) for each line.
+    }
+    // Correct initialization of RHS (stored in the last conceptual column of `fit` matrix)
+    // This part is for sum( (L_delta_p)_i * (L_delta_p)_i ).
+    // The RHS vector for the normal equations is typically sum( J_i * w_i * (obs_i - calc_i) ).
+    // The initial xsqt calculation refers to `ddot(nfit, pfitd, ndfit, pfitd, ndfit)`
+    // where `pfitd` (RHS) was formed by `daxpy(n, delbgn[n-1], pfitb_block_n, 1, pfitd_rhs_for_n, ndfit_stride)`.
+    // This implies `pfitd` is related to `L * delbgn`.
+    // Let's simplify: RHS vector is `this->dpar`. Zero it.
+    memset(this->dpar, 0, (size_t)ndfit * sizeof(double)); // dpar is ndfit long
+    pfitb_ptr = this->fitbgn;
+    for (int n_ls = 0; n_ls < m_nfit; ++n_ls)
+    { // n_ls is 0-based index
+      // Accumulate L_transpose * delbgn into dpar (first m_nfit elements)
+      // This seems like dpar = L^T * delbgn where L is from fitbgn.
+      // Original: for n=1..nfit { daxpy(n, delbgn[n-1], pfitb_ptr_for_col_n, 1, &dpar[0], ???) }
+      // This logic is for forming the initial RHS vector b_0 = L_0^T * delta_p_0
+      // where L_0 is from fitbgn (sqrt of initial covariance).
+      // The xsqt is then b_0^T * b_0.
+      // The dpar array will be overwritten by line contributions later.
+      // For now, store this initial RHS in a temp vector or use dpar up to m_nfit-1.
+      // The original seems to put it in fit(:, m_nfit).
+      double *current_rhs_target = this->fit + m_nfit; // Start of the conceptual (nfit)-th column.
+      for (int i_rhs_init = 0; i_rhs_init < m_nfit; ++i_rhs_init)
+        current_rhs_target[i_rhs_init * ndfit] = 0.0; // Zero it.
+
+      pfitb_ptr = this->fitbgn;              // Standard packed lower/upper
+      double *pfit_col_ptr_init = this->fit; // For L_ii blocks
+      for (int n_idx = 0; n_idx < m_nfit; ++n_idx)
+      { // n_idx is 0-based
+        // copy L_block to fit
+        dcopy(n_idx + 1, pfitb_ptr, 1, pfit_col_ptr_init, ndfit);
+        // form initial RHS = L_block * delbgn[n_idx]
+        // daxpy for column n_idx of RHS: current_rhs_target[k] += L[k, n_idx] * delbgn[n_idx]
+        // This means RHS_vec = L * delbgn
+        daxpy(n_idx + 1, this->delbgn[n_idx], pfitb_ptr, 1, current_rhs_target, ndfit);
+        pfitb_ptr += (n_idx + 1);
+        pfit_col_ptr_init += ndfit; // This advance is wrong if pfitb_ptr is for col
+      }
+      // The original loop for xsqt:
+      // pfitb=fitbgn; pfit=fit; pfitd=fit+nfit; dcopy(nfit,&zero,0,pfitd,ndfit);
+      // for(n=1..nfit){ dcopy(n,pfitb,1,pfit,ndfit); val=delbgn[n-1]; daxpy(n,val,pfitb,1,pfitd,ndfit); pfitb+=n; ++pfit;}
+      // xsqt = ddot(nfit, pfitd,ndfit,pfitd,ndfit);
+      // This populates `fit` with L from `fitbgn`.
+      // And `pfitd` (the RHS vector part of `fit`) becomes `L * delbgn`.
+      pfitb_ptr = this->fitbgn;
+      pfit_ptr = this->fit;                 // Full matrix L
+      double *rhs_ptr = this->fit + m_nfit; // Start of RHS column
+      for (int i_rhs = 0; i_rhs < m_nfit; ++i_rhs)
+        rhs_ptr[i_rhs * ndfit] = 0.0; // Zero RHS
+
+      for (int n_ls_orig = 1; n_ls_orig <= m_nfit; ++n_ls_orig)
+      {
+        dcopy(n_ls_orig, pfitb_ptr, 1, pfit_ptr, ndfit); // Copy col n_ls_orig of L
+        val_iter = this->delbgn[n_ls_orig - 1];
+        // RHS += L_col * val_iter. daxpy(col_length, val, L_col_elements, stride_L_col, RHS_elements, stride_RHS)
+        daxpy(n_ls_orig, val_iter, pfitb_ptr, 1, rhs_ptr, ndfit); // Add L_col * val to RHS
+        pfitb_ptr += n_ls_orig;                                   // Advance in packed fitbgn
+        pfit_ptr++;                                               // Advance to next column start in fit (if fit is row-major packed L)
+                                                                  // Or pfit_ptr += ndfit if column major
+      }
+      // If fit is column major, pfit_ptr should advance by ndfit.
+      // The original ++pfit implies pfit points to conceptual columns in a packed way or was an array of pointers.
+      // Assuming pfit_ptr correctly points to subsequent columns of L for dcopy.
+      // The ddot for xsqt used stride ndfit on pfitd.
+      xsqt = ddot(m_nfit, rhs_ptr, ndfit, rhs_ptr, ndfit);
+
+      // 4. Loop through experimental lines
+      nf_fitted_lines = nrj = nfir = 0;
+      icnt_progress = -1;
+      if (lufit)
+      { // Header for line listing
+        for (int i_space = 0; i_space < 40; ++i_space)
+          fputc(' ', lufit);
+        fputs("EXP.FREQ.  -  CALC.FREQ. -   DIFF.  - EXP.ERR.- ", lufit);
+        fputs("EST.ERR.-AVG. CALC.FREQ. -  DIFF. - WT.\n", lufit);
+      }
+      line_idx = 1;         // 1-based line number for processing
+      double ex_line = 1.0; // Effective weight factor
+
+      do
+      { // Loop over lines (line_idx from 1 to m_nline)
+        if (icnt_progress <= 0 && caldelay(PR_DELAY) != 0)
+        {
+          printf("Fitting Line %d\n", line_idx);
+          fflush(stdout);
+          icnt_progress = 50; // Reset counter
+        }
+        lblnd = line_idx; // Start of potential blend
+        current_scale_iter = rerr_line = 0.0;
+        iflg_line = 0;
+        int supblnd = 0;
+        xwid = 1.0;
+
+        // Inner loop: process all components of a blend
+        do
+        {
+          // frqdat: output iblnd, xfrq_line, xwt_line, xerr_line, qnum_line
+          // Returns 0 if end of data or error, non-zero if line data valid.
+          // dpar (this->dpar) is passed as output for derivatives of this line.
+          k_loop = frqdat(lblnd, &iblnd, &xfrq_line, &xwt_line, &xerr_line, qnum_line);
+
+          if ((iblnd & 1) != 0)
+          { // Blended line width card (supblnd in original)
+            supblnd = 1;
+            xwid = xerr_line;                             // xerr_line is width for this type of card
+            val_iter = 1.0 / (current_scale_iter * xwid); // Ensure current_scale_iter is not zero
+            if (current_scale_iter * xwid == 0)
+              val_iter = 0; // Avoid div by zero
+            else
+              val_iter = sqrt(fabs(1.0 - val_iter * val_iter)); // fabs for safety
+            current_scale_iter *= val_iter;
+            // dscal dpar (derivatives) by val_iter
+            // dpar here means the derivatives vector for the current line, which is dpar[0..nfit-1]
+            // dpar[nfit] is obs-calc. So scale all nfit+1 elements.
+            dscal(m_nfit + 1, val_iter, this->dpar, 1);
+          }
+          else if (k_loop != 0)
+          { // Normal line or component of blend
+            if (xerr_line == 0.0)
+              ex_line = 1.0 / m_tiny; // Avoid division by zero
+            else
+              ex_line = fabs(xwt_line / xerr_line);
+            current_scale_iter += ex_line;
+
+            // dnuget: Get (Obs-Calc) and derivatives for this line
+            // iflg_line: 0 for first component, >0 for subsequent in blend, -1 for printing single line
+            // Output: val_iter = (Obs-Calc) for this line, dpar[0..nfit-1] gets derivatives d(calc)/dp_i
+            // dpar[nfit] gets (Obs-Calc) * ex_line (weighted)
+            val_iter = dnuget(iflg_line, m_nfit, ex_line, lblnd, this->dpar);
+            rerr_line = this->dpar[m_nfit]; // Weighted (Obs-Calc) accumulated for blend
+            iflg_line++;
+          }
+          lblnd++;
+          icnt_progress--;
+        } while (iblnd < 0); // Loop while iblnd indicates more components in blend
+
+        if (iflg_line == 0)
+        {                   // No valid lines/components found for this line_idx
+          line_idx = lblnd; // Advance line_idx past this processed (empty) blend
+          continue;
+        }
+
+        // Calculate errors and process line/blend
+        if (current_scale_iter == 0)
+          current_scale_iter = 1.0;                                             // Avoid division by zero
+        cerr_calc = calerr(m_nfit, this->var, this->dpar) / current_scale_iter; // Estimated error of calc freq
+        adif = this->dpar[m_nfit] / current_scale_iter;                         // Average (Obs-Calc) for blend
+        afrq = xfrq_line - adif;                                                // Average calculated frequency for blend (using last xfrq_line from frqdat as Explt)
+                                                                                // If blend, xfrq_line from frqdat should be the "blend frequency"
+
+        if (fabs(rerr_line) < xerrmx_local)
+        {                                // Check if weighted error is acceptable
+          xsqt += rerr_line * rerr_line; // Accumulate sum of squares of weighted residuals
+          if (xerr_line < 0.0)
+          { // IR line (convention: negative error)
+            avgir += adif;
+            xsqir += adif * adif;
+            nfir++;
+          }
+          else
+          { // Microwave line
+            avgmw += adif;
+            xsqmw += adif * adif;
+          }
+          // Rotate line into FIT matrix (J^T J and J^T diff)
+          // dpar[0...nfit-1] contains derivatives J, dpar[nfit] contains weighted (Obs-Calc)
+          jelim(this->fit, this->dpar, ndfit, m_nfit, 1); // ns=1 for one RHS vector
+          nf_fitted_lines++;
+        }
+        else
+        { // Line rejected
+          if (lufit)
+            fputs(" ***** NEXT LINE NOT USED IN FIT\n", lufit);
+          nrj++;
+          supblnd = 0; // Reset supblnd if rejected
+        }
+
+        // Output formatting for the line/blend (extensive logic from original)
+        if (xerr_line < 0.0)
+        {
+          bigf = bigfIR;
+          bigd = bigdIR;
+        }
+        else
+        {
+          bigf = bigfMW;
+          bigd = bigdMW;
+        }
+        if (fabs(afrq) > bigf)
+          afrq = (afrq > 0.0) ? bigf : -bigf;
+        if (fabs(adif) > bigd)
+          adif = (adif > 0.0) ? bigd : -bigd;
+
+        if (iflg_line == 1)
+        {                                                        // Single unblended line printed
+          qnfmt2(m_nqn_for_iteration * 2, qnum_line, aqnum_str); // nqn*2 for pair
+          if (lufit)
+          {
+            if (xerr_line < 0.)
+            {
+              fprintf(lufit, FMT_xbgnIR_STR, line_idx, aqnum_str, xfrq_line, afrq, adif, xerr_line, cerr_calc);
+            }
+            else
+            {
+              fprintf(lufit, FMT_xbgnMW_STR, line_idx, aqnum_str, xfrq_line, afrq, adif, xerr_line, cerr_calc);
+            }
+            fputc('\n', lufit);
+          }
+        }
+        else
+        {                                          // Blended line, print all components
+          int current_blend_member_idx = line_idx; // Start from the first line of the blend
+          cwid = 0.0;
+          do
+          {
+            k_loop = frqdat(current_blend_member_idx, &iblnd, &xfrq_line, &xwt_line, &xerr_line, qnum_line);
+            if ((iblnd & 1) != 0)
+            {                              // Blend summary/width line
+              xfrq_line = 0.0;             // Placeholder for Explt Freq for this line type
+              frq_calc = sqrt(fabs(cwid)); // RMS of individual diffs from avg_calc for blend
+              if (supblnd != 0 && xwid != 0.0)
+                xsqt += cwid / (xwid * xwid);  // Add to sum of squares
+              qnfmt2(0, qnum_line, aqnum_str); // No quanta for this line
+              if (lufit)
+              {
+                if (xerr_line < 0.)
+                { // Based on original blend line type
+                  fprintf(lufit, FMT_xbgnIR_STR, current_blend_member_idx, aqnum_str, xfrq_line, frq_calc, frq_calc, xwid, 0.0 /*est.err*/);
+                }
+                else
+                {
+                  fprintf(lufit, FMT_xbgnMW_STR, current_blend_member_idx, aqnum_str, xfrq_line, frq_calc, frq_calc, xwid, 0.0);
+                }
+                fputc('\n', lufit);
+              }
+            }
+            else if (k_loop != 0)
+            { // Actual component of the blend
+              if (supblnd != 0 && xwid != 0.0)
+              {                                                                              // If special blend processing active
+                ex_line = sqrt(fabs(xwt_line)) / xwid;                                       // Weight for this component
+                frq_calc = dnuget(0, m_nfit, ex_line, current_blend_member_idx, this->dpar); // Get its contribution again
+                jelim(this->fit, this->dpar, ndfit, m_nfit, 1);                              // Rotate into fit
+                nf_fitted_lines++;                                                           // Count as fitted
+              }
+              else
+              {
+                // Get (Calc Freq) for this component (iflg=-1 for print mode of dnuget)
+                frq_calc = dnuget(-1, m_nfit, ex_line, current_blend_member_idx, this->dpar);
+              }
+              dif_par = xfrq_line - frq_calc; // Individual diff
+              if (fabs(frq_calc) > bigf)
+                frq_calc = (frq_calc > 0.0) ? bigf : -bigf;
+              if (fabs(dif_par) > bigd)
+                dif_par = (dif_par > 0.0) ? bigd : -bigd;
+              qnfmt2(m_nqn_for_iteration * 2, qnum_line, aqnum_str);
+              if (lufit)
+              {
+                if (xerr_line < 0.)
+                {
+                  fprintf(lufit, FMT_xbgnIR_STR, current_blend_member_idx, aqnum_str, xfrq_line, frq_calc, dif_par, xerr_line, cerr_calc);
+                  fprintf(lufit, FMT_xblnIR_STR, afrq, adif, xwt_line); // Avg calc, avg diff, weight
+                }
+                else
+                {
+                  fprintf(lufit, FMT_xbgnMW_STR, current_blend_member_idx, aqnum_str, xfrq_line, frq_calc, dif_par, xerr_line, cerr_calc);
+                  fprintf(lufit, FMT_xblnMW_STR, afrq, adif, xwt_line);
+                }
+              }
+              dif_par = frq_calc - afrq;            // Diff of this component's calc from avg calc
+              cwid += xwt_line * dif_par * dif_par; // Accumulate for RMS width
+            }
+            current_blend_member_idx++;
+          } while (iblnd < 0); // Loop through all components of the blend for printing
+        }
+        line_idx = lblnd; // Advance main line index past this processed blend
+      } while (line_idx <= m_nline); // End loop over lines
+
+      if (nrj > 0 && lufit)
+        fprintf(lufit, "%5d Lines rejected from fit\n", nrj);
+      if (nf_fitted_lines < 1)
+        nf_fitted_lines = 1; // Avoid division by zero for RMS
+
+      // Zero upper triangle of fit matrix (it's symmetric J^T J after jelim)
+      // Original did this by iterating columns and memset on elements *before* diagonal.
+      // If 'fit' is column major:
+      pfit_ptr = this->fit; // Start of matrix
+      for (k_loop = 1; k_loop < m_nfit; ++k_loop)
+      {                                               // For columns 1 to nfit-1
+        pfit_ptr += ndfit;                            // Move to start of column k_loop
+        memset(pfit_ptr, 0, sizeof(double) * k_loop); // Zero k_loop elements from pfit_ptr[0] to pfit_ptr[k_loop-1]
+      }
+
+      varv[0] = xsqt + (double)nrj * xerrmx_local * xerrmx_local; // Variance for lsqfit
+      m_marqlast = m_marqp[0];                                    // Save current Marquardt param before lsqfit changes it
+
+      // 5. Call lsqfit
+      // dk=fit, ndm=ndfit, nr=m_nfit, nvec=1 (for one RHS)
+      // dkold=oldfit, ediag=erpar (used for normalized diagonals), enorm=dpar (param shifts/errors)
+      marqflg_lsqfit = lsqfit(this->fit, ndfit, m_nfit, 1, m_marqp, varv,
+                              this->oldfit, this->erpar, this->dpar, this->iperm);
+
+      if (marqflg_lsqfit != 0)
+      {                                               // Fit diverging
+        dcopy(m_npar, this->oldpar, 1, this->par, 1); // Restore parameters
+                                                      // ... (logging as before) ...
+      }
+      else
+      { // Fit converged for this step
+        m_xsqbest = (xsqt - varv[3]) / nf_fitted_lines;
+        if (m_xsqbest > 0.0)
+          m_xsqbest = sqrt(m_xsqbest);
+        else
+          m_xsqbest = 0.0;
+        // Print normalized diagonals (erpar from lsqfit)
+        if (lufit)
+        {
+          fputs("NORMALIZED DIAGONAL:\n", lufit);
+          icnt_progress = 0;
+          for (k_loop = 0; k_loop < m_nfit; ++k_loop)
+          {
+            fprintf(lufit, "%5d %13.5E", k_loop + 1, this->erpar[k_loop]);
+            if ((++icnt_progress) == 6)
+            {
+              icnt_progress = 0;
+              fputc('\n', lufit);
+            }
+          }
+          if (icnt_progress > 0)
+            fputc('\n', lufit);
+        }
+      }
+      if (lufit)
+      {
+        fprintf(lufit, "MARQUARDT PARAMETER = %g, TRUST EXPANSION = %4.2f\n", m_marqp[0], m_marqp[2]);
+      }
+//      printf("MARQUARDT PARAMETER = %g, TRUST EXPANSION = %4.2f\n", m_marqp[0], m_marqp[2]);
+
+      if (m_xsqbest > xsqt && marqflg_lsqfit == 0)
+        m_xsqbest = xsqt;
+
+      // 6. Update parameters and delbgn
+      //    dpar from lsqfit contains parameter changes * delta_p_i
+      //    erpar from lsqfit contains scaled errors for fitted parameters
+      if (lufit)
+      {
+        for (int i_space = 0; i_space < 32; ++i_space)
+          fputc(' ', lufit);
+        fputs("NEW PARAMETER (EST. ERROR) -- CHANGE THIS ITERATION\n", lufit);
+      }
+
+      // Parameter changes are in the last column of `this->fit`
+      double *solution_vector = this->fit + m_nfit; // Points to fit(0, m_nfit) conceptually
+
+      char *tlbl_ptr = this->parlbl;
+      k_loop = ibase = 0; // k_loop is count of fitted params processed
+      for (int i_par = 0, ibcd_current = 0; i_par < m_npar; ++i_par, ibcd_current += m_ndbcd)
+      {
+        char *current_label = tlbl_ptr;
+        tlbl_ptr += LBLEN;
+
+        this->oldpar[i_par] = this->par[i_par];
+
+        if (this->idpar && (NEGBCD(this->idpar[ibcd_current]) == 0))
+        { // If parameter i_par is fitted
+          if (k_loop < m_nfit)
+          {
+            // dif_par is the change for k_loop'th fitted parameter
+            dif_par = solution_vector[k_loop * ndfit]; // Access element k_loop of solution vector
+
+            this->par[i_par] += dif_par;
+            this->delbgn[k_loop] -= dif_par;
+
+            // Error for this parameter: m_parfac * this->erpar[k_loop]
+            // this->erpar[k_loop] was output `ediag` from lsqfit, which is abs(diag(F_lambda_inv_unscaled))
+            double current_param_error = m_parfac * this->erpar[k_loop];
+
+            // Store final error for this parameter for output (will be at erpar[i_par])
+            // this->erpar was used by lsqfit for its ediag output (m_nfit elements)
+            // We need to copy these to their correct full m_npar positions if saving.
+            // For parer, we use current_param_error.
+            // The member this->erpar will be fully populated in finalizeOutputData.
+            // For now, let's assume we can overwrite this->erpar[i_par] for fitted ones.
+            this->erpar[i_par] = current_param_error;
+
+            parer(this->par[i_par], current_param_error, dif_par, pare_str);
+            putbcd(card_iter_log, NDCARD, &this->idpar[ibcd_current]);
+            ch_par = (*tlbl_ptr);
+            *tlbl_ptr = '\0';
+            if (lufit)
+            {
+              fprintf(lufit, "%4d %s %10.10s %s\n", k_loop + 1, card_iter_log, current_label, pare_str);
+            }
+            *tlbl_ptr = ch_par;
+            ibase = i_par;
+            k_loop++;
+          }
+        }
+      }
+      // Derive errors for non-fitted (dependent) parameters
+      for (int i_par = 0, ibcd_current = 0; i_par < m_npar; ++i_par, ibcd_current += m_ndbcd)
+      {
+        if (this->idpar && NEGBCD(this->idpar[ibcd_current]) != 0)
+        { // Dependent
+          if (ibase >= 0 && ibase < m_npar && this->par && this->erpar)
+          { // Ensure ibase is valid
+            // par[i_par] for dependent param is a factor (how much of par[ibase])
+            // erpar[i_par] = factor * erpar[ibase]
+            // This was done in original after the loop.
+            // The actual value of par[i_par] should be factor * par[ibase]
+            // This logic needs to be careful about when par[i_par] (factor) is used vs par[i_par] (value)
+            // getpar stores factor if dependent. So this->par[i_par] is factor.
+            // The erpar[ibase] must be the final error of the master parameter.
+            this->erpar[i_par] = fabs(this->par[i_par]) * this->erpar[ibase];
+            // The value this->par[i_par] should be updated to actual value for next iter, if hamx needs it.
+            // Or, this update is only for final output.
+            // Original main did this after loop, for final output section.
+            // Let's assume hamx always gets the most up-to-date values.
+            // If hamx needs actual values for dependent params, they should be updated each iter.
+            // par[i] *= par[ibase] was in output section.
+            // For now, keep par[i_par] as factor, erpar[i_par] as derived error.
+          }
+        }
+      }
+
+      // 7. Store `fit` matrix into `var` for next iteration/output
+      //    `fit` contains `F_lambda_inv` (scaled by D_inv) and solution vector.
+      //    We need to save `Cov_inv_final = D_inv * F_lambda_inv^T * F_lambda_inv * D_inv` (or similar).
+      //    The `dkold` (our `oldfit`) from `lsqfit` saved `F_lambda_inv` (unscaled by D_inv).
+      //    Original: pfit=fit; pvar=var; for(n=1..nfit){ dcopy(n,pfit,ndfit,pvar,1); ++pfit; pvar+=n;}
+      //    This copies the lower triangle of `F_lambda_inv * D_inv` (from `fit`) into `var`.
+      //    This is `L_final_inv` if the process yields that.
+      //    So `var` gets updated L_inv (packed lower).
+      double *pvar_ptr_save = this->var;   // Standard packed lower
+      double *pfit_source_col = this->fit; // Full matrix, L_inv_final is in its lower triangle
+      for (int j_col = 0; j_col < m_nfit; ++j_col)
+      {
+        for (int i_row = j_col; i_row < m_nfit; ++i_row)
+        {                                            // Lower triangle elements including diagonal
+          *pvar_ptr_save++ = pfit_source_col[i_row]; // fit[i_row, j_col]
+        }
+        pfit_source_col += ndfit;
+      }
+      // If `var` needs to be standard packed UPPER for consistency with getvar:
+      // Need to form symmetric Cov_inv = L_inv^T L_inv, then pack upper of that.
+      // For now, assume `var` stores L_inv (packed lower) for next iteration's `fitbgn`.
+      // This means `fitbgn` in "Supplied Variance" path should also be built from L_inv (packed lower).
+
+      // 8. Calculate and print statistics (RMS errors, averages)
+      if (nf_fitted_lines > nfir)
+      {
+        current_scale_iter = 1.0 / (double)(nf_fitted_lines - nfir);
+        avgmw *= current_scale_iter;
+        if (xsqmw * current_scale_iter >= 0)
+          xsqmw = sqrt(xsqmw * current_scale_iter);
+        else
+          xsqmw = 0;
+      }
+      else
+      {
+        avgmw = 0;
+        xsqmw = 0;
+      }
+      if (nfir > 0)
+      {
+        current_scale_iter = 1.0 / (double)nfir;
+        avgir *= current_scale_iter;
+        if (xsqir * current_scale_iter >= 0)
+          xsqir = sqrt(xsqir * current_scale_iter);
+        else
+          xsqir = 0;
+      }
+      else
+      {
+        avgir = 0;
+        xsqir = 0;
+      }
+
+      printf(" MICROWAVE AVG = %15.6f MHz, IR AVG =%15.5f\n", avgmw, avgir);
+      if (lufit)
+        fprintf(lufit, " MICROWAVE AVG = %15.6f MHz, IR AVG =%15.5f\n", avgmw, avgir);
+      printf(" MICROWAVE RMS = %15.6f MHz, IR RMS =%15.5f\n", xsqmw, xsqir);
+      if (lufit)
+        fprintf(lufit, " MICROWAVE RMS = %15.6f MHz, IR RMS =%15.5f\n", xsqmw, xsqir);
+
+      m_itr++; // Increment iteration count
+      printf(" END OF ITERATION %2d OLD, NEW RMS ERROR=%15.5f %15.5f\n", m_itr, xsqt, m_xsqbest);
+      if (lufit)
+        fprintf(lufit, " END OF ITERATION %2d OLD, NEW RMS ERROR=%15.5f %15.5f\n", m_itr, xsqt, m_xsqbest);
+      fflush(stdout);
+      if (lufit)
+        fflush(lufit);
+    }
+  }  while (m_itr < nitr_actual && (marqflg_lsqfit != 0 || 0.999999 * xsqt > m_xsqbest));
+  // Original condition: itr < nitr && 0.999999 * xsqt > xsqbest
+  // Added marqflg check: continue if diverging to allow Marquardt param to increase.
+
+  // --- END OF ITERATION LOOP ---
+
+  // Populate output structure (some fields)
+  output.itr = m_itr;
+  output.xsqbest = m_xsqbest;
+  // Final parameters and errors will be fully populated in finalizeOutputData
+
+  return true;
+}
+
+
+
+bool CalFit::finalizeOutputData(const CalFitInput &input, CalFitOutput &output)
+{
+  if (!lufit && output.itr > 0)
+  { // lufit might be needed for prcorr
+    // This case should ideally not happen if lufit is managed correctly through run
+    puts("Warning: lufit stream is null in finalizeOutputData, prcorr might be skipped.");
+  }
+
+  // --- Populate CalFitOutput structure ---
+
+  // Results from fitting process
+  output.xsqbest = m_xsqbest;
+  output.itr = m_itr; // Actual iterations performed
+
+  // Copy final parameters and their errors
+  // Ensure these arrays were allocated and populated if m_npar > 0
+  if (m_npar > 0)
+  {
+    if (this->par)
+    {
+      output.par.assign(this->par, this->par + m_npar);
+    }
+    else
+    {
+      if (lufit)
+        fprintf(lufit, "ERROR: this->par is null in finalizeOutputData.\n");
+      return false;
+    }
+    // this->erpar should contain the final scaled errors for ALL m_npar parameters
+    // (fitted ones from lsqfit, dependent ones derived in performIteration)
+    if (this->erpar)
+    {
+      output.erpar.assign(this->erpar, this->erpar + m_npar);
+    }
+    else
+    {
+      if (lufit)
+        fprintf(lufit, "ERROR: this->erpar is null in finalizeOutputData.\n");
+      return false;
+    }
+  }
+  else
+  {
+    output.par.clear();
+    output.erpar.clear();
+  }
+
+  // Data needed by CalFitIO::writeOutput to reconstruct files
+  output.title_for_output = input.title; // Original title from input .par file
+  // output.optionLines_for_output = input.optionLines; // CalFitIO needs raw option lines from CalFitInput
+  // This will be passed directly to writeOutput from main.
 
   output.npar_final = m_npar;
-  output.limlin_final = m_nline; // Actual number of lines used/read
-  output.nitr_final = output.itr; // Iterations performed from iteration loop
-  // Original output: nxpar = npar - nxpar (where nxpar was threshold count from end)
-  // So input.nxpar_from_file is the count for output header.
-  output.nxpar_final_for_header = input.nxpar_from_file;
-  // output.marqlast_final will be the actual last Marquardt param from the loop
+  // For limlin in output header: original main.c used `limlin` which could be negative
+  // if catqn > MAXCAT. CalFitIO's input.limlin stores this original value.
+  output.limlin_final = input.limlin;
+  output.nitr_final_actual = m_itr;                // Actual iterations done
+  output.nxpar_for_header = input.nxpar_from_file; // The count for the header
+  output.marqlast_final = m_marqlast;              // Last Marquardt param before final lsqfit call, or from input if no iters
   output.xerrmx_final = m_xerrmx;
-  output.parfac_final_for_header = m_parfac0; // The original parfac
+  output.parfac_for_header = m_parfac0; // Original parfac from input file
   output.fqfacq_final = m_fqfacq;
   output.nfit_final = m_nfit;
 
-  if (m_npar > 0 && par)
-  {
-    output.par.assign(par, par + m_npar);
-  }
-  if (m_npar > 0 && erpar)
-  {
-    output.erpar.assign(erpar, erpar + m_npar);
-  } // These are the fitted errors
-  if (m_npar > 0 && erp)
-  {
-    output.erp_original_for_output.assign(erp, erp + m_npar);
-  } // Original a-priori errors
-
-  if (idpar)
+  if (m_npar > 0)
   {
     size_t idpar_actual_size = ((size_t)m_npar * m_ndbcd + m_ndbcd + 3);
-    output.idpar_final_for_output.assign(idpar, idpar + idpar_actual_size);
-  }
-  if (parlbl)
-  {
+    if (this->idpar)
+    {
+      output.idpar_final_for_output.assign(this->idpar, this->idpar + idpar_actual_size);
+    }
+    else
+    {
+      if (lufit)
+        fprintf(lufit, "ERROR: this->idpar is null.\n");
+      return false;
+    }
+
     size_t parlbl_actual_size = (LBLEN * (size_t)m_npar + 1);
-    output.parlbl_final_for_output_flat.assign(parlbl, parlbl + parlbl_actual_size);
-  }
+    if (this->parlbl)
+    {
+      output.parlbl_final_for_output_flat.assign(this->parlbl, this->parlbl + parlbl_actual_size);
+    }
+    else
+    {
+      if (lufit)
+        fprintf(lufit, "ERROR: this->parlbl is null.\n");
+      return false;
+    }
 
-  if (m_nfit > 0 && var)
-  { // var is packed upper triangular
-    size_t nlsq_var_count = ((size_t)m_nfit * ((size_t)m_nfit + 1)) / 2;
-    output.var_final_for_output.assign(var, var + nlsq_var_count);
+    if (this->erp)
+    { // Original a-priori errors
+      output.erp_original_for_output.assign(this->erp, this->erp + m_npar);
+    }
+    else
+    {
+      if (lufit)
+        fprintf(lufit, "ERROR: this->erp is null.\n");
+      return false;
+    }
   }
-  if (m_nfit > 0 && dpar)
-  { // dpar contains scaled errors/shifts for fitted parameters
-    // dpar in lsqfit output has m_nfit elements.
-    // It's used by putvar.
-    output.dpar_final_for_putvar.assign(dpar, dpar + m_nfit);
-  }
-
-  // Call prcorr if lufit is valid and fitting was done
-  if (output.itr > 0 && m_nfit > 0 && fit && dpar && lufit)
+  else
   {
-    // prcorr(lufit, nfit, fit, ndfit, dpar);
-    // This needs to be called after the final fit matrix is available.
-    // For now, it's a stub.
-    fprintf(lufit, "Correlation matrix would be printed here.\n");
+    output.idpar_final_for_output.clear();
+    output.parlbl_final_for_output_flat.clear();
+    output.erp_original_for_output.clear();
+  }
+
+  if (m_nfit > 0)
+  {
+    size_t standard_packed_elements = ((size_t)m_nfit * ((size_t)m_nfit + 1)) / 2;
+    if (this->var)
+    { // Final variance/covariance related matrix (packed)
+      output.var_final_for_output.assign(this->var, this->var + standard_packed_elements);
+    }
+    else
+    {
+      if (lufit && m_nfit > 0)
+        fprintf(lufit, "ERROR: this->var is null but nfit > 0.\n");
+      if (m_nfit > 0)
+        return false;
+    }
+
+    // `dpar` from lsqfit's `enorm` output contained 1/norm(L_col_k) or similar scaling factors.
+    // `putvar` needs the `erpar` argument which was `dpar` in original main's call to `putvar`.
+    // That `dpar` for `putvar` was `erpar[i] = parfac * dnrm2(n, pfitd, 1);` from the parameter update loop,
+    // effectively the final scaled errors of the *fitted* parameters.
+    // `lsqfit`'s `ediag` output (our `this->erpar` member, `m_nfit` elements) contains `abs(diag(F_lambda_inv_unscaled))`.
+    // So, `dpar_for_putvar` should be `m_parfac * this->erpar (fitted part)`.
+    output.dpar_final_for_putvar.resize(m_nfit);
+    for (int i = 0; i < m_nfit; ++i)
+    {
+      // this->erpar (from lsqfit ediag) contains the errors for fitted parameters
+      // This should be the m_nfit block of errors.
+      output.dpar_final_for_putvar[i] = m_parfac * this->erpar[i]; // Assuming this->erpar[0..m_nfit-1] holds these
+    }
+  }
+  else
+  {
+    output.var_final_for_output.clear();
+    output.dpar_final_for_putvar.clear();
+  }
+
+  // Original main.c calls this sequence at the end:
+  // rewind(lubak); fgetstr(card, NDCARD, lubak); chtime(card, 82);
+  // fputs(card, stdout); puts("FIT COMPLETE");
+  // dcopy(npar, oldpar, 1, par, 1); // Restore par to oldpar if fit diverged or for final state?
+  // This was done if marqflg!=0 inside loop.
+  // If done here, it means parameters from *before the last iteration* are restored.
+  // The current `this->par` holds the latest updated parameters.
+  // Original main.c: after loop, if itr==0, exit.
+  // Then, prcorr, then fclose(lufit).
+  // Then save results: open .par, .var. Put title. Put 2nd line. Put options. Put params.
+  // The params written are `this->par` (latest) and `this->erpar` (latest errors).
+  // The dcopy(oldpar to par) seems to be only for divergence recovery.
+
+  // Compute and print/store correlation matrix
+  if (output.itr > 0 && m_nfit > 0 && this->fit && this->dpar && lufit)
+  {
+    // `prcorr` needs the final solution/covariance information.
+    // `dpar` argument to `prcorr` in original main was `dpar` from `lsqfit` (enorm output - scaling factors).
+    // `fit` matrix was the `F_lambda_inv * D_inv` (from lsqfit dk output).
+    fprintf(lufit, "\nCorrelation Matrix:\n"); // Placeholder for actual prcorr call
+    prcorr(lufit, m_nfit, this->fit, ndfit, this->dpar);
+  }
+
+  // Final cleanup before CalFitIO::writeOutput takes over
+  // lbufof(-1,0) was called in original main at this stage.
+  lbufof(-1, 0); // Release line buffer storage
+
+  // calc->setblk(lufit, 0, ...) was called for cleanup.
+  int dummy_nblkpf = 0, dummy_maxdm = 0; // For cleanup call
+  if (calc)
+  { // Check if calc is valid
+    calc->setblk(lufit, 0, this->idpar, this->par, &dummy_nblkpf, &dummy_maxdm);
+  }
+
+  if (output.itr == 0 && m_nfit > 0)
+  { // No iterations performed but tried to fit
+    if (lufit)
+      fprintf(lufit, "Output files not updated as no iterations were performed.\n");
+    // Depending on requirements, might still write initial state or return !success from run()
   }
 
   return true;
 }
+
 
 // original static functions now integrated into class
 
@@ -1186,7 +1992,7 @@ int CalFit::linein(FILE *luin, int *nline, int iqnfmt)
     xline = lbufof(1, i);
     iqnum = xline->qn;
     if (getlin(luin, nqn, nqnt, iqnum, &xfrqn, &xerrn, &xwtn,
-               card, NDCARD) < 0)
+                card, NDCARD) < 0)
     {
       *nline = i - 1;
       return mxqn;
@@ -1353,7 +2159,7 @@ int CalFit::lineix(FILE *lu, int flg, int nline, int nblkpf, int iqnfmt)
       xwtn = 0.;
       qnfmt2(nqn2, iqnum, aqnum);
       printf("Bad Line(%3d): %s %14.5f %8.5f\n",
-             nread, aqnum, xfrqn, xerrn);
+              nread, aqnum, xfrqn, xerrn);
       fprintf(lu, "Bad Line(%3d): %s %14.5f %8.5f\n",
               nread, aqnum, xfrqn, xerrn);
     }

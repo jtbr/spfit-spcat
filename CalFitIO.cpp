@@ -15,57 +15,70 @@
 
 /**
  * @brief Static method to read input data from files
- * @param parFile Path to parameter file
+ * @param parFile Path to parameter input file (as backed up)
  * @param linFile Path to line file
  * @param input Output parameter for input data
- * @param lufit_for_getpar File stream for getpar to write its log.
+ * @param calc_engine calculation engine
+ * @param lufit_for_getpar .par output File stream for getpar to write its log.
  * @return True if reading is successful, false otherwise
  */
 bool CalFitIO::readInput(const std::string &parFile, const std::string &linFile,
-                         CalFitInput &input, FILE *lufit_for_getpar)
+                         CalFitInput &input,
+                         std::unique_ptr<CalculationEngine> &calc_engine_for_setup,
+                         FILE *lufit_for_logging)
 {
-  if (!lufit_for_getpar)
+  if (!calc_engine_for_setup)
   {
-    puts("Error: lufit_for_getpar stream is NULL in CalFitIO::readInput.");
+    puts("Error: calc_engine_for_setup is NULL in CalFitIO::readInput.");
+    if (lufit_for_logging)
+      fprintf(lufit_for_logging, "ERROR: calc_engine_for_setup is NULL.\n");
     return false;
   }
 
-  FILE *lubak = fopen(parFile.c_str(), "r");
-  if (!lubak)
+  if (!lufit_for_logging)
   {
-    printf("Error: Unable to open parameter file '%s'.\n", parFile.c_str());
+    puts("Error: lufit_for_logging stream is NULL."); // Cannot log this error to lufit itself
     return false;
   }
-  printf("Successfully opened parameter file '%s' for reading.\n", parFile.c_str());
+
+  // Open the par backup stream for reading
+  FILE *lubak_stream_for_par_content = fopen(parFile.c_str(), "r");
+  if (!lubak_stream_for_par_content)
+  {
+    printf("Error: Unable to open fit backup file '%s'.\n", parFile.c_str());
+    if (lufit_for_logging)
+      fprintf(lufit_for_logging, "ERROR: lubak_stream_for_par_content is NULL.\n");
+    return false;
+  }
 
   char card[NDCARD];
 
   // Read title of .par file
-  if (fgetstr(card, NDCARD, lubak) <= 0)
+  if (fgetstr(card, NDCARD, lubak_stream_for_par_content) <= 0)
   {
+    fprintf(lufit_for_logging, "Unable to read title of .par file\n");
     puts("Unable to read title of .par file");
-    fclose(lubak);
+    fclose(lubak_stream_for_par_content);
     return false;
   }
   chtime(card, 82);
   input.title = std::string(card);
-  fputs(input.title.c_str(), lufit_for_getpar); // Write title to lufit
+  fputs(input.title.c_str(), lufit_for_logging); // Log to lufit
 
-  // Read run parameters
-  double dvec[8] = {100.0, 32767.0, 1.0, 0.0, 0.0, 1e6, 1.0, 1.0}; // Defaults from original
-  int n_read_dvec = fgetstr(card, NDCARD, lubak);
+  // Read run parameters (2nd line)
+  double dvec[8] = {100.0, 32767.0, 1.0, 0.0, 0.0, 1e6, 1.0, 1.0};
+  int n_read_dvec = fgetstr(card, NDCARD, lubak_stream_for_par_content);
   if (n_read_dvec != 0)
     n_read_dvec = pcard(card, dvec, 8, NULL);
   if (n_read_dvec == 0)
   {
+    fprintf(lufit_for_logging, "Unable to read second line of .par file\n");
     puts("Unable to read second line of .par file");
-    fclose(lubak);
+    fclose(lubak_stream_for_par_content);
     return false;
   }
-
   input.npar = (int)dvec[0];
-  input.limlin = (int)dvec[1]; // Store original value, sign matters for catqn check later
-  // The actual number of lines might change after linein, limlin is the request/limit
+  input.limlin = (int)dvec[1];
   input.nitr = (int)dvec[2];
   input.nxpar_from_file = (int)dvec[3];
   input.marqp0 = dvec[4];
@@ -73,137 +86,113 @@ bool CalFitIO::readInput(const std::string &parFile, const std::string &linFile,
   input.parfac_initial = dvec[6];
   input.fqfacq = dvec[7];
 
-  // Defaults for options
-  input.nfmt_from_options = MAXCAT; // MAXCAT from calpgm.h
-  input.ndbcd_from_options = 1;     // Default BCD length if not specified
-  input.itd_from_options = 0;       // Default ITD
-  input.noptn_count = 0;
-  input.namfil_from_options.clear();
-  input.optionLines.clear();
-
-  // Read option cards
-  // This part is tricky as calc->setopt in original might have complex logic
-  // We replicate the simplified parsing for now and store raw lines
-  // In CalFit, calc->setopt would be called with these raw lines or a temp file
-  // For now, CalFitIO just parses some known ones.
-  std::string temp_namfil_str; // Temporary for namfil from options
-
-  // The original setopt call happens in main *before* getpar
-  // It's possible setopt influences ndbcd, which is needed for getpar
-  // For now, we parse options here to get ndbcd.
-  // A more robust solution would be to pass lubak to CalFit for setopt,
-  // then CalFit passes back ndbcd, or CalFit does getpar internally.
-  // Sticking to current plan: CalFitIO reads options, CalFit uses parsed values.
-
-  long current_pos = ftell(lubak); // Save position before reading options
-
-  while (fgetstr(card, NDCARD, lubak) > 0)
+  // Store file position before setopt reads options
+  long pos_before_options = ftell(lubak_stream_for_par_content);
+  if (pos_before_options == -1L)
   {
-    std::string trimmedCard = card;
-    trimmedCard.erase(0, trimmedCard.find_first_not_of(" \t\n\r"));
-    trimmedCard.erase(trimmedCard.find_last_not_of(" \t\n\r") + 1);
-
-    if (trimmedCard.empty() || trimmedCard[0] == '!')
-    {                             // Skip empty lines and comments
-      current_pos = ftell(lubak); // Update position
-      continue;
-    }
-
-    // Check if it's an option line (e.g., starts with '#' or specific keywords if not '#')
-    // The original `setopt` in CalculationEngine would know how to identify option lines.
-    // Assuming option lines are marked or `getpar` knows when parameters start.
-    // For simplicity, let's assume `getpar` robustly finds the start of parameters.
-    // The original `setopt` reads until it finds a non-option line.
-    // We need to replicate that behavior. Let's assume options start with '#' for this example.
-    // If your options are not prefixed, this logic needs to be more like original setopt.
-
-    bool is_option = false; // This needs to be determined by how setopt works
-    // Simplified check:
-    if (card[0] == '#')
-      is_option = true; // Example: options start with #
-    // Or if using SpinvEngine/DpiEngine's setopt logic:
-    // You might need a way to "peek" if the line is an option without consuming it
-    // from lubak if the line is to be passed to getpar.
-
-    // This is a placeholder for more robust option detection.
-    // For now, we assume CalFitIO can parse these specific options if present
-    // AND that these option lines won't be mistaken for parameter lines by getpar.
-    // It's better if `setopt` itself is used.
-    // For Step 2, we will integrate `calc->setopt`.
-    // For now, let's parse known options if they appear.
-
-    if (strncmp(card, "#FMT", 4) == 0)
-    { // Example simplified parsing
-      sscanf(card + 4, "%d", &input.nfmt_from_options);
-      is_option = true;
-    }
-    else if (strncmp(card, "#ITD", 4) == 0)
-    {
-      sscanf(card + 4, "%d", &input.itd_from_options);
-      is_option = true;
-    }
-    else if (strncmp(card, "#BCD", 4) == 0)
-    {
-      sscanf(card + 4, "%d", &input.ndbcd_from_options);
-      is_option = true;
-    }
-    else if (strncmp(card, "#NAM", 4) == 0)
-    {
-      char temp_nam_buf[NDCARD] = {0};
-      strncpy(temp_nam_buf, card + 5, NDCARD - 6); // Skip "#NAM "
-      temp_nam_buf[NDCARD - 6] = '\0';             // Ensure null termination
-      input.namfil_from_options = std::string(temp_nam_buf);
-      // Remove trailing newline if present from fgetstr
-      input.namfil_from_options.erase(input.namfil_from_options.find_last_not_of(" \n\r\t") + 1);
-      is_option = true;
-    }
-    // Add more specific option parsers as needed from setopt logic
-
-    if (is_option)
-    {
-      input.optionLines.push_back(std::string(card));
-      input.noptn_count++;
-      fputs(card, lufit_for_getpar); // Write option line to lufit
-      if (card[strlen(card) - 1] != '\n')
-        fputc('\n', lufit_for_getpar);
-      current_pos = ftell(lubak); // Update position after consuming an option line
-    }
-    else
-    {
-      // Not a recognized option line by this simplified parser, assume parameters start
-      fseek(lubak, current_pos, SEEK_SET); // Rewind to before this line for getpar
-      break;
-    }
-  }
-  // End of simplified option reading
-
-  // Allocate temporary C-style arrays for getpar
-  // Size for idpar depends on npar and ndbcd_from_options
-  size_t idpar_elem_count = (size_t)input.npar * input.ndbcd_from_options + input.ndbcd_from_options + 3;
-  unsigned char *temp_idpar = (unsigned char *)mallocq(idpar_elem_count * sizeof(unsigned char));
-  if (!temp_idpar)
-  {
-    puts("mallocq failed for temp_idpar");
-    fclose(lubak);
+    // Handle error: cannot reliably read options and then parameters
+    perror("ftell before options failed");
+    fclose(lubak_stream_for_par_content);
     return false;
   }
-  temp_idpar[0] = (unsigned char)input.ndbcd_from_options; // Critical for getpar
+
+  // Call CalculationEngine::setopt
+  // setopt will read option lines from lubak_stream_for_par_content
+  // and advance the file pointer past them.
+  char temp_namfil_buffer[NDCARD] = {0};
+  // Initialize parameters for setopt with defaults that SpinvEngine::setopt expects or can modify
+  int temp_nfmt_cat = MAXCAT; // Default for setopt's nfmt output (catalog format count)
+  int temp_itd = 2;           // Default for molecule type
+  int temp_ndbcd = 1;         // Default BCD length
+
+  input.noptn_read_by_setopt = calc_engine_for_setup->setopt(
+      lubak_stream_for_par_content,  // setopt consumes lines from this stream
+      &temp_nfmt_cat,
+      &temp_itd,
+      &temp_ndbcd,
+      temp_namfil_buffer);
+
+  if (input.noptn_read_by_setopt < 0)
+  { // EOF or error during option reading
+    fprintf(lufit_for_logging, "Warning/Error: calc_engine->setopt returned %d. Check .par file options section.\n", input.noptn_read_by_setopt);
+    // This might be acceptable if no options. If options were expected, it's an issue.
+  }
+  input.nfmt_cat_from_setopt = temp_nfmt_cat;
+  input.itd_from_setopt = temp_itd;
+  input.ndbcd_from_setopt = temp_ndbcd;
+  input.namfil_from_setopt = std::string(temp_namfil_buffer);
+  // Note: CalFitIO does not explicitly log the option cards here, assuming setopt or getpar might.
+  // If not, and we need option cards in lufit, we'd have to read them, store, pass to setopt (e.g. via temp file), then log.
+  // For now, assume setopt handles its own logging or the information is implicit.
+
+  // Rewind to read and store the option lines that setopt processed
+  if (fseek(lubak_stream_for_par_content, pos_before_options, SEEK_SET) != 0)
+  {
+    perror("fseek to re-read options failed");
+    // Handle error: cannot get option lines, but setopt might have worked.
+    // Output files might miss option lines.
+    // For now, proceed but log warning.
+    if (lufit_for_logging)
+      fprintf(lufit_for_logging, "Warning: Could not rewind to save option lines.\n");
+    // To ensure lubak_stream is correctly positioned for getpar, could try to advance it by what setopt read,
+    // though this is less reliable than setopt just leaving it at the right place.
+    // For now, if fseek fails, subsequent getpar might read wrong data. Best to return false.
+    fclose(lubak_stream_for_par_content);
+    return false;
+  }
+
+  input.raw_option_lines_from_par.clear();
+  if (input.noptn_read_by_setopt > 0)
+  {
+    char option_card_buffer[NDCARD];
+    for (int i = 0; i < input.noptn_read_by_setopt; ++i)
+    {
+      if (fgetstr(option_card_buffer, NDCARD, lubak_stream_for_par_content) > 0)
+      {
+        input.raw_option_lines_from_par.push_back(std::string(option_card_buffer));
+      }
+      else
+      {
+        if (lufit_for_logging)
+          fprintf(lufit_for_logging, "Warning: Premature EOF while re-reading option line %d.\n", i + 1);
+        // This implies setopt read more lines than are now available, or fgetstr error.
+        break;
+      }
+    }
+  }
+  else if (input.noptn_read_by_setopt < 0)
+  {
+    // setopt indicated an error or EOF during its own reading.
+    if (lufit_for_logging)
+      fprintf(lufit_for_logging, "Note: setopt returned %d, no option lines stored.\n", input.noptn_read_by_setopt);
+  }
+  // lubak_stream_for_par_content is now positioned AFTER option lines, ready for getpar.
+
+  // Call getpar
+  // `lubak_stream_for_par_content` is now positioned at the start of parameters.
+  // `input.ndbcd_from_setopt` is the authoritative value.
+  size_t idpar_elem_count = (size_t)input.npar * input.ndbcd_from_setopt + input.ndbcd_from_setopt + 3;
+  unsigned char *temp_idpar = (unsigned char *)mallocq(idpar_elem_count * sizeof(unsigned char));
+  if (!temp_idpar)
+  { /* error */
+    fclose(lubak_stream_for_par_content);
+    return false;
+  }
+  temp_idpar[0] = (unsigned char)input.ndbcd_from_setopt; // Set NDEC for getpar
 
   double *temp_par = (double *)mallocq((size_t)input.npar * sizeof(double));
   if (!temp_par)
   {
-    puts("mallocq failed for temp_par");
     free(temp_idpar);
-    fclose(lubak);
+    fclose(lubak_stream_for_par_content);
     return false;
   }
   double *temp_erp = (double *)mallocq((size_t)input.npar * sizeof(double));
   if (!temp_erp)
   {
-    puts("mallocq failed for temp_erp");
     free(temp_idpar);
     free(temp_par);
-    fclose(lubak);
+    fclose(lubak_stream_for_par_content);
     return false;
   }
 
@@ -211,26 +200,26 @@ bool CalFitIO::readInput(const std::string &parFile, const std::string &linFile,
   char *temp_parlbl = (char *)mallocq(parlbl_size);
   if (!temp_parlbl)
   {
-    puts("mallocq failed for temp_parlbl");
     free(temp_idpar);
     free(temp_par);
     free(temp_erp);
-    fclose(lubak);
+    fclose(lubak_stream_for_par_content);
     return false;
   }
 
-  int original_npar_for_getpar = input.npar; // getpar can modify npar
-  input.inpcor = getpar(lubak, lufit_for_getpar, &input.nfit, &original_npar_for_getpar,
+  int original_npar_for_getpar = input.npar;
+  input.inpcor = getpar(lubak_stream_for_par_content, lufit_for_logging,
+                        &input.nfit, &original_npar_for_getpar,
                         temp_idpar, temp_par, temp_erp, temp_parlbl, LBLEN);
-  input.npar = original_npar_for_getpar; // Update npar with value possibly changed by getpar
+  input.npar = original_npar_for_getpar; // Update npar
 
-  // Copy data to CalFitInput's vectors
-  // Adjust idpar_elem_count if npar changed in getpar, though it shouldn't affect the BCD definition part
-  idpar_elem_count = (size_t)input.npar * input.ndbcd_from_options + input.ndbcd_from_options + 3;
+  // Recalculate sizes if npar changed
+  idpar_elem_count = (size_t)input.npar * input.ndbcd_from_setopt + input.ndbcd_from_setopt + 3;
+  parlbl_size = (LBLEN * (size_t)input.npar + 1);
+
   input.idpar_data.assign(temp_idpar, temp_idpar + idpar_elem_count);
   input.par_initial.assign(temp_par, temp_par + input.npar);
   input.erp_initial.assign(temp_erp, temp_erp + input.npar);
-  parlbl_size = (LBLEN * (size_t)input.npar + 1); // Recalculate if npar changed
   input.parlbl_data_flat.assign(temp_parlbl, temp_parlbl + parlbl_size);
 
   free(temp_idpar);
@@ -238,101 +227,240 @@ bool CalFitIO::readInput(const std::string &parFile, const std::string &linFile,
   free(temp_erp);
   free(temp_parlbl);
 
-  // Handle getvar
+  // Call getvar
   if (input.nfit > 0)
   {
     size_t nlsq_var_count = ((size_t)input.nfit * ((size_t)input.nfit + 1)) / 2;
     double *temp_var = (double *)mallocq(nlsq_var_count * sizeof(double));
     if (!temp_var)
     {
-      puts("mallocq failed for temp_var");
-      fclose(lubak);
+      fclose(lubak_stream_for_par_content);
       return false;
     }
-    memset(temp_var, 0, nlsq_var_count * sizeof(double)); // Important for default case in getvar
+    memset(temp_var, 0, nlsq_var_count * sizeof(double));
 
-    // idpar and erpar need to be passed as non-const pointers if getvar might modify them (unlikely for these)
-    // However, .data() from const vector is const*. Use copies if modification is possible.
-    // Assuming getvar doesn't modify idpar content pointed to, nor erpar content.
-    // If it does, we need mutable copies.
-    // For now, assume read-only access to idpar_data and erp_initial by getvar.
-    input.inpcor = getvar(lubak, input.nfit, temp_var,
-                          input.idpar_data.data(),  // Pass pointer to underlying data
-                          input.erp_initial.data(), // Pass pointer to underlying data
+    input.inpcor = getvar(lubak_stream_for_par_content, input.nfit, temp_var,
+                          input.idpar_data.data(), input.erp_initial.data(),
                           input.inpcor);
-
     input.var_initial_from_getvar.assign(temp_var, temp_var + nlsq_var_count);
     free(temp_var);
   }
   else
   {
-    input.var_initial_from_getvar.clear(); // No fit parameters, no variance matrix
+    input.var_initial_from_getvar.clear();
   }
 
-  // Read lines from the line file into input.lineData_raw
-  FILE *lulin = fopen(linFile.c_str(), "r");
-  if (!lulin)
-  {
-    printf("Error: Unable to open line file '%s'.\n", linFile.c_str());
-    fclose(lubak);
+  // Read .lin file
+  FILE *lulin_stream = fopen(linFile.c_str(), "r");
+  if (!lulin_stream)
+  { /* error, log to lufit_for_logging */
     return false;
   }
-  printf("Successfully opened line file '%s' for reading.\n", linFile.c_str());
   input.lineData_raw.clear();
-  char lineBuffer[NDCARD]; // Assuming NDCARD is sufficient for line file lines too
-  while (fgetstr(lineBuffer, NDCARD, lulin) > 0)
+  char lineBuffer[NDCARD];
+  while (fgetstr(lineBuffer, NDCARD, lulin_stream) > 0)
   {
     input.lineData_raw.push_back(std::string(lineBuffer));
   }
-  printf("Read %zu lines from line file '%s' into memory.\n", input.lineData_raw.size(), linFile.c_str());
-
-  fclose(lulin);
-  fclose(lubak);
+  fclose(lulin_stream);
+  fclose(lubak_stream_for_par_content);
 
   return true;
-}
+} // readInput
 
-// CalFitIO::writeOutput implementation will be complex and deferred after CalFit.run works
+
 bool CalFitIO::writeOutput(const std::string &par_filepath_final,
-                           const std::string &bak_filepath_original,
+                           const std::string &bak_filepath_original, // Unused by this function itself
                            const std::string &var_filepath_final,
                            const CalFitOutput &output,
                            const CalFitInput &original_input)
 {
-  // This is a placeholder for Step 4 or later.
-  // It will need to reconstruct the .par, .var files accurately.
-  // For now, just create empty files or minimal output to show flow.
-  FILE *lupar_final = fopen(par_filepath_final.c_str(), "w");
-  if (lupar_final)
-  {
-    fprintf(lupar_final, "Title: %s", output.title_for_output.c_str());
-    // ... more comprehensive writing ...
-    fclose(lupar_final);
-  }
-  else
+  // Silence unused parameter warning if bak_filepath_original is truly unused here
+  (void)bak_filepath_original; // TODO REMOVE
+
+  FILE *lupar = fopen(par_filepath_final.c_str(), "w");
+  if (!lupar)
   {
     printf("Error: Unable to open final parameter file '%s' for writing.\n", par_filepath_final.c_str());
     return false;
   }
+  printf("Opened final parameter file '%s' for writing.\n", par_filepath_final.c_str());
 
-  FILE *luvar_final = fopen(var_filepath_final.c_str(), "w");
-  if (luvar_final)
-  {
-    fprintf(luvar_final, "Title: %s", output.title_for_output.c_str());
-    // ... more comprehensive writing, including putvar ...
-    fclose(luvar_final);
-  }
-  else
+  FILE *luvar = fopen(var_filepath_final.c_str(), "w");
+  if (!luvar)
   {
     printf("Error: Unable to open final variance file '%s' for writing.\n", var_filepath_final.c_str());
+    fclose(lupar);
     return false;
   }
+  printf("Opened final variance file '%s' for writing.\n", var_filepath_final.c_str());
 
-  // The bak_filepath_original is the original .par file, usually just kept as is or handled by filbak.
-  // filbak in main.cpp handles the backup creation. This function might not need bak_filepath_original.
+  // 1. Write Title (already time-stamped if done by chtime earlier)
+  // Assuming output.title_for_output is the final, possibly time-stamped title.
+  // If not, chtime it here. Let's assume it's ready.
+  // Original main.c did: rewind(lubak); fgetstr(card, NDCARD, lubak); chtime(card, 82);
+  // This implies re-reading the original title from the .bak file for the final output.
+  // Let's use output.title_for_output which should be derived from input.title.
+  char title_card_buffer[NDCARD];
+  strncpy(title_card_buffer, output.title_for_output.c_str(), NDCARD - 1);
+  title_card_buffer[NDCARD - 1] = '\0';
+  // chtime(title_card_buffer, 82); // Apply chtime again to ensure latest timestamp if needed
+  // Or assume output.title_for_output is already final.
+  // For safety, let's re-apply chtime from a base title.
+  strncpy(title_card_buffer, original_input.title.c_str(), NDCARD - 1); // Use original non-timestamped title
+  title_card_buffer[NDCARD - 1] = '\0';
+  chtime(title_card_buffer, 82); // Timestamp it now
 
-  printf("CalFitIO::writeOutput - Placeholder for writing to %s and %s\n",
-         par_filepath_final.c_str(), var_filepath_final.c_str());
+  fputs(title_card_buffer, lupar);
+  fputs(title_card_buffer, luvar);
+  // No newline by default from fputs if string doesn't have it. Add if chtime doesn't.
+  // chtime usually adds newline.
 
+  // 2. Write Second Header Line
+  // Original: fprintf(lupar,"%4d %4d %4d %4d %14.4E %14.4E %14.4E %12.10f\n",
+  //           npar, limlin, nitr, nxpar, marqlast, xerrmx, parfac0, fqfacq);
+  // output.limlin_final should be the original limlin value (potentially negative)
+  fprintf(lupar, "%4d %4d %4d %4d %14.4E %14.4E %14.4E %12.10f\n",
+          output.npar_final, output.limlin_final, output.nitr_final_actual,
+          output.nxpar_for_header, output.marqlast_final, output.xerrmx_final,
+          output.parfac_for_header, output.fqfacq_final);
+  fprintf(luvar, "%4d %4d %4d %4d %14.4E %14.4E %14.4E %12.10f\n",
+          output.npar_final, output.limlin_final, output.nitr_final_actual,
+          output.nxpar_for_header, output.marqlast_final, output.xerrmx_final,
+          output.parfac_for_header, output.fqfacq_final);
+
+  // 3. Write Option Lines (from original_input as they were read from .par)
+  // Original: for (icnt=0; icnt<noptn; ++icnt) { fgetstr(card,lubak); card[k]='\n'; card[k+1]='\0'; fputs(card,lupar);}
+  if (!original_input.raw_option_lines_from_par.empty())
+  {
+    printf("Writing %zu stored option lines to output files.\n", original_input.raw_option_lines_from_par.size());
+    for (const auto &opt_line_str : original_input.raw_option_lines_from_par)
+    {
+      fputs(opt_line_str.c_str(), lupar);
+      // fgetstr usually includes newline if line wasn't too long.
+      // If opt_line_str does not end with \n, add one.
+      if (!opt_line_str.empty() && opt_line_str.back() != '\n')
+      {
+        fputc('\n', lupar);
+      }
+      fputs(opt_line_str.c_str(), luvar);
+      if (!opt_line_str.empty() && opt_line_str.back() != '\n')
+      {
+        fputc('\n', luvar);
+      }
+    }
+  }
+  else if (original_input.noptn_read_by_setopt > 0)
+  {
+    // This case means setopt said it read options, but we failed to store them.
+    printf("Warning: Option lines were processed by setopt (%d) but not stored for output.\n", original_input.noptn_read_by_setopt);
+    if (lupar != stdout)
+      fprintf(lupar, "! Warning: Option lines not available for writing.\n");
+    if (luvar != stdout)
+      fprintf(luvar, "! Warning: Option lines not available for writing.\n");
+  }
+
+  // 4. Write Parameter Lines
+  // Original loop: for (i=0, ibcd=0; i<npar; ++i, ibcd+=ndbcd) { ... }
+  // We need idpar, par (fitted), erp (original error for .par), erpar (fitted error for .var), parlbl
+  char param_id_str[64];                 // Buffer for putbcd output
+  char param_label_card_part[LBLEN + 2]; // For "/label" or empty
+
+  const unsigned char *current_idpar_ptr = output.idpar_final_for_output.data();
+  const char *current_parlbl_ptr = output.parlbl_final_for_output_flat.data();
+  int ndbcd_val = original_input.ndbcd_from_setopt; // Get this from input as CalFitOutput might not store it.
+                                                    // Or add it to CalFitOutput. For now, from original_input.
+
+  int ibase_for_dependent_error = 0; // Keeps track of the index of the last independent parameter
+
+  for (int i = 0; i < output.npar_final; ++i)
+  {
+    // Skip parameter lines in original .bak file (not needed here as we construct anew)
+
+    // Prepare label part: "/label" or empty string if label is empty
+    if (current_parlbl_ptr[0] == '\0')
+    {
+      param_label_card_part[0] = '\0';
+    }
+    else
+    {
+      param_label_card_part[0] = '/';
+      // strncpy is safer if LBLEN is exact and no null terminator in source
+      strncpy(param_label_card_part + 1, current_parlbl_ptr, LBLEN);
+      param_label_card_part[LBLEN + 1] = '\0'; // Ensure null termination
+    }
+
+    putbcd(param_id_str, 64, current_idpar_ptr); // Format parameter ID
+
+    double current_par_val = output.par[i];
+    double current_erp_orig_val = output.erp_original_for_output[i];
+    double current_erpar_fitted_val = output.erpar[i];
+
+    // Handle dependent parameters for .var file error (as in original main's output loop)
+    // and potentially for .par file value if it was stored as a factor.
+    if (NEGBCD(current_idpar_ptr[0]) != 0)
+    { // If parameter is dependent (fixed or tied)
+      // Value of dependent parameter: par[i] (factor) * par[ibase] (master value)
+      // Error for dependent parameter: erpar[i] = fabs(par[i-factor]) * erpar[ibase-fitted-error]
+      // This logic was in main.c's output loop:
+      // scale = fabs(par[i]); erpar[i] = scale * erpar[ibase]; par[i] *= par[ibase];
+      // This means output.par[i] for dependent parameters should ideally be the final *value*, not factor.
+      // Let's assume output.par[i] from CalFit::finalizeOutputData IS the final value.
+      // And output.erpar[i] for dependent IS the derived error.
+    }
+    else
+    {                                // Independent parameter
+      ibase_for_dependent_error = i; // Update index of last independent parameter
+    }
+
+    // Write to .par file: ID, Value, OriginalError, /Label
+    fprintf(lupar, "%s %23.15E %14.8E %s\n",
+            param_id_str,
+            current_par_val,
+            current_erp_orig_val, // Original a-priori error
+            param_label_card_part);
+
+    // Write to .var file: ID, Value, FittedError, /Label
+    fprintf(luvar, "%s %23.15E %14.8E %s\n",
+            param_id_str,
+            current_par_val,
+            current_erpar_fitted_val, // Final fitted error
+            param_label_card_part);
+
+    current_idpar_ptr += ndbcd_val;
+    current_parlbl_ptr += LBLEN;
+  }
+
+  // 5. Write Variance/Correlation Data
+  // Original: putvar(luvar, nfit, var, dpar);
+  // `var` is the packed matrix (e.g. L_inv_final_packed_lower or Cov_inv_packed_upper)
+  // `dpar` is the array of scaled errors for the *fitted* parameters.
+  if (output.nfit_final > 0)
+  {
+    if (!output.var_final_for_output.empty() && !output.dpar_final_for_putvar.empty())
+    {
+      // putvar expects non-const pointers for var and erpar (dpar here)
+      // Create mutable copies if necessary, or cast const away if putvar guarantees no modification.
+      // Assuming putvar doesn't modify them (though its erpar is usually output for scaling).
+      // The `putvar` from ulib.c *does* modify `var` by scaling it with `erpar`.
+      // So, we need mutable copies.
+      std::vector<double> var_copy = output.var_final_for_output;
+      std::vector<double> dpar_copy = output.dpar_final_for_putvar;
+      putvar(luvar, output.nfit_final, var_copy.data(), dpar_copy.data());
+    }
+    else if (lupar != stdout && luvar != stdout)
+    { // Avoid print if just stdout
+      printf("Warning: var_final_for_output or dpar_for_putvar is empty, skipping putvar.\n");
+    }
+  }
+
+  // Original main copies remaining lines from .bak to .par if any (e.g. correlation lines already there)
+  // This is not done here, as we are creating new .par and .var from scratch based on fit results.
+  // If original .par had extra info after params/var that needs preserving, that's a different requirement.
+
+  fclose(lupar);
+  fclose(luvar);
+
+  printf("Output files %s and %s written successfully.\n", par_filepath_final.c_str(), var_filepath_final.c_str());
   return true;
 }
