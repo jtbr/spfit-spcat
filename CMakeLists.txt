@@ -24,7 +24,7 @@ endif()
 # Define all potential source files
 # This list is used for set_source_files_properties
 set(SOURCE_FILES
-    calfit.cpp
+    fit_main.cpp
     subfit.c
     spinv_setup.c
     spinv_spin_symmetry.c
@@ -36,7 +36,7 @@ set(SOURCE_FILES
     CalFitIO.cpp
     SpinvEngine.cpp
     DpiEngine.cpp
-    calcat.cpp
+    cat_main.cpp
     sortsub.c
     calmrg.c
     calbak.c
@@ -108,7 +108,7 @@ endif()
 # Add spfit
 if("spfit" IN_LIST EXECUTABLES)
   add_executable_plus(spfit TRUE # This target uses BLAS
-    calfit.cpp
+    fit_main.cpp
     CalFit.cpp
     CalFitIO.cpp
     subfit.c
@@ -134,7 +134,7 @@ endif()
 # Add spcat
 if("spcat" IN_LIST EXECUTABLES)
   add_executable_plus(spcat TRUE # This target uses BLAS
-    calcat.cpp
+    cat_main.cpp
     sortsub.c
     spinv_setup.c
     spinv_spin_symmetry.c
