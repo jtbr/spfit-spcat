@@ -9,6 +9,7 @@
 #include <string.h>
 #include <algorithm> // For std::copy
 #include <vector>    // For std::vector
+#include <math.h>
 #include "CalFitIO.hpp"
 #include "calpgm.h"  // For bcd_t, fgetstr, chtime, pcard, getpar, getvar, mallocq, MAXCAT etc.
 
@@ -85,6 +86,42 @@ bool CalFitIO::readInput(const std::string &parFile, const std::string &linFile,
   input.xerrmx = dvec[5];
   input.parfac_initial = dvec[6];
   input.fqfacq = dvec[7];
+
+  // --- WRITE INITIAL HEADER LINES TO lufit_for_logging NOW ---
+  if (lufit_for_logging)
+  {
+    // Values used: input.limlin, input.npar, input.nitr, input.marqp0, input.xerrmx
+    int display_limlin = input.limlin; // Use the value as read, could be negative
+    // Original main would have already modified limlin if it was negative for catqn.
+    // For display here, let's use the value that would have been used by original printf.
+    // If input.limlin < 0, original main set catqn=MAXQN and used abs(limlin) for display.
+    // We don't have catqn logic here, so just display what's given.
+    // Or, to be very precise:
+    int effective_display_limlin = (input.limlin < 0) ? MAXQN : input.limlin;
+
+    fprintf(lufit_for_logging, "LINES REQUESTED=%5d NUMBER OF PARAMETERS=%3d", display_limlin, input.npar);
+    fprintf(lufit_for_logging, " NUMBER OF ITERATIONS=%3d\n  MARQUARDT PARAMETER =", input.nitr);
+    fprintf(lufit_for_logging, "%11.4E max (OBS-CALC)/ERROR =%10.4E\n", input.marqp0, input.xerrmx);
+
+    // Check for other early log lines from original main that depend only on these initial params:
+    // Example: "PARAMETER ERRORS SCALED BY..."
+    if (fabs(input.parfac_initial - 1.0) > 1e-10)
+    {
+      fprintf(lufit_for_logging, "PARAMETER ERRORS SCALED BY %15.6f", fabs(input.parfac_initial));
+      if (input.parfac_initial < 0.0)
+        fputs(" times the standard error", lufit_for_logging);
+      fputc('\n', lufit_for_logging);
+    }
+    // Note: "NUMBER OF PARAMETERS EXCLUDED..." and "IR Frequencies Scaled by..."
+    // were printed in original main *after* getpar and after options were processed further.
+    // Those should remain in CalFit::initializeParameters or CalFit::processLinesAndSetupBlocks
+    // if they depend on m_nxpar_actual or confirmed m_fqfacq.
+    // The "IR Frequencies Scaled by %12.10f\n" was conditional on fqfacq != 1.0, can be here.
+    if (fabs(input.fqfacq - 1.0) >= 1e-10)
+    {
+      fprintf(lufit_for_logging, " IR Frequencies Scaled by %12.10f\n", input.fqfacq);
+    }
+  }
 
   // Store file position before setopt reads options
   long pos_before_options = ftell(lubak_stream_for_par_content);
@@ -170,6 +207,7 @@ bool CalFitIO::readInput(const std::string &parFile, const std::string &linFile,
 
   // Call getpar
   // `lubak_stream_for_par_content` is now positioned at the start of parameters.
+  // getpar will log its "PARAMETERS - A.PRIORI ERROR" header and lines to lufit_for_logging
   // `input.ndbcd_from_setopt` is the authoritative value.
   size_t idpar_elem_count = (size_t)input.npar * input.ndbcd_from_setopt + input.ndbcd_from_setopt + 3;
   unsigned char *temp_idpar = (unsigned char *)mallocq(idpar_elem_count * sizeof(unsigned char));
