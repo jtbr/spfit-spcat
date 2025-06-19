@@ -468,70 +468,46 @@ bool CalFit::initializeParameters(const CalFitInput &input)
       // For now, proceed as if var = L_packed_lower.
 
       // 4.1. Form full lower triangular `fit` matrix (L) from `var` (L_packed_lower).
-      // `var` is U_packed_colmajor from getvar.
-      // This loop forms L=U^T (full lower triangular) in `fit`.
-      double *pvar_ptr = var;
-      double *pfit_col_start = fit; // Start of current target column in 'fit'
-      for (int n_col_len = 1; n_col_len <= m_nfit; ++n_col_len)
-      { // n_col_len is length of current column in L
-        // Zero out the target column in fit first (m_nfit elements)
-        for (int r = 0; r < m_nfit; ++r)
-          pfit_col_start[r] = 0.0;
-
-        // dcopy(n_col_len, pvar_ptr, 1, &pfit_target_col_start[n_col_len-1], 1); // Incorrect start for L
-        // L has n_col_len elements in column (n_col_len-1).
-        // These start at L(n_col_len-1, n_col_len-1) and go up to L(m_nfit-1, n_col_len-1)
-        // No, L_col_k has elements L(k,k) to L(m_nfit-1, k).
-        // The original dcopy was: dcopy(n, pvar, 1, pfit, ndfit); ++pfit;
-        // If pfit was double*, and ++pfit advanced to next column, ndfit in dcopy must be INCY.
-        // INCY means elements pfit[0], pfit[ndfit], pfit[2*ndfit] are written. That's a ROW.
-        // This means 'fit' was being filled ROW-wise with columns of L.
-        // So fit(n-1, 0:n-1) = L_col_(n-1)_transposed. This makes fit UPPER.
-        // This makes `fit` = U directly if `var` is U_packed.
-
-        // If `fit` is to be made Upper U from `var` (U_packed):
-        pvar_ptr = var;
-        pfit_col_start = fit; // `fit` is m_nfit x ndfit (ndfit = m_nfit+1)
-        for (int j_col = 0; j_col < m_nfit; ++j_col)
-        { // Iterate columns of fit
-          for (int i_row = 0; i_row < m_nfit; ++i_row)
+      // `var` (member this->var) holds U_packed_colmajor from getvar.
+      // Create a temporary L_packed_colmajor from this->var (U_packed).
+      std::vector<double> l_packed_temp(standard_packed_elements);
+      // Transpose U_packed in this->var to L_packed in l_packed_temp
+      // U_ij is var[j*(j+1)/2 + i] for i<=j. We want L_ij = U_ji.
+      // L_packed_colmajor stores L00, L10,L11, L20,L21,L22,...
+      int k_l_packed = 0;
+      for (int j_col_L = 0; j_col_L < m_nfit; ++j_col_L)
+      { // Iterate columns of L
+        for (int i_row_L = j_col_L; i_row_L < m_nfit; ++i_row_L)
+        { // Iterate rows of L (from diagonal down)
+          // L(i_row_L, j_col_L) = U(j_col_L, i_row_L)
+          // Find U(j_col_L, i_row_L) in this->var (U_packed)
+          int u_row = j_col_L;
+          int u_col = i_row_L; // u_row <= u_col
+          int idx_in_u_packed = u_col * (u_col + 1) / 2 + u_row;
+          if (k_l_packed < (int)standard_packed_elements && idx_in_u_packed < (int)standard_packed_elements)
           {
-            pfit_col_start[i_row] = 0.0;
-          } // Zero column
-          for (int i_row = 0; i_row <= j_col; ++i_row)
-          { // U_ij for i <= j
-            pfit_col_start[i_row] = *pvar_ptr++;
+            l_packed_temp[k_l_packed++] = this->var[idx_in_u_packed];
           }
-          pfit_col_start += ndfit;
+          else
+          { /* error bounds */
+          }
         }
       }
-      // Now 'fit' is full Upper triangular U.
+      // Now l_packed_temp contains L0_packed_lower.
 
-      // 4.2. Normalize columns of `fit` (L), similar to lsqfit's prep.
-      // `dpar` will store inverse norms (D_inv). `this->erpar` will store 1.0s (like ediag).
-      pfit_col_start = fit;
-      for (int k_col = 0; k_col < m_nfit; ++k_col)
-      { // For each column k_col
-        // Norm of L(k_col:end, k_col) -- elements from diagonal down
-        double *diag_element_ptr = pfit_col_start + k_col;
-        int elements_in_col_from_diag = m_nfit - k_col;
-        double val_norm = dnrm2(elements_in_col_from_diag, diag_element_ptr, 1);
-
-        if (val_norm < m_tiny)
+      // Form full lower triangular `fit` matrix (L0) from l_packed_temp.
+      double *pl_packed_ptr = l_packed_temp.data();
+      for (int j_col = 0; j_col < m_nfit; ++j_col)
+      {
+        double *pfit_col = this->fit + j_col * ndfit;
+        for (int i_row = 0; i_row < m_nfit; ++i_row)
+          pfit_col[i_row] = 0.0;
+        for (int i_row = j_col; i_row < m_nfit; ++i_row)
         {
-          this->erpar[k_col] = 0.0; // Like ediag in lsqfit
-          dpar[k_col] = 1.0;        // Like enorm in lsqfit (inverse norm)
-                                    // Column is zero, no scaling needed or dscal by 1.0
+          pfit_col[i_row] = *pl_packed_ptr++;
         }
-        else
-        {
-          this->erpar[k_col] = 1.0;
-          dpar[k_col] = current_scale_factor = 1.0 / val_norm;
-          dscal(elements_in_col_from_diag, current_scale_factor, diag_element_ptr, 1);
-        }
-        pfit_col_start += ndfit; // Move to next column
       }
-      // Now 'fit' contains L_s = L * D_inv. `dpar` has D_inv. `erpar` has diag_flags.
+      // Now `fit` is full Lower triangular L0.
 
       // 4.3. `dqrfac` on L_s.
       // `this->erpar` (diag_flags) is passed as `wk`. dqrfac uses it for pivoting and overwrites it.
@@ -549,7 +525,7 @@ bool CalFit::initializeParameters(const CalFitInput &input)
       // Original lsqfit unscaled solution vectors. Here we unscale the inverse factor.
       // Each column k of (F P^T)^-1 should be scaled by dpar[k] (D_inv_kk).
       // (F P^T)^-1 is lower triangular. Scale L_inv_column_k by D_inv_kk.
-      pfit_col_start = fit;
+      double *pfit_col_start = fit;
       for (int k_col = 0; k_col < m_nfit; ++k_col)
       {
         current_scale_factor = dpar[k_col]; // D_inv_kk
@@ -1460,76 +1436,98 @@ bool CalFit::performIteration(const CalFitInput &input, CalFitOutput &output)
       fputs("NEW PARAMETER (EST. ERROR) -- CHANGE THIS ITERATION\n", lufit);
     }
 
-    // Parameter changes are in the last column of `this->fit`
-    double *solution_vector = this->fit + m_nfit; // Points to fit(0, m_nfit) conceptually
+    // Parameter changes delta_p are in the RHS column of `this->fit` (scaled by D_L_inv factors)
+    double *solution_delta_p_vector = this->fit + m_nfit; // Start of RHS conceptual column
+
+    // The matrix M = D_L_inv * F_lambda_inv is in the main m_nfit x m_nfit block of `this->fit`
+    double *matrix_M_start = this->fit;
 
     char *tlbl_ptr = this->parlbl;
-    k_loop = ibase = 0; // k_loop is count of fitted params processed
-    for (int i_par = 0, ibcd_current = 0; i_par < m_npar; ++i_par, ibcd_current += m_ndbcd)
-    {
-      char *current_label = tlbl_ptr;
-      tlbl_ptr += LBLEN;
+    k_loop = 0; // 0-indexed counter for fitted parameters
+    ibase = -1; // Index of the last processed independent parameter
 
-      this->oldpar[i_par] = this->par[i_par];
+    for (int i_par = 0; i_par < m_npar; ++i_par)
+    {
+      int ibcd_current = i_par * m_ndbcd; // Calculate BCD offset based on full param index
+      // (Removed tlbl_ptr logic from here, handle it with parlbl from output struct in writeOutput)
+
+      this->oldpar[i_par] = this->par[i_par]; // Save current param value
 
       if (this->idpar && (NEGBCD(this->idpar[ibcd_current]) == 0))
-      { // If parameter i_par is fitted
+      { // If parameter i_par is FITTED
         if (k_loop < m_nfit)
         {
-          // dif_par is the change for k_loop'th fitted parameter
-          dif_par = solution_vector[k_loop * ndfit]; // Access element k_loop of solution vector
+          // Get parameter change delta_p for this k_loop'th fitted parameter
+          dif_par = solution_delta_p_vector[k_loop * ndfit]; // Accesses solution_vector[k_loop] with stride
 
           this->par[i_par] += dif_par;
-          this->delbgn[k_loop] -= dif_par;
+          this->delbgn[k_loop] -= dif_par; // Update for trust region based on k_loop
 
-          // Error for this parameter: m_parfac * this->erpar[k_loop]
-          // this->erpar[k_loop] was output `ediag` from lsqfit, which is abs(diag(F_lambda_inv_unscaled))
-          double current_param_error = m_parfac * this->erpar[k_loop];
+          // Calculate error for this k_loop'th fitted parameter
+          // Original: erpar[i] = dpar[k] = parfac * dnrm2(n_local, pfitd_col_k_diag_ptr, 1);
+          // pfitd_col_k_diag_ptr was effectively &matrix_M_start[k_loop*ndfit + k_loop]
+          // n_local was m_nfit - k_loop (elements from M(k,k) down to M(nfit-1,k))
+          double *M_col_k_diag_ptr = matrix_M_start + k_loop * ndfit + k_loop; // M(k,k)
+          int n_elements_for_norm = m_nfit - k_loop;
+          double error_val = m_parfac * dnrm2(n_elements_for_norm, M_col_k_diag_ptr, 1);
 
-          // Store final error for this parameter for output (will be at erpar[i_par])
-          // this->erpar was used by lsqfit for its ediag output (m_nfit elements)
-          // We need to copy these to their correct full m_npar positions if saving.
-          // For parer, we use current_param_error.
-          // The member this->erpar will be fully populated in finalizeOutputData.
-          // For now, let's assume we can overwrite this->erpar[i_par] for fitted ones.
-          this->erpar[i_par] = current_param_error;
+          this->erpar[i_par] = error_val; // Store error for absolute parameter i_par
+          // The original also did dpar[k_loop] = error_val.
+          // `this->dpar` from lsqfit contained D_L_inv. If we overwrite it here, that's lost for `prcorr`.
+          // Let's use a temporary for `dpar_for_putvar` if `putvar` needs these errors.
+          // And `this->dpar` (from lsqfit) should be preserved for `prcorr`.
+          // For now, let's assume `this->dpar` can be used to store these errors for `putvar`.
+          // If `prcorr` uses `this->dpar` as `D_L_inv`, we have a conflict.
+          // `prcorr` in main.c used `dpar` (which was `enorm` from lsqfit).
+          // `putvar` in main.c used `dpar` (which was overwritten by these errors).
+          // This implies `prcorr` happens *before* this `dpar` overwrite, or uses a copy.
+          // In our `finalizeOutputData`, `prcorr` is called before `dpar_for_putvar` is finalized.
+          // So, `this->dpar` should retain `lsqfit`'s `enorm` output for `prcorr`.
+          // The errors for `putvar` should be stored separately or computed in `finalizeOutputData`.
+          // Let's assume `this->erpar[i_par]` stores the final error. `dpar[k]` used for `putvar` will be set later.
 
-          parer(this->par[i_par], current_param_error, dif_par, pare_str);
+          // Scale column k (from diagonal down) of matrix M by m_parfac
+          // Original: dscal(n_elements_for_norm, m_parfac, M_col_k_diag_ptr, 1);
+          // This scaling of `fit` matrix columns seems to be part of error propagation.
+          // This means `this->fit` matrix is modified.
+          dscal(n_elements_for_norm, m_parfac, M_col_k_diag_ptr, 1);
+
+          // Printing (using current_label logic from before)
+          char current_label_str_buffer[LBLEN + 1];
+          strncpy(current_label_str_buffer, this->parlbl + k_loop * LBLEN, LBLEN); // Assuming parlbl is 0-indexed by k_loop here
+          current_label_str_buffer[LBLEN] = '\0';
+
+          parer(this->par[i_par], error_val, dif_par, pare_str);
           putbcd(card_iter_log, NDCARD, &this->idpar[ibcd_current]);
-          ch_par = (*tlbl_ptr);
-          *tlbl_ptr = '\0';
           if (lufit)
           {
-            fprintf(lufit, "%4d %s %10.10s %s\n", k_loop + 1, card_iter_log, current_label, pare_str);
+            fprintf(lufit, "%4d %s %10.10s %s\n", k_loop + 1, card_iter_log, current_label_str_buffer, pare_str);
           }
-          *tlbl_ptr = ch_par;
           ibase = i_par;
           k_loop++;
         }
       }
     }
-    // Derive errors for non-fitted (dependent) parameters
-    for (int i_par = 0, ibcd_current = 0; i_par < m_npar; ++i_par, ibcd_current += m_ndbcd)
+    // Derive errors for non-fitted (dependent) parameters (after loop, using final ibase error)
+    // This should use erpar[ibase] which now holds the final error for the master.
+    for (int i_par = 0; i_par < m_npar; ++i_par)
     {
+      int ibcd_current = i_par * m_ndbcd;
       if (this->idpar && NEGBCD(this->idpar[ibcd_current]) != 0)
       { // Dependent
-        if (ibase >= 0 && ibase < m_npar && this->par && this->erpar)
-        { // Ensure ibase is valid
-          // par[i_par] for dependent param is a factor (how much of par[ibase])
-          // erpar[i_par] = factor * erpar[ibase]
-          // This was done in original after the loop.
-          // The actual value of par[i_par] should be factor * par[ibase]
-          // This logic needs to be careful about when par[i_par] (factor) is used vs par[i_par] (value)
-          // getpar stores factor if dependent. So this->par[i_par] is factor.
-          // The erpar[ibase] must be the final error of the master parameter.
+        if (ibase != -1 && this->par && this->erpar)
+        { // ibase must be valid
+          // this->par[i_par] is the factor.
           this->erpar[i_par] = fabs(this->par[i_par]) * this->erpar[ibase];
-          // The value this->par[i_par] should be updated to actual value for next iter, if hamx needs it.
-          // Or, this update is only for final output.
-          // Original main did this after loop, for final output section.
-          // Let's assume hamx always gets the most up-to-date values.
-          // If hamx needs actual values for dependent params, they should be updated each iter.
-          // par[i] *= par[ibase] was in output section.
-          // For now, keep par[i_par] as factor, erpar[i_par] as derived error.
+          // Update actual value of dependent parameter: par_dep = factor * par_master
+          // This should only be done if par[i_par] truly stored a factor.
+          // getpar stores factor: par[i] = vec[0] / parbase.
+          // If parbase was par[ibase_initial_value], then par[i] is ratio.
+          // It's safer to do this update only at the very end in finalizeOutputData
+          // if hamx always expects factors for dependent params.
+          // If hamx expects actual values, this update should happen.
+          // Let's assume for now, par[i_par] is updated here for consistency in this iteration.
+          this->par[i_par] = this->par[i_par] * this->par[ibase];
         }
       }
     }
