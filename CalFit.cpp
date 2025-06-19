@@ -344,7 +344,7 @@ bool CalFit::initializeParameters(const CalFitInput &input)
   {
     if (lufit && m_npar > 0)
     {
-      //fprintf(lufit, "No parameters marked for fitting (nfit = %d).\n", m_nfit);
+      fprintf(lufit, "No parameters marked for fitting (nfit = %d).\n", m_nfit);
     }
     printf("No parameters marked for fitting (nfit = %d).\n", m_nfit);
     iperm = nullptr;
@@ -927,6 +927,7 @@ bool CalFit::performIteration(const CalFitInput &input, CalFitOutput &output)
   short qnum_line[2 * MAXQN]; // MAXQN from lsqfit.h or calpgm.h
   char ch_par, pare_str[64], aqnum_str[6 * MAXQN + 2], card_iter_log[NDCARD];
   int idx_getdbk_local; // Local variable for 'indx' output from getdbk
+  double rms_for_this_iter_report_and_condition;
 
   bigdIR = 9.9999999;
   bigdMW = 100. * bigdIR;
@@ -1387,23 +1388,43 @@ bool CalFit::performIteration(const CalFitInput &input, CalFitOutput &output)
     marqflg_lsqfit = lsqfit(this->fit, ndfit, m_nfit, 1, m_marqp, varv,
                             this->oldfit, this->erpar, this->dpar, this->iperm);
 
+    // `xsqt` currently holds the sum of squared weighted residuals from the line loop.
+    // Let's rename it for clarity in this section to avoid confusion with the per-iteration RMS.
+    double sum_sq_residuals_at_current_params = xsqt;
+
     if (marqflg_lsqfit != 0)
-    {                                               // Fit diverging
+    {
       dcopy(m_npar, this->oldpar, 1, this->par, 1); // Restore parameters
-                                                    // ... (logging as before) ...
+      strcpy(card_iter_log, "Fit Diverging: restore parameters\n"); // card_iter_log needs to be a char array member or local
+      // if (lufit)
+      //   fputs(card_iter_log, lufit);
+      fputs(card_iter_log, stdout); // Original also printed to stdout
     }
     else
-    { // Fit converged for this step
-      m_xsqbest = (xsqt - varv[3]) / nf_fitted_lines;
-      if (m_xsqbest > 0.0)
-        m_xsqbest = sqrt(m_xsqbest);
+    {
+      // Fit converged for this lsqfit step.
+      // First candidate for m_xsqbest is based on lsqfit's prediction (using varv[3]).
+      // m_xsqbest should always be an RMS value.
+      double predicted_rms_sq = (sum_sq_residuals_at_current_params - varv[3]) / nf_fitted_lines;
+      double xsqbest_candidate_from_prediction = (predicted_rms_sq > 0.0) ? sqrt(predicted_rms_sq) : 0.0;
+
+      if (m_itr == 0)
+      { // If first iteration, initialize m_xsqbest
+        m_xsqbest = xsqbest_candidate_from_prediction;
+      }
       else
-        m_xsqbest = 0.0;
-      // Print normalized diagonals (erpar from lsqfit)
+      { // Otherwise, only update if this prediction is better
+        if (xsqbest_candidate_from_prediction < m_xsqbest)
+        {
+          m_xsqbest = xsqbest_candidate_from_prediction;
+        }
+      }
+
+      // Print normalized diagonals (this->erpar from lsqfit ediag output)
       if (lufit)
       {
         fputs("NORMALIZED DIAGONAL:\n", lufit);
-        icnt_progress = 0;
+        icnt_progress = 0; // Ensure icnt_progress is initialized if used only here
         for (k_loop = 0; k_loop < m_nfit; ++k_loop)
         {
           fprintf(lufit, "%5d %13.5E", k_loop + 1, this->erpar[k_loop]);
@@ -1417,14 +1438,80 @@ bool CalFit::performIteration(const CalFitInput &input, CalFitOutput &output)
           fputc('\n', lufit);
       }
     }
+
+    // Log Marquardt parameter and trust expansion (always, like original)
     if (lufit)
     {
       fprintf(lufit, "MARQUARDT PARAMETER = %g, TRUST EXPANSION = %4.2f\n", m_marqp[0], m_marqp[2]);
     }
-//      printf("MARQUARDT PARAMETER = %g, TRUST EXPANSION = %4.2f\n", m_marqp[0], m_marqp[2]);
+    printf("MARQUARDT PARAMETER = %g, TRUST EXPANSION = %4.2f\n", m_marqp[0], m_marqp[2]);
 
-    if (m_xsqbest > xsqt && marqflg_lsqfit == 0)
-      m_xsqbest = xsqt;
+    // parfac scaling logic (from original main.c, uses sum_sq_residuals_at_current_params)
+    if (m_parfac0 < 0.0 && sum_sq_residuals_at_current_params >= 0.0)
+    {
+      ndfree = nf_fitted_lines + m_ndfree0;
+      if (ndfree <= 0)
+        ndfree = 1;
+      // xsqt here is still sum_sq_residuals_at_current_params before sqrt
+      m_parfac = -m_parfac0 * sqrt(sum_sq_residuals_at_current_params / ndfree);
+      if (lufit)
+      {
+        fputs("WARNING: parameter errors multiplied by ", lufit);
+        fprintf(lufit, "%15.5f for %8d degrees of freedom\n", m_parfac, ndfree);
+      }
+    }
+
+    // Calculate ACTUAL RMS for the current set of parameters for THIS iteration.
+    // The parameters are now the NEW ones if lsqfit didn't diverge and they were updated in section 6,
+    // OR they are the OLD ones if lsqfit diverged and they were restored.
+    // The `sum_sq_residuals_at_current_params` was based on parameters *before* the lsqfit update step.
+    // This is a subtle point. The RMS for "OLD" in "END OF ITERATION... OLD, NEW RMS"
+    // should be the RMS *before* applying the parameter changes from this iteration's lsqfit.
+    // The `xsqt` variable in your `printf` and loop condition currently holds the RMS *after* params might have changed.
+    // Let's define:
+    // `rms_before_lsqfit_param_update_this_iter`: calculated from `sum_sq_residuals_at_current_params`
+    // `m_xsqbest`: tracks the best RMS achieved by any *actual set of parameters* at the end of an update.
+
+    double rms_before_lsqfit_param_update_this_iter = 0.0;
+    if (nf_fitted_lines > 0)
+    {
+      rms_before_lsqfit_param_update_this_iter = sum_sq_residuals_at_current_params / nf_fitted_lines;
+      if (rms_before_lsqfit_param_update_this_iter > 0.0)
+      {
+        rms_before_lsqfit_param_update_this_iter = sqrt(rms_before_lsqfit_param_update_this_iter);
+      }
+      else
+      {
+        rms_before_lsqfit_param_update_this_iter = 0.0;
+      }
+    }
+
+    // Now, the second update to m_xsqbest: it should always reflect the minimum actual RMS achieved.
+    // If parameters were restored due to divergence, rms_before_lsqfit_param_update_this_iter reflects the RMS of those restored (old) params.
+    // If parameters will be updated (no divergence), then after they are updated in section 6,
+    // one might ideally re-calculate residuals with new params to get the true "NEW RMS" for m_xsqbest.
+    // However, original `main.c` updated `xsqbest` with `xsqt_rms_this_iter` which was based on residuals *before* param update.
+    // `if (xsqbest > xsqt_rms_this_iter) xsqbest = xsqt_rms_this_iter;`
+    // This `xsqt_rms_this_iter` was the RMS of the fit *leading into* the current `lsqfit` call.
+
+    // Let's follow original: m_xsqbest is the best of (prediction from lsqfit) AND (actual RMS *before* this iter's param changes).
+    if (m_itr == 0)
+    {
+      m_xsqbest = rms_before_lsqfit_param_update_this_iter; // Initialize with the first actual RMS
+    }
+    else
+    {
+      // m_xsqbest was potentially updated by lsqfit prediction.
+      // Now compare with actual RMS of current params *before* update from this iteration.
+      if (rms_before_lsqfit_param_update_this_iter < m_xsqbest)
+      {
+        m_xsqbest = rms_before_lsqfit_param_update_this_iter;
+      }
+    }
+
+    // The `xsqt` variable that your `printf` and `do...while` condition use needs to be
+    // `rms_before_lsqfit_param_update_this_iter`. I'll rename it to `rms_for_this_iter_report_and_condition`.
+    rms_for_this_iter_report_and_condition = rms_before_lsqfit_param_update_this_iter;
 
     // 6. Update parameters and delbgn
     //    dpar from lsqfit contains parameter changes * delta_p_i
@@ -1593,13 +1680,13 @@ bool CalFit::performIteration(const CalFitInput &input, CalFitOutput &output)
       fprintf(lufit, " MICROWAVE RMS = %15.6f MHz, IR RMS =%15.5f\n", xsqmw, xsqir);
 
     m_itr++; // Increment iteration count
-    printf(" END OF ITERATION %2d OLD, NEW RMS ERROR=%15.5f %15.5f\n", m_itr, xsqt, m_xsqbest);
+    printf(" END OF ITERATION %2d OLD, NEW RMS ERROR=%15.5f %15.5f\n", m_itr, rms_for_this_iter_report_and_condition, m_xsqbest);
     if (lufit)
-      fprintf(lufit, " END OF ITERATION %2d OLD, NEW RMS ERROR=%15.5f %15.5f\n", m_itr, xsqt, m_xsqbest);
+      fprintf(lufit, " END OF ITERATION %2d OLD, NEW RMS ERROR=%15.5f %15.5f\n", m_itr, rms_for_this_iter_report_and_condition, m_xsqbest);
     fflush(stdout);
     if (lufit)
       fflush(lufit);
-  } while (m_itr < nitr_actual && (marqflg_lsqfit != 0 || 0.999999 * xsqt > m_xsqbest));
+  } while (m_itr < nitr_actual && (marqflg_lsqfit != 0 || 0.999999 * rms_for_this_iter_report_and_condition > m_xsqbest));
   // Original condition: itr < nitr && 0.999999 * xsqt > xsqbest
   // Added marqflg check: continue if diverging to allow Marquardt param to increase.
 
@@ -1782,7 +1869,6 @@ bool CalFit::finalizeOutputData(const CalFitInput &input, CalFitOutput &output)
     // `prcorr` needs the final solution/covariance information.
     // `dpar` argument to `prcorr` in original main was `dpar` from `lsqfit` (enorm output - scaling factors).
     // `fit` matrix was the `F_lambda_inv * D_inv` (from lsqfit dk output).
-    fprintf(lufit, "\nCorrelation Matrix:\n"); // Placeholder for actual prcorr call
     prcorr(lufit, m_nfit, this->fit, ndfit, this->dpar);
   }
 
