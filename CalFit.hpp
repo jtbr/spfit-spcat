@@ -155,6 +155,7 @@ private:
   int m_itd;
   int m_nline;  // Number of lines after linein
   int m_limlin; // Max lines requested
+  bool m_force_nqn10_for_linein; // if original m_linlin was negative
   int m_nitr_requested; // #/ iterations requested
   int m_maxf_from_linein;
   int m_nblkpf_actual;

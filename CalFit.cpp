@@ -139,10 +139,12 @@ bool CalFit::initializeParameters(const CalFitInput &input)
 {
   // --- 1. Transfer scalar control parameters ---
   m_npar = input.npar;
-  m_limlin = input.limlin;
-  if (input.limlin < 0)
-  {
-    m_limlin = -input.limlin;
+
+  m_force_nqn10_for_linein = (input.limlin < 0); // Set the flag
+  if (m_force_nqn10_for_linein) {
+      m_limlin = -input.limlin; // Use positive for array sizing etc.
+  } else {
+    m_limlin = input.limlin;
   }
   m_nitr_requested = input.nitr;
   m_fqfacq = input.fqfacq;
@@ -1225,12 +1227,18 @@ bool CalFit::performIteration(const CalFitInput &input, CalFitOutput &output)
       if (iflg_line == 0)
       {                   // No valid lines/components found for this line_idx
         line_idx = lblnd; // Advance line_idx past this processed (empty) blend
-        continue;
+        continue;         // skip to next master line_idx
       }
 
       // Calculate errors and process line/blend
-      if (current_scale_iter == 0)
-        current_scale_iter = 1.0;                                             // Avoid division by zero
+      if (fabs(current_scale_iter) < m_tiny)
+      { // Check if effectively zero
+        if (lufit)
+          fprintf(lufit, "Line %d (and blend) has zero total weight after processing components, skipping.\n", line_idx);
+        nrj++; // Count as rejected
+        line_idx = lblnd;
+        continue;
+      }
       cerr_calc = calerr(m_nfit, this->var, this->dpar) / current_scale_iter; // Estimated error of calc freq
       adif = this->dpar[m_nfit] / current_scale_iter;                         // Average (Obs-Calc) for blend
       afrq = xfrq_line - adif;                                                // Average calculated frequency for blend (using last xfrq_line from frqdat as Explt)
@@ -1366,8 +1374,25 @@ bool CalFit::performIteration(const CalFitInput &input, CalFitOutput &output)
 
     if (nrj > 0 && lufit)
       fprintf(lufit, "%5d Lines rejected from fit\n", nrj);
+    // --- Crucial check before RMS calculations ---
     if (nf_fitted_lines < 1)
-      nf_fitted_lines = 1; // Avoid division by zero for RMS
+    {
+      if (lufit && m_nfit > 0)
+        fprintf(lufit, "WARNING: No lines were included in the fit for this iteration (nf_fitted_lines=0).\n");
+        printf("WARNING: No lines were included in the fit for this iteration (nf_fitted_lines=0).\n");
+      // What to do if no lines are fitted?
+      // Original: if (nf < 1) nf = 1;
+      // This prevents division by zero in RMS calculations.
+      // However, if nf_fitted_lines is genuinely 0, the RMS is undefined or infinite.
+      // lsqfit might also behave poorly if no lines contributed to `fit` matrix.
+      // If no lines were fitted, the `fit` matrix (J^TJ part) would be just L0 from `fitbgn`.
+      // The RHS vector would be just L0*delbgn.
+      // `lsqfit` might then produce large parameter changes or diverge.
+
+      // For now, replicate original:
+      nf_fitted_lines = 1; // To prevent division by zero in RMS.
+                           // The quality of fit will be terrible, but it avoids crash.
+    }
 
     // Zero upper triangle of fit matrix (it's symmetric J^T J after jelim)
     // Original did this by iterating columns and memset on elements *before* diagonal.
@@ -1529,14 +1554,24 @@ bool CalFit::performIteration(const CalFitInput &input, CalFitOutput &output)
     // The matrix M = D_L_inv * F_lambda_inv is in the main m_nfit x m_nfit block of `this->fit`
     double *matrix_M_start = this->fit;
 
-    char *tlbl_ptr = this->parlbl;
+    // --- Option for "more standard" covariance matrix calculation later ---
+    // // If we wanted to calculate a standard covariance matrix later via prcorr,
+    // // we would need the 'fit' matrix as lsqfit returned it (before parfac scaling)
+    // // and the 'dpar' array as lsqfit returned it (enorm factors).
+    // std::vector<double> fit_matrix_for_std_covar;
+    // std::vector<double> dpar_enorm_for_std_covar;
+    // if (m_nfit > 0) {
+    //     // fit_matrix_for_std_covar.assign(this->fit, this->fit + (size_t)m_nfit * ndfit); // Save M
+    //     // dpar_enorm_for_std_covar.assign(this->dpar, this->dpar + m_nfit); // Save enorm
+    // }
+    // --- End Option ---
+
     k_loop = 0; // 0-indexed counter for fitted parameters
     ibase = -1; // Index of the last processed independent parameter
 
     for (int i_par = 0; i_par < m_npar; ++i_par)
     {
       int ibcd_current = i_par * m_ndbcd; // Calculate BCD offset based on full param index
-      // (Removed tlbl_ptr logic from here, handle it with parlbl from output struct in writeOutput)
 
       this->oldpar[i_par] = this->par[i_par]; // Save current param value
 
@@ -1548,43 +1583,51 @@ bool CalFit::performIteration(const CalFitInput &input, CalFitOutput &output)
           dif_par = solution_delta_p_vector[k_loop * ndfit]; // Accesses solution_vector[k_loop] with stride
 
           this->par[i_par] += dif_par;
-          this->delbgn[k_loop] -= dif_par; // Update for trust region based on k_loop
+          this->delbgn[k_loop] -= dif_par;
 
-          // Calculate error for this k_loop'th fitted parameter
-          // Original: erpar[i] = dpar[k] = parfac * dnrm2(n_local, pfitd_col_k_diag_ptr, 1);
-          // pfitd_col_k_diag_ptr was effectively &matrix_M_start[k_loop*ndfit + k_loop]
-          // n_local was m_nfit - k_loop (elements from M(k,k) down to M(nfit-1,k))
-          double *M_col_k_diag_ptr = matrix_M_start + k_loop * ndfit + k_loop; // M(k,k)
-          int n_elements_for_norm = m_nfit - k_loop;
+          // Calculate error for this k_loop'th fitted parameter based on original main.c
+          // M_col_k_diag_ptr points to M(k,k) in the current `this->fit` matrix
+          double *M_col_k_diag_ptr = matrix_M_start + k_loop * ndfit + k_loop;
+          int n_elements_for_norm = m_nfit - k_loop; // Elements from M(k,k) down column k
           double error_val = m_parfac * dnrm2(n_elements_for_norm, M_col_k_diag_ptr, 1);
 
           this->erpar[i_par] = error_val; // Store error for absolute parameter i_par
-          // The original also did dpar[k_loop] = error_val.
-          // `this->dpar` from lsqfit contained D_L_inv. If we overwrite it here, that's lost for `prcorr`.
-          // Let's use a temporary for `dpar_for_putvar` if `putvar` needs these errors.
-          // And `this->dpar` (from lsqfit) should be preserved for `prcorr`.
-          // For now, let's assume `this->dpar` can be used to store these errors for `putvar`.
-          // If `prcorr` uses `this->dpar` as `D_L_inv`, we have a conflict.
-          // `prcorr` in main.c used `dpar` (which was `enorm` from lsqfit).
-          // `putvar` in main.c used `dpar` (which was overwritten by these errors).
-          // This implies `prcorr` happens *before* this `dpar` overwrite, or uses a copy.
-          // In our `finalizeOutputData`, `prcorr` is called before `dpar_for_putvar` is finalized.
-          // So, `this->dpar` should retain `lsqfit`'s `enorm` output for `prcorr`.
-          // The errors for `putvar` should be stored separately or computed in `finalizeOutputData`.
-          // Let's assume `this->erpar[i_par]` stores the final error. `dpar[k]` used for `putvar` will be set later.
 
-          // Scale column k (from diagonal down) of matrix M by m_parfac
-          // Original: dscal(n_elements_for_norm, m_parfac, M_col_k_diag_ptr, 1);
-          // This scaling of `fit` matrix columns seems to be part of error propagation.
-          // This means `this->fit` matrix is modified.
+          // === REPLICATE ORIGINAL BEHAVIOR: ===
+          // Overwrite this->dpar[k_loop]
+          // this->dpar initially holds 'enorm' (scaling factors D_L_inv) from lsqfit.
+          // Original main.c overwrote its 'dpar' array here with 'error_val'.
+          if (this->dpar)
+          { // Ensure dpar is allocated
+            this->dpar[k_loop] = error_val;
+          }
+          else {
+            perror("dcal not allocated saving error vals");
+          }
+          // Scale column k of `this->fit` by m_parfac
+          // This modifies the `this->fit` matrix that will be passed to prcorr.
           dscal(n_elements_for_norm, m_parfac, M_col_k_diag_ptr, 1);
+          // === END REPLICATION OF ORIGINAL BEHAVIOR ===
 
-          // Printing (using current_label logic from before)
+          // === BEGIN Alternative for "more standard" covariance: ===
+          // // If preserving this->dpar as enorm and this->fit unscaled by parfac:
+          // // double actual_enorm_factor_for_k = (dpar_enorm_for_std_covar.empty()) ? 1.0 : dpar_enorm_for_std_covar[k_loop];
+          // // double error_val_std = m_parfac * (some_norm_of_unscaled_fit_col / actual_enorm_factor_for_k); // Hypothetical
+          // // this->erpar[i_par] = error_val_std;
+          // // `this->fit` would NOT be scaled here by m_parfac.
+          // // `this->dpar` (as enorm) would remain unchanged.
+          // === End Alternative (also see finalizeOutputData) ===
+
+          // Printing
           char current_label_str_buffer[LBLEN + 1];
-          strncpy(current_label_str_buffer, this->parlbl + k_loop * LBLEN, LBLEN); // Assuming parlbl is 0-indexed by k_loop here
+          // Use this->parlbl directly, assuming it's correctly populated for all m_npar parameters
+          // And k_loop correctly maps to the fitted parameter's label block.
+          // Need a robust way to get label for i_par if only fitted params have compact labels,
+          // or if parlbl is dense for all m_npar. Assuming it's dense:
+          strncpy(current_label_str_buffer, this->parlbl + i_par * LBLEN, LBLEN);
           current_label_str_buffer[LBLEN] = '\0';
 
-          parer(this->par[i_par], error_val, dif_par, pare_str);
+          parer(this->par[i_par], error_val, dif_par, pare_str); // Use error_val for printing
           putbcd(card_iter_log, NDCARD, &this->idpar[ibcd_current]);
           if (lufit)
           {
@@ -1823,11 +1866,12 @@ bool CalFit::finalizeOutputData(const CalFitInput &input, CalFitOutput &output)
     }
     else
     {
-      // if (lufit && m_nfit > 0)
-      //   fprintf(lufit, "ERROR: this->var is null but nfit > 0.\n");
-      printf("ERROR: this->var is null but nfit > 0.\n");
-      if (m_nfit > 0)
+      if (m_nfit > 0) {
+        // if (lufit)
+        //   fprintf(lufit, "ERROR: this->var is null but nfit > 0.\n");
+        printf("ERROR: this->var is null but nfit > 0.\n");
         return false;
+      }
     }
 
     // `dpar` from lsqfit's `enorm` output contained 1/norm(L_col_k) or similar scaling factors.
@@ -1836,12 +1880,16 @@ bool CalFit::finalizeOutputData(const CalFitInput &input, CalFitOutput &output)
     // effectively the final scaled errors of the *fitted* parameters.
     // `lsqfit`'s `ediag` output (our `this->erpar` member, `m_nfit` elements) contains `abs(diag(F_lambda_inv_unscaled))`.
     // So, `dpar_for_putvar` should be `m_parfac * this->erpar (fitted part)`.
-    output.dpar_final_for_putvar.resize(m_nfit);
-    for (int i = 0; i < m_nfit; ++i)
+    if (this->dpar)
     {
-      // this->erpar (from lsqfit ediag) contains the errors for fitted parameters
-      // This should be the m_nfit block of errors.
-      output.dpar_final_for_putvar[i] = m_parfac * this->erpar[i]; // Assuming this->erpar[0..m_nfit-1] holds these
+      // For putvar, dpar_for_putvar needs the errors of the *fitted* parameters.
+      // Since this->dpar was overwritten in performIteration to hold these errors (for fitted slots k_loop=0..m_nfit-1),
+      // we can assign it directly.
+      output.dpar_final_for_putvar.assign(this->dpar, this->dpar + m_nfit);
+    }
+    else
+    {
+      output.dpar_final_for_putvar.clear();
     }
   }
   else
@@ -1863,14 +1911,24 @@ bool CalFit::finalizeOutputData(const CalFitInput &input, CalFitOutput &output)
   // The params written are `this->par` (latest) and `this->erpar` (latest errors).
   // The dcopy(oldpar to par) seems to be only for divergence recovery.
 
-  // Compute and print/store correlation matrix
+  // === ORIGINAL BEHAVIOR replication ===
+  // Compute and print/store "correlation" matrix (actually, scaled covariance)
   if (output.itr > 0 && m_nfit > 0 && this->fit && this->dpar && lufit)
   {
     // `prcorr` needs the final solution/covariance information.
-    // `dpar` argument to `prcorr` in original main was `dpar` from `lsqfit` (enorm output - scaling factors).
-    // `fit` matrix was the `F_lambda_inv * D_inv` (from lsqfit dk output).
-    prcorr(lufit, m_nfit, this->fit, ndfit, this->dpar);
+    // Pass this->fit (which has been scaled by m_parfac in the update loop)
+    // Pass this->dpar (which has been overwritten with errors in the update loop)
+    prcorr(lufit, m_nfit, this->fit, ndfit, this->dpar, 0 /* covariance, not correlation*/);
   }
+  // === END ORIGINAL BAHAVIOR replication ===
+  // === Alternative for "more standard" covariance/correlation matrix (to use in conjunction with section in performIteration) ===
+  // if (output.itr > 0 && m_nfit > 0 && lufit) {
+  //     // Assume fit_matrix_for_std_covar and dpar_enorm_for_std_covar were populated
+  //     // with the state of this->fit and this->dpar immediately after lsqfit.
+  //     // fprintf(lufit, "\nParameter Covariance Matrix (Standard Calculation):\n");
+  //     // prcorr(lufit, m_nfit, fit_matrix_for_std_covar.data(), ndfit, dpar_enorm_for_std_covar.data(), 1 /* correlation, not covariance */);
+  // }
+  // === End Option ===
 
   // Final cleanup before CalFitIO::writeOutput takes over
   // lbufof(-1,0) was called in original main at this stage.
@@ -1888,6 +1946,16 @@ bool CalFit::finalizeOutputData(const CalFitInput &input, CalFitOutput &output)
     if (lufit)
       fprintf(lufit, "Output files not updated as no iterations were performed.\n");
     // Depending on requirements, might still write initial state or return !success from run()
+  }
+
+  // Write the final title card to lufit
+  if (lufit && !input.title.empty())
+  { // input.title is original title before chtime
+    char title_card_buffer_final[NDCARD];
+    strncpy(title_card_buffer_final, input.title.c_str(), NDCARD - 1);
+    title_card_buffer_final[NDCARD - 1] = '\0';
+    chtime(title_card_buffer_final, 82); // Timestamp it
+    fputs(title_card_buffer_final, lufit);
   }
 
   return true;
@@ -2034,16 +2102,16 @@ int CalFit::parer(double par, double errx, double dif, char *ptmp)
  * @brief Read experimental spectral lines from input file
  * @param luin Input file pointer
  * @param nline Pointer to number of lines (input: max lines, output: actual lines)
- * @param iqnfmt Quantum number format for line input
+ * @param iqnfmt Quantum number format for line input (from setfmt)
  * @return Largest quantum number encountered
  */
-int CalFit::linein(FILE *luin, int *nline, int iqnfmt)
+int CalFit::linein(FILE *luin, int *nline, int iqnfmt) // TODO iqnfmt is m_nfmt, could remove (?)
 {
   /* Local variables */
   SXLINE *xline;                /* Pointer to line data structure */
   double xfrqn, xerrn, xwtn;    /* Current line frequency, error, weight */
   double xfrqx, xerrx;          /* Previous line frequency and error */
-  int nqn, nqnu, nqnl;          /* Number of quantum numbers */
+  int /*nqn,*/ nqnu, nqnl;          /* Number of quantum numbers */
   int kqnu, kqnl;               /* Indices for upper/lower state quantum numbers */
   int i, iqf, ipace, mxline;    /* Loop variables and counters */
   int mxqn, isblnd, icmp;       /* Max quantum number, blend flag, comparison flag */
@@ -2057,15 +2125,25 @@ int CalFit::linein(FILE *luin, int *nline, int iqnfmt)
   /*     RETURN: largest quantum number */
   /*******************************************************************/
 
+  int iqnfmt_to_use_for_deflin = iqnfmt;
+  if (m_force_nqn10_for_linein) {
+    // Force NQN part of iqnfmt to 0 (which deflin interprets as 10)
+    // QFMT = Q*100 + H*10 + NQN. NQN is iqnfmt % 10.
+    // To set NQN part to 0: iqnfmt_for_deflin = (iqnfmt / 10) * 10;
+    int current_nqn_digits = iqnfmt_to_use_for_deflin % 10;
+    iqnfmt_to_use_for_deflin = iqnfmt_to_use_for_deflin - current_nqn_digits; // Clears the NQN field to 0
+  }
+
+  int nqn_for_getlin = deflin(iqnfmt_to_use_for_deflin, nqnt);
+
   mxline = *nline;
   mxqn = 1;
   nbln = 1;
-  nqn = deflin(iqnfmt, nqnt);
-  nqnu = nqn - 1;
+  nqnu = nqn_for_getlin - 1;
   if (nqnt[nqnu] < 0)
     nqnu = 0;
   kqnu = nqnt[nqnu];
-  nqnl = nqnu + nqn;
+  nqnl = nqnu + nqn_for_getlin;
   kqnl = nqnt[nqnl];
   ipace = 100;
   xfrqx = xerrx = 0.;
@@ -2074,13 +2152,14 @@ int CalFit::linein(FILE *luin, int *nline, int iqnfmt)
   { /*  loop for reading lines */
     xline = lbufof(1, i);
     iqnum = xline->qn;
-    if (getlin(luin, nqn, nqnt, iqnum, &xfrqn, &xerrn, &xwtn,
-                card, NDCARD) < 0)
+    if (getlin(luin, nqn_for_getlin, nqnt, iqnum, &xfrqn, &xerrn, &xwtn,
+               card, NDCARD) < 0)
     {
       *nline = i - 1;
       return mxqn;
     }
-    iqf = iqnum[nqnu];
+    // This logic for iqf also uses nqn_for_getlin (via nqnu, nqnl)
+    iqf = iqnum[nqnu]; // nqnu derived from nqn_for_getlin
     if (iqf == -1)
     {
       if (kqnu >= 0)
@@ -2095,10 +2174,10 @@ int CalFit::linein(FILE *luin, int *nline, int iqnfmt)
       iqf = -iqf;
     if (iqf > mxqn)
       mxqn = iqf;
-    iqf = iqnum[nqnl];
+    iqf = iqnum[nqnl]; // nqnl derived from nqn_for_getlin
     if (iqf == -1)
     {
-      if (kqnl > 0)
+      if (kqnl > 0) // kqnl was from nqnt[nqnl], check bounds if nqnl can be large
       {
         iqf = -iqnum[kqnl];
         if (iqf >= 0)
@@ -2123,20 +2202,20 @@ int CalFit::linein(FILE *luin, int *nline, int iqnfmt)
       {
         isblnd = 1;
       }
-      else if ((xerrn / xerrx) > 2.0 && nbln > 2)
+      else if ((xerrn / xerrx) > 2.0 && nbln > 2) // Original code had xerrn/xerrx, ensure xerrx is not zero
       {
         isblnd = 1;
         ++nbln;
         icmp = 0;
         xline->xwt = (float)0.;
         iqnum[0] = (short)-1;
-        iqnum[nqn] = iqnum[0];
+        if (nqn_for_getlin > 0) iqnum[nqn_for_getlin] = iqnum[0]; // Index with actual NQN
       }
     }
     if (isblnd != 0)
     {
       xline->bln = nbln;
-      xline = lbufof(1, i - 1);
+      xline = lbufof(1, i - 1); // Get previous line
       xline->bln = -2;
       nbln += 2;
     }

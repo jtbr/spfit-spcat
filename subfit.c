@@ -139,43 +139,118 @@ char *fbak;
   return 0;
 }                               /* filbak */
 
-int prcorr(lufit, nfit, cor, ndcor, err)
-FILE *lufit;
-int nfit, ndcor;
-double *cor, *err;
-{                               /*  calculates and prints correlation coefficients */
+int prcorr(FILE *lufit, int nfit, double *cor, int ndcor, double *err, int normalize_to_correlation)
+{ /*  calculates and prints correlation/covariance coefficients */
   int i, j, n, ndiag;
   double val, *dcor, *pcor;
+  // Temporary array to store diagonal elements sqrt(Cov_ii) if normalizing
+  double *sqrt_diag_cov = NULL; // Initialize to NULL
+  double tiny = 10e-13;
   ndiag = ndcor + 1;
   dcor = cor;
-  for (j = 0; j < nfit; ++j) {  /* scale */
+  for (j = 0; j < nfit; ++j)
+  { /* scale */
     if (j > 0)
       dcor += ndiag;
     n = nfit - j;
     val = 1. / err[j];
     dscal(n, val, dcor, 1);
   }
-  for (n = 1; n < nfit; ++n) {  /* matrix multiply */
+  for (n = 1; n < nfit; ++n)
+  { /* matrix multiply */
     i = nfit - n;
     pcor = &cor[i];
-    for (j = 0; j < i; ++j) {
+    for (j = 0; j < i; ++j)
+    {
       dcor[j - i] = ddot(n, pcor, 1, dcor, 1);
       pcor += ndcor;
     }
     dcor -= ndiag;
   }
   pcor = dcor = cor;
-  for (n = 1; n < nfit; ++n) {
+  for (n = 1; n < nfit; ++n)
+  {
     pcor += ndcor;
     ++dcor;
     dcopy(n, pcor, 1, dcor, ndcor);
   }
+  // --- Optional Normalization to True Correlation Matrix ---
+  if (normalize_to_correlation && nfit > 0)
+  {
+    sqrt_diag_cov = (double *)malloc(nfit * sizeof(double));
+    if (sqrt_diag_cov == NULL)
+    {
+      fprintf(lufit, "Error: Could not allocate memory for sqrt_diag_cov in prcorr.\n");
+      // Proceed to print unnormalized covariance
+    }
+    else
+    {
+      // Calculate sqrt(Cov_ii)
+      pcor = cor; // Points to cor[0,0]
+      for (i = 0; i < nfit; ++i)
+      {
+        if (*pcor > 0.0)
+        { // Cov_ii must be positive
+          sqrt_diag_cov[i] = sqrt(*pcor);
+        }
+        else
+        {
+          sqrt_diag_cov[i] = 1.0; // Avoid division by zero, correlation will be 0 or undefined
+        }
+        pcor += ndiag; // Move to next diagonal Cov_i+1,i+1
+      }
+
+      // Normalize: Corr_ij = Cov_ij / (sqrt_diag_cov[i] * sqrt_diag_cov[j])
+      dcor = cor; // To iterate through Cov matrix elements
+      for (i = 0; i < nfit; ++i)
+      {              // Row i
+        pcor = dcor; // Start of row i (or column i)
+        for (j = 0; j < nfit; ++j)
+        { // Column j
+          if (sqrt_diag_cov[i] != 0.0 && sqrt_diag_cov[j] != 0.0)
+          {
+            *pcor /= (sqrt_diag_cov[i] * sqrt_diag_cov[j]);
+          }
+          else
+          {
+            *pcor = 0.0; // Or NaN, if diagonal was zero
+          }
+          pcor++; // Next element in the row/column (assuming flat access for now)
+                  // This needs to correctly access cor[i][j]
+                  // If cor is col-major: cor[i + j*ndcor]
+        }
+        dcor += ndcor; // Next row/column start for outer loop
+      }
+      // More careful access for normalization:
+      for (i = 0; i < nfit; ++i)
+      { // Target row index
+        for (j = 0; j < nfit; ++j)
+        {                                                    // Target col index
+          double *current_element_ptr = cor + j * ndcor + i; // Access cor[i,j] if col-major
+          if (sqrt_diag_cov[i] > tiny && sqrt_diag_cov[j] > tiny)
+          { // Avoid div by zero/small
+            *current_element_ptr /= (sqrt_diag_cov[i] * sqrt_diag_cov[j]);
+          }
+          else
+          {
+            if (i == j)
+              *current_element_ptr = 1.0; // Corr_ii = 1
+            else
+              *current_element_ptr = 0.0; // Undefined correlation
+          }
+        }
+      }
+    }
+  }
   n = 0;
   dcor = cor;
-  for (i = 1; i <= nfit; ++i) {
+  for (i = 1; i <= nfit; ++i)
+  {
     pcor = dcor;
-    for (j = 1; j <= nfit; ++j) {
-      if (i != j) {
+    for (j = 1; j <= nfit; ++j)
+    {
+      if (i != j)
+      {
         fprintf(lufit, "%3d%3d%10.6f", i, j, *pcor);
         n = (n + 1) & 7;
         if (n == 0)
@@ -188,57 +263,63 @@ double *cor, *err;
   if (n > 0)
     fputc('\n', lufit);
   return 0;
-}                               /* prcorr */
+} /* prcorr */
 
-SXLINE *lbufof(iflg, ipos)
-int iflg, ipos;
-{ /*  FUNCTION TO ACCESS LINE DATA, WITH POSSIBLE STORE */
-  /*  iflg = 0, then read line at abs(ipos)             */
-  /*  iflg = 1, then read/write line at abs(ipos)       */
-  /*  iflg = 2, then write line at abs(ipos)            */
-  /*  iflg < 0, then -iflg is number of derivatives     */
-  /*            and ipos is the number of lines         */
-  static SXLINE head;
-  /*@owned@*/ static double **dheapv = NULL;
-  /*@owned@*/ static double *dheap = NULL;
-  /*@dependent@*/ static double *tail;
-  static FILE *scratch = NULL;
-  static size_t nbyte;
-  static int nbuf, bpos, tpos, next, maxrec, ndbl, dnuoff, rewrit;
-  SXLINE *sret;
-  double *pheap;
-  size_t lpos, nline;
-  int n, relpos, k, state;
+  SXLINE *lbufof(iflg, ipos) int iflg, ipos;
+  { /*  FUNCTION TO ACCESS LINE DATA, WITH POSSIBLE STORE */
+    /*  iflg = 0, then read line at abs(ipos)             */
+    /*  iflg = 1, then read/write line at abs(ipos)       */
+    /*  iflg = 2, then write line at abs(ipos)            */
+    /*  iflg < 0, then -iflg is number of derivatives     */
+    /*            and ipos is the number of lines         */
+    static SXLINE head;
+    /*@owned@*/ static double **dheapv = NULL;
+    /*@owned@*/ static double *dheap = NULL;
+    /*@dependent@*/ static double *tail;
+    static FILE *scratch = NULL;
+    static size_t nbyte;
+    static int nbuf, bpos, tpos, next, maxrec, ndbl, dnuoff, rewrit;
+    SXLINE *sret;
+    double *pheap;
+    size_t lpos, nline;
+    int n, relpos, k, state;
 
-  sret = &head;
-  if (iflg >= 0) {
-    if (ipos == 0) {
-      return sret;
-    }
-    if (dheapv == NULL) {
-      puts(" scratch used before initialization");
-      exit(EXIT_FAILURE);
-    }
-    /* find offset from buffer origin */
-    if (ipos < 0)
-      ipos = -ipos;
-    --ipos;
-    state = 2;                  /* defaults for write/read new buffer */
-    relpos = ipos - bpos;
-    k = relpos - next;
-    if (k >= 0) {
-      if (k == 0) {
-        if (relpos < nbuf) {    /* record next in buffer */
-          state = 1;            /* read only */
-          if (tpos == ipos) {   /* copy from tail to body */
-            dcopy(ndbl, tail, 1, dheapv[relpos], 1);
-            ++next;
-            tpos = -1;
-            state = 0;
-            if ((rewrit & 2) != 0)
-              rewrit = 1;
-          }
-        } else if (relpos == nbuf && tpos < 0) {
+    sret = &head;
+    if (iflg >= 0)
+    {
+      if (ipos == 0)
+      {
+        return sret;
+      }
+      if (dheapv == NULL)
+      {
+        puts(" scratch used before initialization");
+        exit(EXIT_FAILURE);
+      }
+      /* find offset from buffer origin */
+      if (ipos < 0)
+        ipos = -ipos;
+      --ipos;
+      state = 2; /* defaults for write/read new buffer */
+      relpos = ipos - bpos;
+      k = relpos - next;
+      if (k >= 0)
+      {
+        if (k == 0)
+        {
+          if (relpos < nbuf)
+          {            /* record next in buffer */
+            state = 1; /* read only */
+            if (tpos == ipos)
+            { /* copy from tail to body */
+              dcopy(ndbl, tail, 1, dheapv[relpos], 1);
+              ++next;
+              tpos = -1;
+              state = 0;
+              if ((rewrit & 2) != 0)
+                rewrit = 1;
+            }
+          } else if (relpos == nbuf && tpos < 0) {
           state = 1;
         }
       }

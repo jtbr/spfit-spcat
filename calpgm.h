@@ -121,7 +121,8 @@ int getlbl(int npar, bcd_t *idpar, /*@out@*/ char *parlbl, const char *fil, int 
 //int getblk(/*@out@*/ int *iblk, /*@out@*/ int *indx, short *iqnum,
 //           int nblkpf, int ipos, int nqn);
 int filbak(char *flu, char *fbak);
-int prcorr(FILE *lufit, int npar, double *cor, int ndcor, double *err);
+int prcorr(FILE *lufit, int npar, double *cor, int ndcor, double *err,
+           int normalize_to_correlation);
 SXLINE * lbufof(int iflg, int ipos);
 void dnuadd(int npar, int nparx, int initl, int indx,
             int ifac, double *egy, double *egyder, int nsize,
