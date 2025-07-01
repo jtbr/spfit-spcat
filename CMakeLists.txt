@@ -110,6 +110,7 @@ if("spfit" IN_LIST EXECUTABLES)
   add_executable_plus(spfit TRUE # This target uses BLAS
     fit_main.cpp
     CalFit.cpp
+    CalFit_helpers.cpp
     CalFitIO.cpp
     subfit.c
     spinv_setup.c
