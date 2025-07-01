@@ -956,7 +956,8 @@ bool CalFit::performIteration(const CalFitInput &input, CalFitOutput &output)
 
   nitr_actual = (m_nitr_requested < 0) ? -m_nitr_requested : m_nitr_requested;
   if (nitr_actual == 0 && m_nitr_requested <= 0)
-  { // if nitr=0, or e.g. -1 to mean calc only
+  {
+    // if nitr=0, or e.g. -1 to mean calc only
     // If just calculation, may not need full iteration, but original did one pass.
     // For now, let's assume if nitr_actual is 0, we might do one pass for calc if m_nitr_requested < 0
   }
@@ -1158,7 +1159,8 @@ bool CalFit::performIteration(const CalFitInput &input, CalFitOutput &output)
     nf_fitted_lines = nrj = nfir = 0;
     icnt_progress = -1;
     if (lufit)
-    { // Header for line listing
+    {
+      // Header for line listing
       for (int i_space = 0; i_space < 40; ++i_space)
         fputc(' ', lufit);
       fputs("EXP.FREQ.  -  CALC.FREQ. -   DIFF.  - EXP.ERR.- ", lufit);
@@ -1190,7 +1192,8 @@ bool CalFit::performIteration(const CalFitInput &input, CalFitOutput &output)
         k_loop = frqdat(lblnd, &iblnd, &xfrq_line, &xwt_line, &xerr_line, qnum_line);
 
         if ((iblnd & 1) != 0)
-        { // Blended line width card (supblnd in original)
+        {
+          // Blended line width card (supblnd in original)
           supblnd = 1;
           xwid = xerr_line;                             // xerr_line is width for this type of card
           val_iter = 1.0 / (current_scale_iter * xwid); // Ensure current_scale_iter is not zero
@@ -1205,7 +1208,8 @@ bool CalFit::performIteration(const CalFitInput &input, CalFitOutput &output)
           dscal(m_nfit + 1, val_iter, this->dpar, 1);
         }
         else if (k_loop != 0)
-        { // Normal line or component of blend
+        {
+          // Normal line or component of blend
           if (xerr_line == 0.0)
             ex_line = 1.0 / m_tiny; // Avoid division by zero
           else
@@ -1225,14 +1229,15 @@ bool CalFit::performIteration(const CalFitInput &input, CalFitOutput &output)
       } while (iblnd < 0); // Loop while iblnd indicates more components in blend
 
       if (iflg_line == 0)
-      {                   // No valid lines/components found for this line_idx
+      {
+        // No valid lines/components found for this line_idx
         line_idx = lblnd; // Advance line_idx past this processed (empty) blend
         continue;         // skip to next master line_idx
       }
 
       // Calculate errors and process line/blend
       if (fabs(current_scale_iter) < m_tiny)
-      { // Check if effectively zero
+      {
         if (lufit)
           fprintf(lufit, "Line %d (and blend) has zero total weight after processing components, skipping.\n", line_idx);
         nrj++; // Count as rejected
@@ -1245,16 +1250,19 @@ bool CalFit::performIteration(const CalFitInput &input, CalFitOutput &output)
                                                                               // If blend, xfrq_line from frqdat should be the "blend frequency"
 
       if (fabs(rerr_line) < xerrmx_local)
-      {                                // Check if weighted error is acceptable
+      {
+        // Check if weighted error is acceptable
         xsqt += rerr_line * rerr_line; // Accumulate sum of squares of weighted residuals
         if (xerr_line < 0.0)
-        { // IR line (convention: negative error)
+        {
+          // IR line (convention: negative error)
           avgir += adif;
           xsqir += adif * adif;
           nfir++;
         }
         else
-        { // Microwave line
+        {
+          // Microwave line
           avgmw += adif;
           xsqmw += adif * adif;
         }
@@ -1264,7 +1272,8 @@ bool CalFit::performIteration(const CalFitInput &input, CalFitOutput &output)
         nf_fitted_lines++;
       }
       else
-      { // Line rejected
+      {
+        // Line rejected
         if (lufit)
           fputs(" ***** NEXT LINE NOT USED IN FIT\n", lufit);
         nrj++;
@@ -1288,7 +1297,8 @@ bool CalFit::performIteration(const CalFitInput &input, CalFitOutput &output)
         adif = (adif > 0.0) ? bigd : -bigd;
 
       if (iflg_line == 1)
-      {                                                        // Single unblended line printed
+      {
+        // Single unblended line printed
         qnfmt2(m_nqn_for_iteration * 2, qnum_line, aqnum_str); // nqn*2 for pair
         if (lufit)
         {
@@ -1304,14 +1314,16 @@ bool CalFit::performIteration(const CalFitInput &input, CalFitOutput &output)
         }
       }
       else
-      {                                          // Blended line, print all components
+      {
+        // Blended line, print all components
         int current_blend_member_idx = line_idx; // Start from the first line of the blend
         cwid = 0.0;
         do
         {
           k_loop = frqdat(current_blend_member_idx, &iblnd, &xfrq_line, &xwt_line, &xerr_line, qnum_line);
           if ((iblnd & 1) != 0)
-          {                              // Blend summary/width line
+          {
+            // Blend summary/width line
             xfrq_line = 0.0;             // Placeholder for Explt Freq for this line type
             frq_calc = sqrt(fabs(cwid)); // RMS of individual diffs from avg_calc for blend
             if (supblnd != 0 && xwid != 0.0)
@@ -1331,9 +1343,11 @@ bool CalFit::performIteration(const CalFitInput &input, CalFitOutput &output)
             }
           }
           else if (k_loop != 0)
-          { // Actual component of the blend
+          {
+            // Actual component of the blend
             if (supblnd != 0 && xwid != 0.0)
-            {                                                                              // If special blend processing active
+            {
+              // If special blend processing active
               ex_line = sqrt(fabs(xwt_line)) / xwid;                                       // Weight for this component
               frq_calc = dnuget(0, m_nfit, ex_line, current_blend_member_idx, this->dpar); // Get its contribution again
               jelim(this->fit, this->dpar, ndfit, m_nfit, 1);                              // Rotate into fit
@@ -1399,7 +1413,8 @@ bool CalFit::performIteration(const CalFitInput &input, CalFitOutput &output)
     // If 'fit' is column major:
     double *pfit_ptr = this->fit; // Start of matrix
     for (k_loop = 1; k_loop < m_nfit; ++k_loop)
-    {                                               // For columns 1 to nfit-1
+    {
+      // For columns 1 to nfit-1
       pfit_ptr += ndfit;                            // Move to start of column k_loop
       memset(pfit_ptr, 0, sizeof(double) * k_loop); // Zero k_loop elements from pfit_ptr[0] to pfit_ptr[k_loop-1]
     }
@@ -1434,11 +1449,13 @@ bool CalFit::performIteration(const CalFitInput &input, CalFitOutput &output)
       double xsqbest_candidate_from_prediction = (predicted_rms_sq > 0.0) ? sqrt(predicted_rms_sq) : 0.0;
 
       if (m_itr == 0)
-      { // If first iteration, initialize m_xsqbest
+      {
+        // If first iteration, initialize m_xsqbest
         m_xsqbest = xsqbest_candidate_from_prediction;
       }
       else
-      { // Otherwise, only update if this prediction is better
+      {
+        // Otherwise, only update if this prediction is better
         if (xsqbest_candidate_from_prediction < m_xsqbest)
         {
           m_xsqbest = xsqbest_candidate_from_prediction;
@@ -1576,7 +1593,8 @@ bool CalFit::performIteration(const CalFitInput &input, CalFitOutput &output)
       this->oldpar[i_par] = this->par[i_par]; // Save current param value
 
       if (this->idpar && (NEGBCD(this->idpar[ibcd_current]) == 0))
-      { // If parameter i_par is FITTED
+      {
+        // If parameter i_par is FITTED
         if (k_loop < m_nfit)
         {
           // Get parameter change delta_p for this k_loop'th fitted parameter
@@ -1598,7 +1616,8 @@ bool CalFit::performIteration(const CalFitInput &input, CalFitOutput &output)
           // this->dpar initially holds 'enorm' (scaling factors D_L_inv) from lsqfit.
           // Original main.c overwrote its 'dpar' array here with 'error_val'.
           if (this->dpar)
-          { // Ensure dpar is allocated
+          {
+            // Ensure dpar is allocated
             this->dpar[k_loop] = error_val;
           }
           else {
@@ -1644,9 +1663,11 @@ bool CalFit::performIteration(const CalFitInput &input, CalFitOutput &output)
     {
       int ibcd_current = i_par * m_ndbcd;
       if (this->idpar && NEGBCD(this->idpar[ibcd_current]) != 0)
-      { // Dependent
+      {
+        // Dependent
         if (ibase != -1 && this->par && this->erpar)
-        { // ibase must be valid
+        {
+          // ibase must be valid
           // this->par[i_par] is the factor.
           this->erpar[i_par] = fabs(this->par[i_par]) * this->erpar[ibase];
           // Update actual value of dependent parameter: par_dep = factor * par_master
@@ -1675,7 +1696,8 @@ bool CalFit::performIteration(const CalFitInput &input, CalFitOutput &output)
     for (int j_col = 0; j_col < m_nfit; ++j_col)
     {
       for (int i_row = j_col; i_row < m_nfit; ++i_row)
-      {                                            // Lower triangle elements including diagonal
+      {
+        // Lower triangle elements including diagonal
         *pvar_ptr_save++ = pfit_source_col[i_row]; // fit[i_row, j_col]
       }
       pfit_source_col += ndfit;
@@ -1747,7 +1769,8 @@ bool CalFit::performIteration(const CalFitInput &input, CalFitOutput &output)
 bool CalFit::finalizeOutputData(const CalFitInput &input, CalFitOutput &output)
 {
   if (!lufit && output.itr > 0)
-  { // lufit might be needed for prcorr
+  {
+    // lufit might be needed for prcorr
     // This case should ideally not happen if lufit is managed correctly through run
     puts("Warning: lufit stream is null in finalizeOutputData, prcorr might be skipped.");
   }
@@ -1839,7 +1862,8 @@ bool CalFit::finalizeOutputData(const CalFitInput &input, CalFitOutput &output)
     }
 
     if (this->erp)
-    { // Original a-priori errors
+    {
+      // Original a-priori errors
       output.erp_original_for_output.assign(this->erp, this->erp + m_npar);
     }
     else
@@ -1861,7 +1885,8 @@ bool CalFit::finalizeOutputData(const CalFitInput &input, CalFitOutput &output)
   {
     size_t standard_packed_elements = ((size_t)m_nfit * ((size_t)m_nfit + 1)) / 2;
     if (this->var)
-    { // Final variance/covariance related matrix (packed)
+    {
+      // Final variance/covariance related matrix (packed)
       output.var_final_for_output.assign(this->var, this->var + standard_packed_elements);
     }
     else
@@ -1937,12 +1962,14 @@ bool CalFit::finalizeOutputData(const CalFitInput &input, CalFitOutput &output)
   // calc->setblk(lufit, 0, ...) was called for cleanup.
   int dummy_nblkpf = 0, dummy_maxdm = 0; // For cleanup call
   if (calc)
-  { // Check if calc is valid
+  {
+    // Check if calc is valid
     calc->setblk(lufit, 0, this->idpar, this->par, &dummy_nblkpf, &dummy_maxdm);
   }
 
   if (output.itr == 0 && m_nfit > 0)
-  { // No iterations performed but tried to fit
+  {
+    // No iterations performed but tried to fit
     if (lufit)
       fprintf(lufit, "Output files not updated as no iterations were performed.\n");
     // Depending on requirements, might still write initial state or return !success from run()
@@ -1950,7 +1977,8 @@ bool CalFit::finalizeOutputData(const CalFitInput &input, CalFitOutput &output)
 
   // Write the final title card to lufit
   if (lufit && !input.title.empty())
-  { // input.title is original title before chtime
+  {
+    // input.title is original title before chtime
     char title_card_buffer_final[NDCARD];
     strncpy(title_card_buffer_final, input.title.c_str(), NDCARD - 1);
     title_card_buffer_final[NDCARD - 1] = '\0';
@@ -1984,7 +2012,8 @@ int CalFit::qnfmt2(int nqn, short *qnum, char *aqnum)
     aqnum += 3;
   }
   for (i = nqn; i < 12; ++i)
-  { // Pad to 12 quantum numbers (36 chars)
+  {
+    // Pad to 12 quantum numbers (36 chars)
     aqnum[2] = aqnum[1] = aqnum[0] = ' ';
     aqnum += 3;
   }
@@ -1997,8 +2026,8 @@ int CalFit::qnfmt2(int nqn, short *qnum, char *aqnum)
  * @param par Parameter value
  * @param errx Parameter error
  * @param dif Parameter change
- * @param ptmp Output string buffer for formatted parameter
- * @return Always returns 0
+ * @param ptmp Output string for formatted parameter
+ * @return int Always returns 0
  */
 int CalFit::parer(double par, double errx, double dif, char *ptmp)
 {
@@ -2100,50 +2129,53 @@ int CalFit::parer(double par, double errx, double dif, char *ptmp)
 
 /**
  * @brief Read experimental spectral lines from input file
+ *
+ * Reads spectral line data from the input file, including frequencies,
+ * errors, weights, and quantum numbers. Handles blended lines by
+ * identifying lines with matching frequencies. Stores the data in
+ * the global line buffer for later processing.
+ *
  * @param luin Input file pointer
  * @param nline Pointer to number of lines (input: max lines, output: actual lines)
  * @param iqnfmt Quantum number format for line input (from setfmt)
- * @return Largest quantum number encountered
+ * @return intLargest quantum number encountered
  */
-int CalFit::linein(FILE *luin, int *nline, int iqnfmt) // TODO iqnfmt is m_nfmt, could remove (?)
+int CalFit::linein(FILE *luin, int *nline, int iqnfmt) // TODO: iqnfmt is m_nfmt. could remove it(?)
 {
   /* Local variables */
-  SXLINE *xline;                /* Pointer to line data structure */
-  double xfrqn, xerrn, xwtn;    /* Current line frequency, error, weight */
-  double xfrqx, xerrx;          /* Previous line frequency and error */
-  int /*nqn,*/ nqnu, nqnl;          /* Number of quantum numbers */
-  int kqnu, kqnl;               /* Indices for upper/lower state quantum numbers */
-  int i, iqf, ipace, mxline;    /* Loop variables and counters */
-  int mxqn, isblnd, icmp;       /* Max quantum number, blend flag, comparison flag */
+  SXLINE *xline;             /* Pointer to line data structure */
+  double xfrqn, xerrn, xwtn; /* Current line frequency, error, weight */
+  double xfrqx, xerrx;       /* Previous line frequency and error */
+  int nqn, nqnu, nqnl;       /* Number of quantum numbers */
+  int kqnu, kqnl;            /* Indices for upper/lower state quantum numbers */
+  int i, iqf, ipace, mxline; /* Loop variables and counters */
+  int mxqn, isblnd, icmp;    /* Max quantum number, blend flag, comparison flag */
   short nbln, nqnt[20], *iqnum; /* Blend counter, quantum number template, quantum number pointer */
-  static char card[NDCARD];     /* Buffer for reading input lines */
+  char card[NDCARD];         /* Buffer for input lines. Should be static? */
 
   /*   get lines from input  and stores them */
+
   /*     LUIN= unit for finding lines */
   /*     NLINE = number of lines */
   /*     IQNFMT= qunatum number format for line input */
   /*     RETURN: largest quantum number */
   /*******************************************************************/
 
-  int iqnfmt_to_use_for_deflin = iqnfmt;
-  if (m_force_nqn10_for_linein) {
-    // Force NQN part of iqnfmt to 0 (which deflin interprets as 10)
-    // QFMT = Q*100 + H*10 + NQN. NQN is iqnfmt % 10.
-    // To set NQN part to 0: iqnfmt_for_deflin = (iqnfmt / 10) * 10;
-    int current_nqn_digits = iqnfmt_to_use_for_deflin % 10;
-    iqnfmt_to_use_for_deflin = iqnfmt_to_use_for_deflin - current_nqn_digits; // Clears the NQN field to 0
-  }
-
-  int nqn_for_getlin = deflin(iqnfmt_to_use_for_deflin, nqnt);
-
   mxline = *nline;
   mxqn = 1;
   nbln = 1;
-  nqnu = nqn_for_getlin - 1;
+  nqn = deflin(iqnfmt, nqnt);
+  printf("DEBUG linein: iqnfmt parameter = %d\n", iqnfmt);
+  printf("DEBUG linein: iqnfmt passed to deflin = %d\n", iqnfmt);
+  printf("DEBUG linein: nqnt after deflin = %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d \n",
+         nqnt[0], nqnt[1], nqnt[2], nqnt[3], nqnt[4], nqnt[5], nqnt[6], nqnt[7], nqnt[8], nqnt[9],
+         nqnt[10], nqnt[11], nqnt[12], nqnt[13], nqnt[14], nqnt[15], nqnt[16], nqnt[17], nqnt[18], nqnt[19]);
+
+  nqnu = nqn - 1;
   if (nqnt[nqnu] < 0)
     nqnu = 0;
   kqnu = nqnt[nqnu];
-  nqnl = nqnu + nqn_for_getlin;
+  nqnl = nqnu + nqn;
   kqnl = nqnt[nqnl];
   ipace = 100;
   xfrqx = xerrx = 0.;
@@ -2152,14 +2184,13 @@ int CalFit::linein(FILE *luin, int *nline, int iqnfmt) // TODO iqnfmt is m_nfmt,
   { /*  loop for reading lines */
     xline = lbufof(1, i);
     iqnum = xline->qn;
-    if (getlin(luin, nqn_for_getlin, nqnt, iqnum, &xfrqn, &xerrn, &xwtn,
+    if (getlin(luin, nqn, nqnt, iqnum, &xfrqn, &xerrn, &xwtn,
                card, NDCARD) < 0)
     {
       *nline = i - 1;
       return mxqn;
     }
-    // This logic for iqf also uses nqn_for_getlin (via nqnu, nqnl)
-    iqf = iqnum[nqnu]; // nqnu derived from nqn_for_getlin
+    iqf = iqnum[nqnu];
     if (iqf == -1)
     {
       if (kqnu >= 0)
@@ -2174,10 +2205,10 @@ int CalFit::linein(FILE *luin, int *nline, int iqnfmt) // TODO iqnfmt is m_nfmt,
       iqf = -iqf;
     if (iqf > mxqn)
       mxqn = iqf;
-    iqf = iqnum[nqnl]; // nqnl derived from nqn_for_getlin
+    iqf = iqnum[nqnl];
     if (iqf == -1)
     {
-      if (kqnl > 0) // kqnl was from nqnt[nqnl], check bounds if nqnl can be large
+      if (kqnl > 0)
       {
         iqf = -iqnum[kqnl];
         if (iqf >= 0)
@@ -2202,14 +2233,14 @@ int CalFit::linein(FILE *luin, int *nline, int iqnfmt) // TODO iqnfmt is m_nfmt,
       {
         isblnd = 1;
       }
-      else if ((xerrn / xerrx) > 2.0 && nbln > 2) // Original code had xerrn/xerrx, ensure xerrx is not zero
+      else if ((xerrn / xerrx) > 2.0 && nbln > 2) // Original code had xerrn/xerrx, should ensure xerrx is not zero
       {
         isblnd = 1;
         ++nbln;
         icmp = 0;
         xline->xwt = (float)0.;
         iqnum[0] = (short)-1;
-        if (nqn_for_getlin > 0) iqnum[nqn_for_getlin] = iqnum[0]; // Index with actual NQN
+        iqnum[nqn] = iqnum[0];  // TODO: check if nqn>0 ?
       }
     }
     if (isblnd != 0)
@@ -2239,12 +2270,18 @@ int CalFit::linein(FILE *luin, int *nline, int iqnfmt) // TODO iqnfmt is m_nfmt,
 
 /**
  * @brief Process spectral lines and set up block structure for fitting
+ *
+ * Processes the spectral lines read by linein(), determining the Hamiltonian
+ * blocks and indices for upper and lower states of each transition.
+ * Sets up links for calculating energies and derivatives in block order.
+ * Identifies and reports bad lines (those with invalid quantum numbers).
+ *
  * @param lu Output file pointer for listing
  * @param flg Flag for printing (negative for detailed output)
  * @param nline Number of lines
  * @param nblkpf Number of blocks per F quantum number
  * @param iqnfmt Quantum number format for line input
- * @return Number of bad lines
+ * @return int Number of bad lines
  */
 int CalFit::lineix(FILE *lu, int flg, int nline, int nblkpf, int iqnfmt)
 {
@@ -2257,8 +2294,8 @@ int CalFit::lineix(FILE *lu, int flg, int nline, int nblkpf, int iqnfmt)
   static int nsort = 2048;
   SXLINE *xline;
   double xfrqn, xerrn, xwtn, xnorm;
-  int nblk, ipos, i, j, ipace, nread, iblkl, iblku, ncat;
-  int linkx, indxl, linky, indxu, orgblk, nqn, nqn2, nbad;
+  int nblk, ipos_for_getblk, i, j, ipace, nread, iblkl, iblku, ncat;
+  int linkx, indxl, linky, indxu, orgblk, nqn_for_hamiltonian_basis, nqn2, nbad;
   /*@owned@*/ int *prvblk;
   short *iqnum;
   char aqnum[6 * MAXQN + 2];
@@ -2271,21 +2308,21 @@ int CalFit::lineix(FILE *lu, int flg, int nline, int nblkpf, int iqnfmt)
   {
     prvblk[i] = 0;
   }
-  nqn = iqnfmt % 10;
-  if (nqn == 0)
-    nqn = 10;
-  nqn2 = nqn + nqn;
+  nqn_for_hamiltonian_basis = iqnfmt % 10;
+  if (nqn_for_hamiltonian_basis == 0)
+    nqn_for_hamiltonian_basis = 10;
+  nqn2 = nqn_for_hamiltonian_basis + nqn_for_hamiltonian_basis;
   ncat = nqn2;
   if (ncat < 12)
     ncat = 12;
   i = (iqnfmt / 100) % 5;
-  if (i >= nqn)
+  if (i >= nqn_for_hamiltonian_basis)
   {
-    ipos = 1;
+    ipos_for_getblk = 1;
   }
   else
   {
-    ipos = nqn;
+    ipos_for_getblk = nqn_for_hamiltonian_basis;
   }
   if (flg < 0)
   {
@@ -2305,10 +2342,12 @@ int CalFit::lineix(FILE *lu, int flg, int nline, int nblkpf, int iqnfmt)
     xwtn = xline->xwt;
     /* find blocks and index for upper and lower states */
     iqnum = xline->qn;
-    getblk(&iblku, &indxu, iqnum, nblkpf, ipos, nqn);
-    getblk(&iblkl, &indxl, &iqnum[nqn], nblkpf, ipos, nqn);
-    if (iblkl == 0 && iqnum[nqn] >= 0)
+    this->getblk(&iblku, &indxu, iqnum, nblkpf, ipos_for_getblk, nqn_for_hamiltonian_basis);
+    this->getblk(&iblkl, &indxl, &iqnum[nqn_for_hamiltonian_basis], nblkpf, ipos_for_getblk, nqn_for_hamiltonian_basis);
+    if (iblkl == 0 && iqnum[nqn_for_hamiltonian_basis] >= 0)
+    {
       iblku = 0;
+    }
     xline->ibu = iblku;
     xline->inu = (short)indxu;
     xline->ibl = iblkl;
@@ -2375,7 +2414,8 @@ int CalFit::lineix(FILE *lu, int flg, int nline, int nblkpf, int iqnfmt)
     {
       xnorm += xwtn;
       if (j > 0)
-      { /* normalize weights */
+      {
+        /* normalize weights */
         xnorm = 1. / xnorm;
         for (j = nread - (j >> 1); j <= nread; ++j)
         {
@@ -2392,7 +2432,8 @@ int CalFit::lineix(FILE *lu, int flg, int nline, int nblkpf, int iqnfmt)
   } /* end loop for converting lines */
   orgblk = nsort;
   while (nblk > orgblk)
-  { /* finish up links */
+  {
+    /* finish up links */
     --orgblk;
     linkx = 0;
     for (j = 0; j < nsort; ++j)
@@ -2436,6 +2477,7 @@ int CalFit::getblk(int *iblk, int *indx, short *iqnum, int nblkpf, int ipos, int
   short kqnum[MAXQN];
 
   /*  gets block (IBLK) and INDEX from quantum numbers (IQNUM) */
+
   /*     NBLKPF IS THE NUMBER OF BLOCKS PER "F" */
   /*     IPOS   IS THE POSITION IN IQNUM TO FIND "F" */
   /*     NQN    IS THE NUMBER OF QUANTUM NUMBERS */
@@ -2530,4 +2572,4 @@ int CalFit::getblk(int *iblk, int *indx, short *iqnum, int nblkpf, int ipos, int
   }
   iqnum[ipos] = (short)iqnf;
   return 0;
-} // getblk
+} /* getblk */
