@@ -12,6 +12,7 @@
 #include <string.h> // for strcpy
 #include <vector>   // for std::vector
 #include <algorithm>// for std::copy
+#include <sstream>  // for std::stringstream
 #include "CalFitIO.hpp"
 #include "CalFit.hpp"
 #include "lsqfit.h"  // For C functions like dcopy, ddot, mallocq, etc.
@@ -30,10 +31,10 @@ CalFit::CalFit(std::unique_ptr<CalculationEngine> &calc_engine, FILE *final_lufi
     parlbl(nullptr), par(nullptr), erp(nullptr), oldpar(nullptr), erpar(nullptr),
     dpar(nullptr), delbgn(nullptr), fitbgn(nullptr), var(nullptr), oldfit(nullptr),
     fit(nullptr), teig(nullptr), pmix(nullptr), iperm(nullptr), idpar(nullptr),
-    m_npar(0), m_nfit(0), ndfit(0), ndiag(0), m_nsize_p(0), m_nxpar_actual(0), m_nxfit(0),
+    m_npar(0), m_nfit(0), ndfit(0), ndiag(0), m_catqn(0), m_nxpar_actual(0), m_nxfit(0),
     m_inpcor(0), m_xerrmx(0.0), m_parfac(0.0), m_parfac0(0.0), m_fqfacq(0.0),
     m_ndbcd(0), m_nfmt(0), m_itd(0), m_nline(0), m_limlin(0), m_maxf_from_linein(0),
-    m_nblkpf_actual(0), m_maxdm_actual(0), m_ndfree0(0)
+    m_nblkpf_actual(0), m_maxdm_actual(0), m_ndfree0(0), m_nqn_for_iteration(0)
 {
   if (!lufit)
   {
@@ -139,13 +140,8 @@ bool CalFit::initializeParameters(const CalFitInput &input)
 {
   // --- 1. Transfer scalar control parameters ---
   m_npar = input.npar;
-
-  m_force_nqn10_for_linein = (input.limlin < 0); // Set the flag
-  if (m_force_nqn10_for_linein) {
-      m_limlin = -input.limlin; // Use positive for array sizing etc.
-  } else {
-    m_limlin = input.limlin;
-  }
+  m_catqn = input.catqn;
+  m_limlin = input.limlin;
   m_nitr_requested = input.nitr;
   m_fqfacq = input.fqfacq;
   m_ndbcd = input.ndbcd_from_setopt;
@@ -165,7 +161,7 @@ bool CalFit::initializeParameters(const CalFitInput &input)
   m_parfac0 = input.parfac_initial;
   m_parfac = input.parfac_initial;
   if (m_xerrmx < m_tiny)
-    m_xerrmx = 1e6;
+    m_xerrmx = 1e6; // TODO: should be 1e-6?!
 
   // --- 2. Allocate C-style member arrays ---
   // Free any existing memory first
@@ -213,8 +209,6 @@ bool CalFit::initializeParameters(const CalFitInput &input)
   parlbl = (char *)mallocq(parlbl_actual_size);
   if (!parlbl)
   {
-    // if (lufit)
-    //   fprintf(lufit, "ERROR: mallocq for parlbl failed.\n");
     perror("mallocq for parlbl failed");
     return false;
   }
@@ -222,44 +216,33 @@ bool CalFit::initializeParameters(const CalFitInput &input)
   par = (double *)mallocq((size_t)m_npar * sizeof(double));
   if (!par)
   {
-    // if (lufit)
-    //   fprintf(lufit, "ERROR: mallocq for par failed.\n");
     perror("mallocq for par failed");
     free(parlbl);
-    parlbl = nullptr;
     return false;
   }
 
   oldpar = (double *)mallocq((size_t)m_npar * sizeof(double));
   if (!oldpar)
   {
-    // if (lufit)
-    //   fprintf(lufit, "ERROR: mallocq for oldpar failed.\n");
     perror("mallocq for oldpar failed");
     free(parlbl);
     free(par);
-    parlbl = nullptr;
-    par = nullptr;
     return false;
   }
 
   erp = (double *)mallocq((size_t)m_npar * sizeof(double));
   if (!erp)
   {
-    // if (lufit)
-    //   fprintf(lufit, "ERROR: mallocq for erp failed.\n");
     perror("mallocq for erp failed");
     free(parlbl);
     free(par);
-    free(oldpar); /*... set null ...*/
+    free(oldpar);
     return false;
   }
 
   erpar = (double *)mallocq((size_t)m_npar * sizeof(double));
   if (!erpar)
   {
-    // if (lufit)
-    //   fprintf(lufit, "ERROR: mallocq for erpar failed.\n");
     perror("mallocq for erpar failed");
     free(parlbl);
     free(par);
@@ -269,11 +252,10 @@ bool CalFit::initializeParameters(const CalFitInput &input)
   }
 
   size_t idpar_actual_size = ((size_t)m_npar * m_ndbcd + m_ndbcd + 3);
-  idpar = (bcd_t *)mallocq(idpar_actual_size * sizeof(bcd_t));
+  idpar = (bcd_t *)mallocq(idpar_actual_size * sizeof(bcd_t));  // sizeof(bcd_t) == 1
   if (!idpar)
   {
-    // if (lufit)
-    //   fprintf(lufit, "ERROR: mallocq for idpar failed.\n");
+
     perror("mallocq for idpar failed");
     free(parlbl);
     free(par);
@@ -344,10 +326,10 @@ bool CalFit::initializeParameters(const CalFitInput &input)
   // --- Initialize fitting matrices and related arrays (sized by m_nfit) ---
   if (m_nfit <= 0)
   {
-    if (lufit && m_npar > 0)
-    {
-      fprintf(lufit, "No parameters marked for fitting (nfit = %d).\n", m_nfit);
-    }
+    // if (lufit && m_npar > 0)
+    // {
+    //   fprintf(lufit, "No parameters marked for fitting (nfit = %d).\n", m_nfit);
+    // }
     printf("No parameters marked for fitting (nfit = %d).\n", m_nfit);
     iperm = nullptr;
     dpar = nullptr;
@@ -464,7 +446,8 @@ bool CalFit::initializeParameters(const CalFitInput &input)
     double current_scale_factor; // Renamed from 'scale'
 
     if (m_inpcor > 0)
-    { // "Supplied variance" path
+    {
+      // "Supplied variance" path
       // Assume 'var' is standard packed LOWER Cholesky factor L of Covariance.
       // (If getvar truly gives UPPER, then var is U, and fit=U. Logic might need U^T U.)
       // For now, proceed as if var = L_packed_lower.
@@ -478,9 +461,11 @@ bool CalFit::initializeParameters(const CalFitInput &input)
       // L_packed_colmajor stores L00, L10,L11, L20,L21,L22,...
       int k_l_packed = 0;
       for (int j_col_L = 0; j_col_L < m_nfit; ++j_col_L)
-      { // Iterate columns of L
+      {
+        // Iterate columns of L
         for (int i_row_L = j_col_L; i_row_L < m_nfit; ++i_row_L)
-        { // Iterate rows of L (from diagonal down)
+        {
+          // Iterate rows of L (from diagonal down)
           // L(i_row_L, j_col_L) = U(j_col_L, i_row_L)
           // Find U(j_col_L, i_row_L) in this->var (U_packed)
           int u_row = j_col_L;
@@ -491,7 +476,8 @@ bool CalFit::initializeParameters(const CalFitInput &input)
             l_packed_temp[k_l_packed++] = this->var[idx_in_u_packed];
           }
           else
-          { /* error bounds */
+          {
+            /* error bounds */
           }
         }
       }
@@ -515,7 +501,8 @@ bool CalFit::initializeParameters(const CalFitInput &input)
       // `this->erpar` (diag_flags) is passed as `wk`. dqrfac uses it for pivoting and overwrites it.
       int n_rank = dqrfac(fit, ndfit, m_nfit, m_nfit, 0, this->erpar, iperm);
       if (m_nfit > n_rank && lufit)
-      { /* singular warning */
+      {
+        /* singular warning */
       }
       // `fit` now contains F (lower factor of L_s * P). `this->erpar` has diag of F.
 
@@ -553,7 +540,8 @@ bool CalFit::initializeParameters(const CalFitInput &input)
       double *pfitb_ptr = fitbgn;
       pfit_col_start = fit; // `fit` is m_nfit x ndfit (contains symmetric InvCov)
       for (int j_col_idx = 0; j_col_idx < m_nfit; ++j_col_idx)
-      { // For each column j
+      {
+        // For each column j
         // Pack lower triangle: elements from row j_col_idx down to m_nfit-1
         for (int i_row_idx = j_col_idx; i_row_idx < m_nfit; ++i_row_idx)
         {
@@ -563,7 +551,8 @@ bool CalFit::initializeParameters(const CalFitInput &input)
       }
     }
     else
-    { // "No supplied variance"
+    {
+      // "No supplied variance"
       // `var` is standard packed upper, diagonal elements are sigma_i^2 from getvar.
       // `fitbgn` needs to be standard packed upper, 1/sigma_i^2 on diagonal, 0 off-diagonal.
       memset(fitbgn, 0, standard_packed_elements * sizeof(double));
@@ -574,7 +563,8 @@ bool CalFit::initializeParameters(const CalFitInput &input)
         for (int i_row = 0; i_row <= j_col; ++i_row)
         {
           if (i_row == j_col)
-          { // Diagonal element
+          {
+            // Diagonal element
             if (*pvar_ptr == 0.0)
             {
               *pfitb_ptr = 1.0 / (m_tiny * m_tiny);
@@ -585,7 +575,8 @@ bool CalFit::initializeParameters(const CalFitInput &input)
             }
             if (*pfitb_ptr < 1.e-15)
               --m_ndfree0;
-          } // Off-diagonals in fitbgn remain 0 from memset
+          }
+          // Off-diagonals in fitbgn remain 0 from memset
           pvar_ptr++;
           pfitb_ptr++;
         }
@@ -619,7 +610,8 @@ bool CalFit::initializeParameters(const CalFitInput &input)
   {
     int ibcd_offset = i_par_idx * m_ndbcd;
     if (idpar && (size_t)ibcd_offset < idpar_actual_size)
-    {                                      // Check bounds
+    {
+      // Check bounds
       if (NEGBCD(idpar[ibcd_offset]) == 0) // If parameter is fitted (not fixed)
         --m_nxfit;
     }
@@ -632,13 +624,14 @@ bool CalFit::initializeParameters(const CalFitInput &input)
     }
   }
 
-  // --- 6. Call lbufof ---
-  lbufof(-m_nfit, m_limlin);
-
   if (lufit && fabs(m_fqfacq - 1.) >= 1e-10)
   {
     fprintf(lufit, " IR Frequencies Scaled by %12.10f\n", m_fqfacq);
   }
+
+  // --- 6. Call lbufof ---
+  lbufof(-m_nfit, m_limlin);
+
   return true;
 } // initializeParamaters
 
@@ -683,43 +676,40 @@ bool CalFit::processLinesAndSetupBlocks(const CalFitInput &input)
   //    Member variables like m_itd, m_ndbcd are set. m_namfil_buffer has content.
 
   // 2. Set quantum number format in CalculationEngine (calc->setfmt)
-  int iqnfmt_val_from_setfmt = 0;
-  // m_nfmt (member) will store the iqnfmt value for linein/lineix.
-  // Initialize with a default or value from input if appropriate (e.g. input.nfmt_cat_from_setopt if it's the same kind of nfmt)
-  // The original main did: iqnfmt = 0; ... nqn = calc->setfmt(&iqnfmt, 1);
-  // So, iqnfmt_val_from_setfmt is the primary output.
-  int nqn_engine_actual = calc->setfmt(&iqnfmt_val_from_setfmt, 1); // iflg=1 usually means primary format
-  if (nqn_engine_actual <= 0)
+  // The nfmt value is read by setopt in CalFitIO and stored in input.nfmt_cat_from_setopt. This is not used subsequently.
+  // The value 0 is sent as iqnfmt input to setfmt and is modified and used
+  m_nqn_for_iteration = calc->setfmt(&m_nfmt, 1); // iflg=1 usually means primary format
+  if (m_nqn_for_iteration <= 0)
   {
     // if (lufit)
-    //   fprintf(lufit, "ERROR: calc->setfmt failed to set quantum number format (returned %d).\n", nqn_engine_actual);
-    printf("ERROR: calc->setfmt failed (returned %d).\n", nqn_engine_actual);
+    //   fprintf(lufit, "ERROR: calc->setfmt failed to set quantum number format (returned %d).\n", m_nqn_for_iteration);
+    printf("ERROR: calc->setfmt failed (returned %d).\n", m_nqn_for_iteration);
     return false;
   }
-  m_nfmt = iqnfmt_val_from_setfmt; // Store the iqnfmt for line processing by CalFit methods
-  // Original main also had: if (nqn > MAXCAT) catqn = nqn; nqn = nqn + nqn; (for pairs)
-  // This `nqn_engine_actual` is used later in main iteration loop's qnfmt2 call. Store if needed.
-  // For now, m_nfmt (the iqnfmt itself) is the key part for linein/lineix.
-  m_nqn_for_iteration = nqn_engine_actual; // Store this for later use with qnfmt2
+
+  if (m_nqn_for_iteration > MAXCAT) {
+    m_catqn = m_nqn_for_iteration;
+  }
+  // original also had: nqn = nqn + nqn; (for pairs)  TODO: why does this cause a regression now?
+  // m_nqn_for_iteration *= 2;
+
+  printf("DEBUG processLinesAndSetupBlocks: m_nqn_for_iteration: %d, m_nfmt: %d\n", m_nqn_for_iteration, m_nfmt);
 
   // 3. Process Experimental Lines (using this->linein)
-  FILE *temp_line_file = tmpfile();
+  std::stringstream line_stream;
+  for (const auto &line_str : input.lineData_raw)
+  {
+    line_stream << line_str << '\n';
+  }
+  std::string line_buffer_str = line_stream.str();
+  FILE *temp_line_file = fmemopen((void *)line_buffer_str.c_str(), line_buffer_str.size(), "r");
   if (!temp_line_file)
   {
     // if (lufit)
     //   fprintf(lufit, "ERROR: Unable to create temporary file for line data.\n");
-    puts("ERROR: Unable to create temporary file for line data.");
+    puts("ERROR: Unable to create in-memory file for line data.");
     return false;
   }
-  for (const auto &line_str : input.lineData_raw)
-  {
-    fputs(line_str.c_str(), temp_line_file);
-    if (!line_str.empty() && line_str.back() != '\n')
-    {
-      fputc('\n', temp_line_file);
-    }
-  }
-  rewind(temp_line_file);
 
   int current_nline_val = m_limlin;                                        // Pass current max line count, linein updates it
   m_maxf_from_linein = this->linein(temp_line_file, &current_nline_val, m_nfmt); // Call CalFit's linein
@@ -737,7 +727,8 @@ bool CalFit::processLinesAndSetupBlocks(const CalFitInput &input)
     return false;
   }
   if (m_limlin > m_nline)
-  {                     // From original main logic
+  {
+    // From original main logic
     m_limlin = m_nline; // Adjust m_limlin to actual if fewer were read
   }
 
@@ -759,7 +750,8 @@ bool CalFit::processLinesAndSetupBlocks(const CalFitInput &input)
 
   // 5. Set parameter labels (getlbl - global C function)
   if (this->parlbl && this->idpar)
-  { // parlbl allocated in initializeParameters
+  {
+    // parlbl allocated in initializeParameters
     const char *namfil_cstr = (m_namfil_buffer[0] == '\0') ? nullptr : m_namfil_buffer;
     getlbl(m_npar, this->idpar, this->parlbl, namfil_cstr, k_from_setblk, LBLEN);
   }
@@ -941,11 +933,9 @@ bool CalFit::performIteration(const CalFitInput &input, CalFitOutput &output)
   fqfac[2] = fqfacq_local / 29979.2458;
   fqfac[3] = -fqfac[2];
 
-  m_marqp[0] = input.marqp0; // Initial Marquardt parameter from input file
+  m_marqp[0] = input.marqp0; // Initial Marquardt parameter from input file (set to 0 if negative)
   m_marqp[1] = -1.0;         // Trust region, -1 means find max initially
-  m_marqp[2] = 1.0;          // Trust region ratio
-  if (m_marqp[0] < 0.0)
-    m_marqp[0] = 0.0;
+  m_marqp[2] = 1.0;          // Trust region ratio (ORIGINALLY UNSET. SET IN lsqfit())
 
   m_xsqbest = zero_static; // Best RMS error
   m_marqlast = m_marqp[0]; // Store initial marqp for output if no iterations
@@ -1822,9 +1812,8 @@ bool CalFit::finalizeOutputData(const CalFitInput &input, CalFitOutput &output)
   // This will be passed directly to writeOutput from main.
 
   output.npar_final = m_npar;
-  // For limlin in output header: original main.c used `limlin` which could be negative
-  // if catqn > MAXCAT. CalFitIO's input.limlin stores this original value.
-  output.limlin_final = input.limlin;
+  // For limlin in output header: original `limlin` which could be negative
+  output.limlin_final = m_catqn > MAXCAT ? -input.limlin : input.limlin;
   output.nitr_final_actual = m_itr;                // Actual iterations done
   output.nxpar_for_header = input.nxpar_from_file; // The count for the header
   output.marqlast_final = m_marqlast;              // Last Marquardt param before final lsqfit call, or from input if no iters

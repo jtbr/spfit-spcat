@@ -65,8 +65,8 @@ This document outlines the prioritized tasks for modernizing the SPFIT/SPCAT sof
             - Modify the `main` functions in `calfit.c` and `calcat.c` to use the `CalculationEngine` interface.
         - **Step 5: Preliminary simplifications**:
             - Remove `zero` and `szero` from `SpinvContext` and `DpiContext`, use `memset` instead of `dcopy()` where simple, remove context parameter from functions that don't need it.
-        - **Step 6: Refactor `calfit.cpp` and `calcat.cpp`**:
-            - Refactor `calfit.cpp` and `calcat.cpp` to be more modular.
+        - **Step 6: Refactor `fit_main.cpp` and `cat_main.cpp`**:
+            - Refactor `fit_main.cpp` and `cat_main.cpp` to be more modular.
             - This will involve creating `Spfit` and `Spcat` classes and moving the logic from the `main` functions into these classes.
             In this step we'll need to:
               - **Define Clear C++ APIs**: Create well-defined C++ class interfaces (e.g., `Spfit`, `Spcat`) with methods that encapsulate core functionalities. These methods should take C++ data structures as input and return C++ data structures as output.
@@ -76,17 +76,18 @@ This document outlines the prioritized tasks for modernizing the SPFIT/SPCAT sof
       - **Completed in Step 6**:
         - Created `CalFit` class with methods for parameter initialization (`initializeParameters`), spectral line processing (`processLines`), and formatting (`parer`, `qnfmt2`).
         - Implemented core logic for reading and processing spectral lines (`linein`, `lineix`, `getblk`).
-        - Updated `calfit.cpp` to use the `CalFit` class integrated with the calculation engine.
+        - Updated `fit_main.cpp` to use the `CalFit` class integrated with the calculation engine.
         - Implemented iterative fitting logic in `performIteration` using the Marquardt-Levenberg algorithm.
         - Implemented error calculation and statistics in `calculateErrors`.
         - Completed I/O separation by implementing `readInput` and `writeOutput` in `CalFitIO` for handling file operations (these are not fully utilized yet; there are still scratch files being used.)
       - **Remaining in Step 6**:
-        - Debug current issues in reproducing correct functionality (spfit exits with error 1 after messages about "No option lines found, using default values", and "Unable to open line input file", followed by "Fitting process failed")
+        - Debug current issues in reproducing correct functionality (a number of discrepancies in output files remain, compared with the baseline outputs.)
+        - Once this is validated, commit a new baseline to git
+        - Refactor `cat_main.cpp` into a `CalCat` class following the same modularization pattern.
         - Make full use of `CalFitIO` and remove use of scratch files.
-        - Refactor `calcat.cpp` into a `CalCat` class following the same modularization pattern.
         - Note that some input/output files are shared between `fit` and `cal` and it may make sense that IO is modularized by file type and shared between `CalCat` and `CalFit`. This needs to be explored first.
         - we may need to refactor linein and getlin and possibly other code to remove dependencies on file IO and separate that from the logic
-    - **Details**: The refactoring has focused on disentangling file I/O from calculation logic within the `CalFit` class. Temporary file placeholders are in use until full I/O separation is achieved.
+    - **Details**: The refactoring has focused on disentangling file I/O from calculation logic within the `CalFit` class. Temporary file (or in-memory file) placeholders are in use until full I/O separation is achieved.
     - **Plan**:
         1.  **Spfit/Spcat Class Structure:**
             *   Create `Spfit` (implemented as `CalFit`) and `Spcat` classes.

@@ -42,6 +42,8 @@ bool CalFitIO::readInput(const std::string &parFile, const std::string &linFile,
     return false;
   }
 
+  input.catqn = MAXCAT;
+
   // Open the par backup stream for reading
   FILE *lubak_stream_for_par_content = fopen(parFile.c_str(), "r");
   if (!lubak_stream_for_par_content)
@@ -79,10 +81,18 @@ bool CalFitIO::readInput(const std::string &parFile, const std::string &linFile,
     return false;
   }
   input.npar = (int)dvec[0];
-  input.limlin = (int)dvec[1];
+  if (dvec[1] < 0.0)
+  {
+    input.catqn = MAXQN;
+    dvec[1] = -dvec[1];
+  }
+  input.limlin = (size_t)dvec[1];
   input.nitr = (int)dvec[2];
   input.nxpar_from_file = (int)dvec[3];
   input.marqp0 = dvec[4];
+  if (input.marqp0 < 0.0) {
+    input.marqp0 = 0.0;
+  }
   input.xerrmx = dvec[5];
   input.parfac_initial = dvec[6];
   input.fqfacq = dvec[7];
@@ -90,21 +100,6 @@ bool CalFitIO::readInput(const std::string &parFile, const std::string &linFile,
   // --- WRITE INITIAL HEADER LINES TO lufit_for_logging NOW ---
   if (lufit_for_logging)
   {
-    // Values used: input.limlin, input.npar, input.nitr, input.marqp0, input.xerrmx
-    int display_limlin = input.limlin; // Use the value as read, could be negative
-    // Original main would have already modified limlin if it was negative for catqn.
-    // For display here, let's use the value that would have been used by original printf.
-    // If input.limlin < 0, original main set catqn=MAXQN and used abs(limlin) for display.
-    // We don't have catqn logic here, so just display what's given.
-    // Or, to be very precise:
-    int effective_display_limlin = (input.limlin < 0) ? MAXQN : input.limlin;
-
-    fprintf(lufit_for_logging, "LINES REQUESTED=%5d NUMBER OF PARAMETERS=%3d", display_limlin, input.npar);
-    fprintf(lufit_for_logging, " NUMBER OF ITERATIONS=%3d\n  MARQUARDT PARAMETER =", input.nitr);
-    fprintf(lufit_for_logging, "%11.4E max (OBS-CALC)/ERROR =%10.4E\n", input.marqp0, input.xerrmx);
-
-    // Check for other early log lines from original main that depend only on these initial params:
-    // Example: "PARAMETER ERRORS SCALED BY..."
     if (fabs(input.parfac_initial - 1.0) > 1e-10)
     {
       fprintf(lufit_for_logging, "PARAMETER ERRORS SCALED BY %15.6f", fabs(input.parfac_initial));
@@ -112,15 +107,13 @@ bool CalFitIO::readInput(const std::string &parFile, const std::string &linFile,
         fputs(" times the standard error", lufit_for_logging);
       fputc('\n', lufit_for_logging);
     }
-    // Note: "NUMBER OF PARAMETERS EXCLUDED..." and "IR Frequencies Scaled by..."
-    // were printed in original main *after* getpar and after options were processed further.
-    // Those should remain in CalFit::initializeParameters or CalFit::processLinesAndSetupBlocks
-    // if they depend on m_nxpar_actual or confirmed m_fqfacq.
-    // The "IR Frequencies Scaled by %12.10f\n" was conditional on fqfacq != 1.0, can be here.
-    if (fabs(input.fqfacq - 1.0) >= 1e-10)
-    {
-      fprintf(lufit_for_logging, " IR Frequencies Scaled by %12.10f\n", input.fqfacq);
-    }
+
+    printf(                    "LINES REQUESTED=%5lu NUMBER OF PARAMETERS=%3d", input.limlin, input.npar);
+    fprintf(lufit_for_logging, "LINES REQUESTED=%5lu NUMBER OF PARAMETERS=%3d", input.limlin, input.npar);
+    printf(                    " NUMBER OF ITERATIONS=%3d\n  MARQUARDT PARAMETER =", input.nitr);
+    fprintf(lufit_for_logging, " NUMBER OF ITERATIONS=%3d\n  MARQUARDT PARAMETER =", input.nitr);
+    printf(                    "%11.4E max (OBS-CALC)/ERROR =%10.4E\n", input.marqp0, input.xerrmx);
+    fprintf(lufit_for_logging, "%11.4E max (OBS-CALC)/ERROR =%10.4E\n", input.marqp0, input.xerrmx);
   }
 
   // Store file position before setopt reads options
@@ -138,9 +131,9 @@ bool CalFitIO::readInput(const std::string &parFile, const std::string &linFile,
   // and advance the file pointer past them.
   char temp_namfil_buffer[NDCARD] = {0};
   // Initialize parameters for setopt with defaults that SpinvEngine::setopt expects or can modify
-  int temp_nfmt_cat = MAXCAT; // Default for setopt's nfmt output (catalog format count)
-  int temp_itd = 2;           // Default for molecule type
-  int temp_ndbcd = 1;         // Default BCD length
+  int temp_nfmt_cat = input.catqn;
+  int temp_itd = 2;           // Default for molecule type (overwritten by setopt)
+  int temp_ndbcd = 1;         // Default BCD length (overwritten by setopt)
 
   input.noptn_read_by_setopt = calc_engine_for_setup->setopt(
       lubak_stream_for_par_content,  // setopt consumes lines from this stream
@@ -151,26 +144,19 @@ bool CalFitIO::readInput(const std::string &parFile, const std::string &linFile,
 
   if (input.noptn_read_by_setopt < 0)
   { // EOF or error during option reading
-    fprintf(lufit_for_logging, "Warning/Error: calc_engine->setopt returned %d. Check .par file options section.\n", input.noptn_read_by_setopt);
-    // This might be acceptable if no options. If options were expected, it's an issue.
+    fprintf(lufit_for_logging, "Error reading option lines (calc_engine->setopt returned %d). Check .par file options section.\n", input.noptn_read_by_setopt);
+    fclose(lubak_stream_for_par_content);
+    return false;
   }
   input.nfmt_cat_from_setopt = temp_nfmt_cat;
   input.itd_from_setopt = temp_itd;
   input.ndbcd_from_setopt = temp_ndbcd;
   input.namfil_from_setopt = std::string(temp_namfil_buffer);
-  // Note: CalFitIO does not explicitly log the option cards here, assuming setopt or getpar might.
-  // If not, and we need option cards in lufit, we'd have to read them, store, pass to setopt (e.g. via temp file), then log.
-  // For now, assume setopt handles its own logging or the information is implicit.
 
   // Rewind to read and store the option lines that setopt processed
   if (fseek(lubak_stream_for_par_content, pos_before_options, SEEK_SET) != 0)
   {
     perror("fseek to re-read options failed");
-    // Handle error: cannot get option lines, but setopt might have worked.
-    // Output files might miss option lines.
-    // For now, proceed but log warning.
-    if (lufit_for_logging)
-      fprintf(lufit_for_logging, "Warning: Could not rewind to save option lines.\n");
     // To ensure lubak_stream is correctly positioned for getpar, could try to advance it by what setopt read,
     // though this is less reliable than setopt just leaving it at the right place.
     // For now, if fseek fails, subsequent getpar might read wrong data. Best to return false.
@@ -178,45 +164,37 @@ bool CalFitIO::readInput(const std::string &parFile, const std::string &linFile,
     return false;
   }
 
+  // Save all the option lines from file, for future use (TODO)
   input.raw_option_lines_from_par.clear();
-  if (input.noptn_read_by_setopt > 0)
+  char option_card_buffer[NDCARD];
+  for (int i = 0; i < input.noptn_read_by_setopt; ++i)
   {
-    char option_card_buffer[NDCARD];
-    for (int i = 0; i < input.noptn_read_by_setopt; ++i)
+    if (fgetstr(option_card_buffer, NDCARD, lubak_stream_for_par_content) > 0)
     {
-      if (fgetstr(option_card_buffer, NDCARD, lubak_stream_for_par_content) > 0)
-      {
-        input.raw_option_lines_from_par.push_back(std::string(option_card_buffer));
-      }
-      else
-      {
-        if (lufit_for_logging)
-          fprintf(lufit_for_logging, "Warning: Premature EOF while re-reading option line %d.\n", i + 1);
-        // This implies setopt read more lines than are now available, or fgetstr error.
-        break;
-      }
+      input.raw_option_lines_from_par.push_back(std::string(option_card_buffer));
+    }
+    else
+    {
+      if (lufit_for_logging)
+        fprintf(lufit_for_logging, "Warning: Premature EOF while re-reading option line %d.\n", i + 1);
+      // This implies setopt read more lines than are now available, or fgetstr error.
+      break;
     }
   }
-  else if (input.noptn_read_by_setopt < 0)
-  {
-    // setopt indicated an error or EOF during its own reading.
-    if (lufit_for_logging)
-      fprintf(lufit_for_logging, "Note: setopt returned %d, no option lines stored.\n", input.noptn_read_by_setopt);
-  }
-  // lubak_stream_for_par_content is now positioned AFTER option lines, ready for getpar.
+  // lubak_stream_for_par_content is again positioned AFTER option lines, ready for getpar.
 
   // Call getpar
   // `lubak_stream_for_par_content` is now positioned at the start of parameters.
   // getpar will log its "PARAMETERS - A.PRIORI ERROR" header and lines to lufit_for_logging
   // `input.ndbcd_from_setopt` is the authoritative value.
   size_t idpar_elem_count = (size_t)input.npar * input.ndbcd_from_setopt + input.ndbcd_from_setopt + 3;
-  unsigned char *temp_idpar = (unsigned char *)mallocq(idpar_elem_count * sizeof(unsigned char));
+  bcd_t *temp_idpar = (bcd_t *)mallocq(idpar_elem_count * sizeof(bcd_t));
   if (!temp_idpar)
   { /* error */
     fclose(lubak_stream_for_par_content);
     return false;
   }
-  temp_idpar[0] = (unsigned char)input.ndbcd_from_setopt; // Set NDEC for getpar
+  temp_idpar[0] = (bcd_t)input.ndbcd_from_setopt; // Set NDEC for getpar
 
   double *temp_par = (double *)mallocq((size_t)input.npar * sizeof(double));
   if (!temp_par)
@@ -245,16 +223,14 @@ bool CalFitIO::readInput(const std::string &parFile, const std::string &linFile,
     return false;
   }
 
-  int original_npar_for_getpar = input.npar;
   input.inpcor = getpar(lubak_stream_for_par_content, lufit_for_logging,
-                        &input.nfit, &original_npar_for_getpar,
+                        &input.nfit, &input.npar,
                         temp_idpar, temp_par, temp_erp, temp_parlbl, LBLEN);
-  input.npar = original_npar_for_getpar; // Update npar
 
   // Recalculate sizes if npar changed
   idpar_elem_count = (size_t)input.npar * input.ndbcd_from_setopt + input.ndbcd_from_setopt + 3;
   parlbl_size = (LBLEN * (size_t)input.npar + 1);
-
+  // save output arrays to vectors in input struct (TODO: Avoid above mallocs; just initialize these to the right sizes first and use data() directly in getpar above)
   input.idpar_data.assign(temp_idpar, temp_idpar + idpar_elem_count);
   input.par_initial.assign(temp_par, temp_par + input.npar);
   input.erp_initial.assign(temp_erp, temp_erp + input.npar);
@@ -266,8 +242,8 @@ bool CalFitIO::readInput(const std::string &parFile, const std::string &linFile,
   free(temp_parlbl);
 
   // Call getvar
-  if (input.nfit > 0)
-  {
+  // if (input.nfit > 0)
+  // {
     size_t nlsq_var_count = ((size_t)input.nfit * ((size_t)input.nfit + 1)) / 2;
     double *temp_var = (double *)mallocq(nlsq_var_count * sizeof(double));
     if (!temp_var)
@@ -282,19 +258,45 @@ bool CalFitIO::readInput(const std::string &parFile, const std::string &linFile,
                           input.inpcor);
     input.var_initial_from_getvar.assign(temp_var, temp_var + nlsq_var_count);
     free(temp_var);
-  }
-  else
-  {
-    input.var_initial_from_getvar.clear();
-  }
+  // }
+  // else
+  // {
+  //   input.var_initial_from_getvar.clear();
+  // }
+
+  // these fixes and printouts are in CalFit::initializeParameters
+  // Unless the ordering of the output file is getting messed up, these can be removed
+  // Leaving until this is confirmed
+  // if (lufit_for_logging)
+  // {
+  //   if (input.nxpar_from_file > input.npar || input.nxpar_from_file < 0)
+  //     input.nxpar_from_file = 0;
+  //   if (input.nxpar_from_file > 0)
+  //   {
+  //     fprintf(lufit_for_logging, "NUMBER OF PARAMETERS EXCLUDED IF INDEX < 0 =%5d\n",
+  //             input.nxpar_from_file);
+  //   }
+
+  //   // Check for other early log lines from original main that depend only on these initial params:
+  //   // Note: "NUMBER OF PARAMETERS EXCLUDED..." and "IR Frequencies Scaled by..."
+  //   // were printed in original main *after* getpar and after options were processed further.
+  //   // Those should remain in CalFit::initializeParameters or CalFit::processLinesAndSetupBlocks
+  //   // if they depend on m_nxpar_actual or confirmed m_fqfacq.
+  //   // The "IR Frequencies Scaled by %12.10f\n" was conditional on fqfacq != 1.0, can be here.
+  //   if (fabs(input.fqfacq - 1.0) >= 1e-10)
+  //   {
+  //     fprintf(lufit_for_logging, " IR Frequencies Scaled by %12.10f\n", input.fqfacq);
+  //   }
 
   // Read .lin file
+  input.lineData_raw.clear();
   FILE *lulin_stream = fopen(linFile.c_str(), "r");
   if (!lulin_stream)
-  { /* error, log to lufit_for_logging */
+  {
+    printf("Unable to read lin file: %s\n", linFile.c_str());
     return false;
   }
-  input.lineData_raw.clear();
+
   char lineBuffer[NDCARD];
   while (fgetstr(lineBuffer, NDCARD, lulin_stream) > 0)
   {

@@ -180,7 +180,7 @@ int CalFit::linein(FILE *luin, int *nline, int iqnfmt) // TODO: iqnfmt is m_nfmt
   int i, iqf, ipace, mxline; /* Loop variables and counters */
   int mxqn, isblnd, icmp;    /* Max quantum number, blend flag, comparison flag */
   short nbln, nqnt[20], *iqnum; /* Blend counter, quantum number template, quantum number pointer */
-  char card[NDCARD];         /* Buffer for input lines. Should be static? */
+  char card[NDCARD];         /* Buffer for input lines */
 
   /*   get lines from input  and stores them */
 
@@ -194,11 +194,11 @@ int CalFit::linein(FILE *luin, int *nline, int iqnfmt) // TODO: iqnfmt is m_nfmt
   mxqn = 1;
   nbln = 1;
   nqn = deflin(iqnfmt, nqnt);
-  printf("DEBUG linein: iqnfmt parameter = %d\n", iqnfmt);
-  printf("DEBUG linein: iqnfmt passed to deflin = %d\n", iqnfmt);
-  printf("DEBUG linein: nqnt after deflin = %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d \n",
-         nqnt[0], nqnt[1], nqnt[2], nqnt[3], nqnt[4], nqnt[5], nqnt[6], nqnt[7], nqnt[8], nqnt[9],
-         nqnt[10], nqnt[11], nqnt[12], nqnt[13], nqnt[14], nqnt[15], nqnt[16], nqnt[17], nqnt[18], nqnt[19]);
+  //  printf("DEBUG linein: iqnfmt parameter = %d\n", iqnfmt);
+  //   printf("DEBUG linein: iqnfmt passed to deflin = %d\n", iqnfmt);
+  //   printf("DEBUG linein: nqnt after deflin = %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d \n",
+  //                 nqnt[0], nqnt[1], nqnt[2], nqnt[3], nqnt[4], nqnt[5], nqnt[6], nqnt[7], nqnt[8], nqnt[9],
+  //                 nqnt[10], nqnt[11], nqnt[12], nqnt[13], nqnt[14], nqnt[15], nqnt[16], nqnt[17], nqnt[18], nqnt[19]);
 
   nqnu = nqn - 1;
   if (nqnt[nqnu] < 0)
@@ -258,12 +258,10 @@ int CalFit::linein(FILE *luin, int *nline, int iqnfmt) // TODO: iqnfmt is m_nfmt
     if (icmp != 0 && fabs(xfrqn - xfrqx) < fabs(xfrqn) * 1.e-14 + 1.e-8)
     {
       /* frq match */
-      if (fabs(xerrn - xerrx) < 1e-7)
-      {
+      if (fabs(xerrn - xerrx) < 1e-7) {
         isblnd = 1;
       }
-      else if ((xerrn / xerrx) > 2.0 && nbln > 2) // Original code had xerrn/xerrx, should ensure xerrx is not zero
-      {
+      else if ((xerrn / xerrx) > 2.0 && nbln > 2) { // TODO: should ensure xerrx is not zero
         isblnd = 1;
         ++nbln;
         icmp = 0;

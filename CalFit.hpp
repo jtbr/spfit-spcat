@@ -32,13 +32,14 @@ struct CalFitInput
 
   // 2nd line
   int npar;   // Number of parameters
-  int limlin; // Max requested lines from file, can be updated by linein
-  int nitr;   // Number of iterations
+  size_t limlin; // Max requested lines from file, can be updated by linein
+  int nitr;            // Number of iterations
   int nxpar_from_file; // The nxpar read from the second line of .par
   double marqp0;       // Marquardt parameter
   double xerrmx;         // Max (OBS-CALC)/ERROR
   double parfac_initial; // The parfac from the second line of .par
   double fqfacq;         // IR frequency scaling factor
+  int catqn;             // Quantum numbers to write
 
   std::vector<std::string> raw_option_lines_from_par;
 
@@ -142,6 +143,7 @@ private:
   int m_npar; // Actual number of parameters after getpar
   int m_nfit;
   int ndfit, ndiag;
+  int m_catqn;
   long m_nsize_p;     // Changed from int to long based on maxmem return type if necessary (or keep size_t)
   int m_nxpar_actual; // Derived from input.nxpar_from_file and parameters
   int m_nxfit;
@@ -154,8 +156,7 @@ private:
   int m_nfmt;
   int m_itd;
   int m_nline;  // Number of lines after linein
-  int m_limlin; // Max lines requested
-  bool m_force_nqn10_for_linein; // if original m_linlin was negative
+  size_t m_limlin; // Max lines requested
   int m_nitr_requested; // #/ iterations requested
   int m_maxf_from_linein;
   int m_nblkpf_actual;
@@ -180,10 +181,10 @@ private:
   bool performIteration(const CalFitInput &input, CalFitOutput &output);
   bool finalizeOutputData(const CalFitInput &input, CalFitOutput &output); // For populating CalFitOutput
 
-  // Helper methods (kept as private, implementations copied from original if simple)
+  // Helper methods (kept as private, implementations copied from original, now in CalFit_helpers.cpp)
   int qnfmt2(int nqn, short *qnum, char *aqnum);
-  int parer(double par_val, double errx, double dif, char *ptmp);  // Renamed par to par_val to avoid conflict
-  int linein(FILE *luin, int *nline_val, int iqnfmt_val); // Renamed to avoid conflict if global linein exists
+  int parer(double par_val, double errx, double dif, char *ptmp);
+  int linein(FILE *luin, int *nline_val, int iqnfmt);
   int lineix(FILE *lu, int flg, int nline_val, int nblkpf_val, int iqnfmt_val);
   int getblk(int *iblk, int *indx, short *iqnum, int nblkpf_val, int ipos, int nqn_val);
 };

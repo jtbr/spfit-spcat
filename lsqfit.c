@@ -40,7 +40,7 @@ double *dk, *dkold, *marqp, *varv, *ediag, *enorm;
   /*                 derivative matrix before constraints are applied */
   /* dkold is used to save non-dero parts of dk with dimension of at least */
   /*          nr * (nr + 1) / 2 + nvec * nr */
-  static int nrest;
+  static int nrest = 0;
   double *pdk, *pdkold;
   double scale, val, slope, curv, dif;
   int k, nt, kk, nrank;

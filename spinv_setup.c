@@ -1043,11 +1043,16 @@ int setfmt(struct SpinvContext *ctx, int *iqnfmt, int nfmt)
       si2 += (ff & 1);
       if (si2 > 9)
         si2 &= 7;
+      // These additions to iqfmtq determine the 'Q' component of IQNFMT.
+      // QNFMT = Q*100 + H*10 + NQN
+      // Q is a format identifier, typically 0, 1, 2, 3, 4, 5.
+      // 2000 is added if ctx->itptr < ctx->nspin (related to spin states)
+      // 4000 is added if ctx->itsym < ctx->itptr (related to spin symmetry)
       if (ctx->itptr < ctx->nspin)
         iqfmtq += 2000;
       if (ctx->itsym < ctx->itptr)
         iqfmtq += 4000;
-      iqfmtq += 10 * si2;
+      iqfmtq += 10 * si2; // si2 contributes to the 'H' component (half-integer quanta)
     }
     if (iv == 0)
       iqfmt0 = iqfmtq;
@@ -1059,9 +1064,11 @@ int setfmt(struct SpinvContext *ctx, int *iqnfmt, int nfmt)
     else
     {
       iqnfmt[iv] = iqfmtq;
+      printf("DEBUG setfmt: iqnfmt[%d] set to %d\n", iv, iqnfmt[iv]);
     }
     ++pvinfo;
   }
+  printf("DEBUG setfmt: Before return, iqnfmt[0]=%d, ctx->glob.maxqn=%d\n", iqnfmt[0], ctx->glob.maxqn);
   if (nfmt <= 0)
     return 1;
   return ctx->glob.maxqn;
