@@ -1673,24 +1673,13 @@ bool CalFit::performIteration(const CalFitInput &input, CalFitOutput &output)
       }
     }
 
-    // 7. Store `fit` matrix into `var` for next iteration/output
-    //    `fit` contains `F_lambda_inv` (scaled by D_inv) and solution vector.
-    //    We need to save `Cov_inv_final = D_inv * F_lambda_inv^T * F_lambda_inv * D_inv` (or similar).
-    //    The `dkold` (our `oldfit`) from `lsqfit` saved `F_lambda_inv` (unscaled by D_inv).
-    //    Original: pfit=fit; pvar=var; for(n=1..nfit){ dcopy(n,pfit,ndfit,pvar,1); ++pfit; pvar+=n;}
-    //    This copies the lower triangle of `F_lambda_inv * D_inv` (from `fit`) into `var`.
-    //    This is `L_final_inv` if the process yields that.
-    //    So `var` gets updated L_inv (packed lower).
-    double *pvar_ptr_save = this->var;   // Standard packed lower
-    double *pfit_source_col = this->fit; // Full matrix, L_inv_final is in its lower triangle
-    for (int j_col = 0; j_col < m_nfit; ++j_col)
-    {
-      for (int i_row = j_col; i_row < m_nfit; ++i_row)
-      {
-        // Lower triangle elements including diagonal
-        *pvar_ptr_save++ = pfit_source_col[i_row]; // fit[i_row, j_col]
-      }
-      pfit_source_col += ndfit;
+    // 7. Store `fit` matrix into `var` for next iteration/output (original logic)
+    pfit_ptr = this->fit;
+    double *pvar_ptr = this->var;
+    for (int n = 1; n <= m_nfit; ++n) {
+        dcopy(n, pfit_ptr, ndfit, pvar_ptr, 1);
+        pfit_ptr++;
+        pvar_ptr += n;
     }
     // If `var` needs to be standard packed UPPER for consistency with getvar:
     // Need to form symmetric Cov_inv = L_inv^T L_inv, then pack upper of that.
