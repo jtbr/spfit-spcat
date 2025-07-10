@@ -440,13 +440,8 @@ bool CalFitIO::writeOutput(const std::string &par_filepath_final,
     // and potentially for .par file value if it was stored as a factor.
     if (NEGBCD(current_idpar_ptr[0]) != 0)
     { // If parameter is dependent (fixed or tied)
-      // Value of dependent parameter: par[i] (factor) * par[ibase] (master value)
-      // Error for dependent parameter: erpar[i] = fabs(par[i-factor]) * erpar[ibase-fitted-error]
-      // This logic was in main.c's output loop:
-      // scale = fabs(par[i]); erpar[i] = scale * erpar[ibase]; par[i] *= par[ibase];
-      // This means output.par[i] for dependent parameters should ideally be the final *value*, not factor.
-      // Let's assume output.par[i] from CalFit::finalizeOutputData IS the final value.
-      // And output.erpar[i] for dependent IS the derived error.
+      current_par_val = original_input.par_initial[i] * output.par[ibase_for_dependent_error];
+      current_erpar_fitted_val = fabs(original_input.par_initial[i]) * output.erpar[ibase_for_dependent_error];
     }
     else
     {                                // Independent parameter

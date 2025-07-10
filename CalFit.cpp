@@ -1112,41 +1112,31 @@ bool CalFit::performIteration(const CalFitInput &input, CalFitOutput &output)
                                               // The dcopy/ddot use ndfit as leading dimension, so this should be strided for RHS.
     }
 
-    // This loop structure is taken directly from original main.c:
-    // It forms L0 in `fit` (main m_nfit x m_nfit part) and b0=L0*delbgn in `fit` (RHS part).
-    for (int n_loop = 1; n_loop <= m_nfit; ++n_loop)
-    {
-      // `dcopy(n_loop, pfitb_packed_L0, 1, pfit_full_L0_col_start, ndfit)`:
-      // Copies `n_loop` elements from `pfitb_packed_L0` (contiguous source).
-      // To `pfit_full_L0_col_start` with destination increment `ndfit`.
-      // This means it writes to:
-      // pfit_full_L0_col_start[0],
-      // pfit_full_L0_col_start[ndfit],
-      // pfit_full_L0_col_start[2*ndfit], ...
-      // This fills a ROW of `fit` if `fit` is column-major.
-      // If `fit` is to be L (Lower triangular), this fills L^T (Upper triangular) row by row.
-      // This means `fit` effectively becomes U0 (Upper Cholesky factor, U0=L0^T).
-      dcopy(n_loop, pfitb_packed_L0, 1, pfit_full_L0_col_start, ndfit);
+    // Form L0 in `fit` (main m_nfit x m_nfit part) and b0=L0*delbgn in `fit` (RHS part).
+    // `pfitb_packed_L0` contains the packed lower triangular L0 (column-major packed).
+    // We need to copy it into `this->fit` (column-major) as a full lower triangular matrix.
+    // And compute RHS = L0 * delbgn.
 
-      val_iter = this->delbgn[n_loop - 1]; // delbgn is 0-indexed
-
-      // `daxpy(n_loop, val_iter, pfitb_packed_L0, 1, pRHS_in_fit_col_start, ndfit)`:
-      // Adds `val_iter * (L0_col_n_loop)` to the RHS vector (which is also strided).
-      // RHS_row_i += val_iter * L0_col_n_loop[i]
-      // This forms RHS = sum_cols (L0_col * delbgn_corresponding_element) = L0 * delbgn.
-      daxpy(n_loop, val_iter, pfitb_packed_L0, 1, pRHS_in_fit_col_start, ndfit);
-
-      pfitb_packed_L0 += n_loop; // Advance in packed L0 array
-      pfit_full_L0_col_start++;  // CRITICAL: Original was ++pfit.
-                                 // If pfit_full_L0_col_start is double*, this moves by ONE DOUBLE.
-                                 // This means it expects to write to the next ROW's starting element
-                                 // for the next transposed column of L0. This confirms `fit` is U0.
+    // Zero out the `fit` matrix (main m_nfit x m_nfit part)
+    for (int j_col = 0; j_col < m_nfit; ++j_col) {
+        for (int i_row = 0; i_row < m_nfit; ++i_row) {
+            this->fit[i_row + j_col * ndfit] = 0.0;
+        }
     }
-    // At this point:
-    // - `this->fit` (m_nfit x m_nfit part) contains U0 (Upper triangular, where U0 = L0^T, L0 from fitbgn).
-    // - `this->fit` (conceptual (m_nfit)-th column, accessed via pRHS_in_fit_col_start with ndfit stride) contains b0 = L0 * delbgn.
-    //   (Note: If fit has U0, then RHS should be U0 * something, or L0 * delbgn consistent with U0 = L0^T).
-    //   The daxpy used pfitb_packed_L0, which is L0. So RHS is L0 * delbgn.
+
+    // Reset pfitb_packed_L0 to the beginning of the packed L0 data
+    pfitb_packed_L0 = this->fitbgn;
+
+    // Populate `fit` as L0 and compute RHS = L0 * delbgn
+    int packed_idx = 0;
+    for (int j_col = 0; j_col < m_nfit; ++j_col) { // Iterate through columns
+        for (int i_row = j_col; i_row < m_nfit; ++i_row) { // Iterate through rows from diagonal down
+            double l0_val = pfitb_packed_L0[packed_idx];
+            this->fit[i_row + j_col * ndfit] = l0_val; // Populate L0
+            pRHS_in_fit_col_start[i_row * ndfit] += l0_val * this->delbgn[j_col]; // Compute RHS
+            packed_idx++;
+        }
+    }
 
     // Calculate initial sum of squares: xsqt = || L0 * delbgn ||^2
     // The RHS vector (L0*delbgn) is stored strided in the last "column" of `fit`.
