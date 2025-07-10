@@ -502,7 +502,7 @@ bool CalFit::initializeParameters(const CalFitInput &input)
       int n_rank = dqrfac(fit, ndfit, m_nfit, m_nfit, 0, this->erpar, iperm);
       if (m_nfit > n_rank && lufit)
       {
-        /* singular warning */
+        fprintf(lufit, "WARNING: supplied variance is singular\n");
       }
       // `fit` now contains F (lower factor of L_s * P). `this->erpar` has diag of F.
 
@@ -537,6 +537,7 @@ bool CalFit::initializeParameters(const CalFitInput &input)
       //    The original code: `dcopy(nt, pdk, 1, pdkold, 1);` saves the full solution block.
       //    The `dcopy(n,pfit,ndfit,pfitb,1)` from `main.c`'s "Supplied Variance" implies `fit` had the symmetric matrix.
       //    Let's assume `fit` after unscaling IS the symmetric Inverse Covariance.
+      fitbgn[0] = fit[0];
       double *pfitb_ptr = fitbgn;
       pfit_col_start = fit; // `fit` is m_nfit x ndfit (contains symmetric InvCov)
       for (int j_col_idx = 0; j_col_idx < m_nfit; ++j_col_idx)
@@ -726,7 +727,7 @@ bool CalFit::processLinesAndSetupBlocks(const CalFitInput &input)
     // but typically for fitting this is an issue. Let's return false.
     return false;
   }
-  if (m_limlin > m_nline)
+  if ((size_t)m_nline < m_limlin)
   {
     // From original main logic
     m_limlin = m_nline; // Adjust m_limlin to actual if fewer were read
@@ -1802,8 +1803,8 @@ bool CalFit::finalizeOutputData(const CalFitInput &input, CalFitOutput &output)
 
   output.npar_final = m_npar;
   // For limlin in output header: original `limlin` which could be negative
-  output.limlin_final = m_catqn > MAXCAT ? -input.limlin : input.limlin;
-  output.nitr_final_actual = m_itr;                // Actual iterations done
+  output.limlin_final = m_catqn > MAXCAT ? -(int)m_limlin : (int)m_limlin;
+  output.nitr_final_actual = input.nitr;           // Requested maximum iterations (iterations actually done = m_nitr)
   output.nxpar_for_header = input.nxpar_from_file; // The count for the header
   output.marqlast_final = m_marqlast;              // Last Marquardt param before final lsqfit call, or from input if no iters
   output.xerrmx_final = m_xerrmx;

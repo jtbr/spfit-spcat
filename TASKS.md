@@ -172,3 +172,14 @@ The tasks will be executed sequentially, with thorough testing and verification 
 *   Core C files: `calfit.c`, `dpi.c`, `spinv_setup.c`, `spinv_spin_symmetry.c`, `spinv_linalg_sort.c`, `spinv_hamiltonian.c`, `spinv_utils.c`, `spinv_internal.h` (related to Task 1).
 *   Files identified by `cppcheck` for issues or potential removal (for Task 2).
 *   New C++ header and source files: `CalculationEngine.hpp`, `SpinvEngine.hpp`, `SpinvEngine.cpp`, `SpinvContext.hpp`, `DpiEngine.hpp`, `DpiEngine.cpp`, `DpiContext.hpp` (related to Task 4).
+
+## Future Considerations
+
+- [ ] **Task 11: Re-evaluate Quantum Number (QN) Limits**
+    - **Description**: Investigate the current `MAXQN` definition (currently 10) and its implications on handling molecules with a larger number of quantum numbers (e.g., complex spin structures, multiple vibrational modes). The original code may have imposed this limit due to hardware constraints.
+    - **Implementation Plan**:
+        - Determine the maximum number of quantum numbers required for known molecular systems.
+        - Evaluate the impact of increasing `MAXQN` on memory usage and performance.
+        - Consider options for dynamic allocation of quantum number arrays if a fixed `MAXQN` becomes a bottleneck or is difficult to manage due to subtle dependencies.
+        - Update relevant code sections (e.g., `calpgm.h`, `spinv_utils.c:getqn`, `CalFit_helpers.cpp:getblk`) to support expanded quantum number sets.
+    - **Constraint**: Ensure backward compatibility with existing input formats and maintain quantitative accuracy.

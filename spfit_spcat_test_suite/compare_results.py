@@ -7,6 +7,8 @@ import sys
 DEFAULT_REL_TOL = 1e-5  # Relative tolerance
 DEFAULT_ABS_TOL = 1e-8  # Absolute tolerance for numbers close to zero
 
+COMPARE_INTERMEDIATE_FILES = True
+
 # Regex to find numbers (integers, floats, scientific notation)
 # Handles: 123, 123.45, .45, 123., 1e5, -1.2e-3, 1.234E+002
 NUMBER_REGEX_STR = r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?"
@@ -199,6 +201,11 @@ def main_comparison(new_output_dir_name, ref_output_dir_name):
     print(f"Comparing '{ref_output_dir_name}/' with '{new_output_dir_name}/'")
     print("=" * 70)
 
+    comparison_file_types = [".fit",  ".cat", ".out"]
+    if COMPARE_INTERMEDIATE_FILES:
+        comparison_file_types += [".par", ".var"]
+
+
     n_comparable_examples = 0
 
     for category_name in sorted(os.listdir(suite_base_path)):
@@ -226,14 +233,15 @@ def main_comparison(new_output_dir_name, ref_output_dir_name):
                 continue
 
             n_comparable_examples += 1
-            for ext in [".fit", ".cat", ".out"]:
+            for ext in comparison_file_types:
                 overall_summary["total_files"] += 1
-                file_type_str = ext[1:] # "fit", "cat", "out"
+                file_type_str = ext[1:] # "fit", "par", "var", "cat", "out"
 
                 ref_file = os.path.join(ref_dir, f"{molecule_basename}{ext}")
                 new_file = os.path.join(new_dir, f"{molecule_basename}{ext}")
 
                 # Special handling for .cat and .out which might not always be in reference_outputs
+                # .par and .var are expected outputs from spfit, so their absence in ref is an issue.
                 if ext in [".cat", ".out"] and not os.path.exists(ref_file):
                     print(f"    Reference file {os.path.basename(ref_file)} not found. Skipping comparison for this optional file.")
                     overall_summary["ref_missing"] += 1

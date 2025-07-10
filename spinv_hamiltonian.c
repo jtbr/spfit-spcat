@@ -1127,6 +1127,7 @@ int dpmake(const int nsize, double *dp, const double *t, const int n,
   {
     iz = idx[0];
     jz = jdx[0];
+
     if (iz != jz)
     { /* off-diagonal unit matrix */
       for (k = 0; k < nsize; ++k)
