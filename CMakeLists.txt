@@ -94,7 +94,7 @@ endmacro()
 
 # Define executables
 set(DEFAULT_EXECUTABLES spfit spcat)
-set(OPTIONAL_EXECUTABLES calmrg moiam stark termval sortn calbak reassign sortegy iambak)
+set(OPTIONAL_EXECUTABLES calmrg moiam stark termval sortn calbak reassign sortegy iambak iamcalc)
 if(BUILD_ALL)  # NOT WORKING? EVEN IF OFF, INCLUDES OPTIONAL_EXECUTABLES!
     set(EXECUTABLES ${DEFAULT_EXECUTABLES} ${OPTIONAL_EXECUTABLES})
 else()
@@ -245,19 +245,20 @@ if (NOT DEFINED EXCLUDE_MOIAM AND "moiam" IN_LIST EXECUTABLES)
   )
 endif()
 
-# # Add iamcalc (NOT WORKING/OBSOLETE)
-# if (NOT DEFINED EXCLUDE_IAMCALC AND "iamcalc" IN_LIST EXECUTABLES)
-#   add_executable_plus(iamcalc TRUE # This target uses BLAS
-#       iamcalc.c
-#       ftran.c
-#       ulib.c
-#       cnjj.c
-#       slibgcc.c
-#       catutil.c
-#       lsqfit.c
-#       # dblas.c removed
-#   )
-# endif()
+# Add iamcalc (NOT WORKING/OBSOLETE)
+if (NOT DEFINED EXCLUDE_IAMCALC AND "iamcalc" IN_LIST EXECUTABLES)
+  add_executable_plus(iamcalc TRUE # This target uses BLAS
+      iamcalc.c
+      ftran.c
+      readopt.c
+      ulib.c
+      cnjj.c
+      slibgcc.c
+      catutil.c
+      lsqfit.c
+      # dblas.c removed
+  )
+endif()
 
 # Add sortn
 if (NOT DEFINED EXCLUDE_SORTN AND "sortn" IN_LIST EXECUTABLES)

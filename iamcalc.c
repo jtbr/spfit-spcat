@@ -2,13 +2,12 @@
 /*   All rights reserved.  U. S. Government Sponsorship under */
 /*   NASA Contract NAS7-918 is acknowledged. */
 /*   Herbert M. Pickett, 20 March 1989 */
-/*   18 Aug.  2003: code cleanup, @comment@ is for splint */ 
+/*   18 Aug.  2003: code cleanup, @comment@ is for splint */
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
 #include <ctype.h>
 #include "calpgm.h"
-#include "ftran.h"
 #include "readopt.h"
 
 #define MYDEBUG 0
@@ -28,8 +27,8 @@ typedef struct sxpec {
   /* vector of expectation values */
   double xval; /* sum of parameter values used in Hamiltonian */
   int nval, mval, kdel, ixvib, isunit;
-  /* for first element, nval = nsym, mval = max(m)/nsym, 
-                        kdel = number of parameters in Hamiltonian 
+  /* for first element, nval = nsym, mval = max(m)/nsym,
+                        kdel = number of parameters in Hamiltonian
                         ixvib = number of extra vibrations
                         isunit = number of parameter types */
 } SXPEC;
@@ -55,7 +54,7 @@ typedef /*@out@*/ SEIG *PSEIG;
 typedef struct s2top {
   int ix1, ix2, iqv, iqsig, inew;
 } S2TOP;
- 
+
 static double zero = 0.;
 static double eps = 1.e-35;
 static double tiny = 1.e-12;
@@ -63,6 +62,7 @@ static double clight = 29979.2458;
 static double rthalf =0.707;
 static int morgsym[10];
 
+int ftran(int nft, double *xpec, int pec, double *fc, int flg);
 int iamdiag( /*@null@*/ FILE * lu, int nvib, SXPEC ** pxpecv,
              /*@out@*/ SEIG * eig, /*@out@*/ double *egy,
              int ioff);
@@ -72,7 +72,7 @@ int getparv(int nv, int mv, int iv, int nvib2, /*@out@*/ SIPAR *parp,
                    PSXPEC *pxpecv);
 int ideqv(long *idtmp, /*@out@*/ double *fac);
 int init2top(FILE *lu, int nvib2, int nsym, int nvib, int nvtot,
-	     int nsig, short *kmap, S2TOP *vmap, 
+	     int nsig, short *kmap, S2TOP *vmap,
              /*@out@*/int *sigma2, /*@out@*/int *ivtop);
 int get2top(SIPAR *ppar,/*@out@*/ double *xpec2, int nvtot, int nft,
             int nsym, int *vmapsym, int *ivtop, int nvtop);
@@ -122,7 +122,7 @@ void seig_alloc(PSEIG eigv, const int nvec, const size_t nfill,
 /*  output file name.par */
 /*       rho */
 /*       V_n */
-/*  
+/*
       Kinetic energy */
 /*       expectation for ityp=2..10 (all Fourier series in tau combined) */
 
@@ -134,7 +134,7 @@ int main(argc, argv)
 {
 #define LIN   0
 #define LPAR  1
-#define LOUT  
+#define LOUT
 #define LINT  3
 #define LBAK  4
 #define NFILE 5
@@ -156,7 +156,7 @@ int main(argc, argv)
   /*@owned@*/ SIPAR *parwk;
   SIPAR *parp, *parq, *parr;
   SEIG *eigp, *eig, *eig0;
-  /*@owned@*/ SEIG *eigv; 
+  /*@owned@*/ SEIG *eigv;
   /*@owned@*/ S2TOP *vmap;
   /*@owned@*/ double *eigval, *eigvalk, *eigvalk2, *xfc, *rhokdif, *xpec2top;
   double *egy, *egyp, *egywk, *eigvec0, *eigvec1, *eigvec0p, *eigvec1p, *pdtmp;
@@ -175,7 +175,7 @@ int main(argc, argv)
   int nsize_p, iend, kflg, ipar, nvibsq, maxm, npar, nvib, ift, ncalc, nxvib;
   int ityp, nsym, ntyp, i, k, nbasis, negy, nvfac, nrhok, nft, nft2, nftp, m;
   int nvfac2, kd, kk, iv, ivp, ivv, ivvp, mv, nv, nkk, neig, nxpec, ldel;
-  int isig, isigp, ivx, ivxp, nvs, nvp, kdel, kdel0, kmax, kmax0, ktest, ntyp0; 
+  int isig, isigp, ivx, ivxp, nvs, nvp, kdel, kdel0, kmax, kmax0, ktest, ntyp0;
   int neigp, nhalf, nsymb, isymtau, ksymtau, kdoff, nsin, mbasis, nsig, nvtot2;
   int kflg0, kflgm, nprn, isdip, nvtot, nvtotsq, nvtot0, nxrho, ncalcm, nvt2;
   int ixv, nxblks, nxdim, isigx, ixvv, nnblk, ndip, nvib2, nvt, nvtsq, nsymsq;
@@ -230,7 +230,7 @@ int main(argc, argv)
     } else {
       if (nft > 99) nft = 99;
       drhok = (double) nsym / nft;
-      voff = rho / nsym; 
+      voff = rho / nsym;
       negrho = (rho < 0.);
       fputs("sampling for periodic rho K\n",luout);
     }
@@ -251,13 +251,13 @@ int main(argc, argv)
     morgsym[k] = 0; ilink[k] = k;
   }
   nsymb = -10000;
-  if ((nsym & 1) == 0) 
+  if ((nsym & 1) == 0)
     nsymb = nsym >> 1;
   nsymsq = nsym * nsym;
   nl = (size_t) (nline2 * ND2TOP + 1);
   /* save 2-top info */
   kmap = (short *)mallocq (nl * sizeof(short));
-  kmap[0] = (short) nline2; 
+  kmap[0] = (short) nline2;
   ivv = 1; nsig = 1; vtmax = 0; nvib2 = 0; iv1 = 0; iv2 = 0;
   for (k = 0; k < nline2; ++k, ivv += ND2TOP){
     if (fgetstr(card, 82, luin) < 1) break;
@@ -318,11 +318,11 @@ int main(argc, argv)
       if (iv >= 9) continue;
       if (nxvib < iv) nxvib = iv;
     }
-    if (nv < 0) 
+    if (nv < 0)
       nv = -nv;
     if (nv >= 25)
       nv -= 25;
-    if (lsym && (nv % nsym) != 0) lsym = FALSE; 
+    if (lsym && (nv % nsym) != 0) lsym = FALSE;
     if (ivp != iv && idtmp == 99L && mv == 0) {
       isoffd = TRUE;
       if (nsymb > 1 && ilink[ivp] != ilink[iv]) {
@@ -331,36 +331,36 @@ int main(argc, argv)
         kk = ilink[iv];
         for (k = 1; k <= nxvib; ++k) {
           if (ilink[k] == kk) {
-            ilink[k] = ilink[ivp]; 
+            ilink[k] = ilink[ivp];
             morgsym[k] = (morgsym[k] + i) % nsym;
           }
         }
       }
     }
     if (idtmp == 910099L) {
-      if (ivp == iv && iv < 9) { 
+      if (ivp == iv && iv < 9) {
         rhov[ivv] = dval[3]; ++nxrho;
       }
       continue;
     }
-    ++npar; ++ntyp; 
+    ++npar; ++ntyp;
     if (ivv == 99) {
-      ++ivx; ++ivxp; 
+      ++ivx; ++ivxp;
     } else if (iv != ivp) {
-      ++npar; ++ntyp; 
+      ++npar; ++ntyp;
     }
     if (ideqv(&idtmp, &val) != 0){
-      ++npar; ++ntyp; 
+      ++npar; ++ntyp;
       if (ivv == 99) {
         ++ivx;
       } else if (iv != ivp) {
-        ++npar; ++ntyp; 
+        ++npar; ++ntyp;
       }
     }
   }
   npar += nxvib * ivx;
   ntyp += nxvib * (ivxp + nrhok);
-  ++nxvib; 
+  ++nxvib;
   nxblks = nxvib; nxdim = 1;
   if (isoffd) {
     nxblks = 1; nxdim = nxvib;
@@ -391,12 +391,12 @@ int main(argc, argv)
   for (k = 0; k < nrhok; ++k) { /* offsets for overlaps */
     kk = (k + 1) >> 1; /* i = 0,1,1,2,2 */
     i = kk;
-    if (ODD(k)) i = -i;        
+    if (ODD(k)) i = -i;
     krhok[k] = i;     /* i = 0,-1,1,-2,2 */
     if (nhalf > 0 && ODD(kk))
       ++i;/* i = 0,0,2,-2,2 */
     rhokv[k] = 0.5 * i * rhov[0];
-    for (ixv = 1; ixv < nxvib; ++ixv) 
+    for (ixv = 1; ixv < nxvib; ++ixv)
       rhokv[k + ixv * nrhok] = 0.5 * i * rhov[ixv];
   }
   if (maxm < 0) {
@@ -404,7 +404,7 @@ int main(argc, argv)
   }
   maxm = (maxm - 1) / nsym + 1;
   mbasis = maxm + maxm + 1; nbasis = mbasis;
-  nvt = (nvib - 1) / nsym + 1; 
+  nvt = (nvib - 1) / nsym + 1;
   if (nvt > nbasis)
     nvt = nbasis;
   nvib = nvt * nsym;
@@ -435,7 +435,7 @@ int main(argc, argv)
   nl = (nvib2 + 1) * sizeof(S2TOP);
   vmap = (S2TOP *)mallocq(nl);
   ivtop = (int *)mallocq((size_t) nvtop * sizeof(int));
-  nvtop = init2top(luout, nvib2, nsym, nvib, nvtot2, nsig, kmap, 
+  nvtop = init2top(luout, nvib2, nsym, nvib, nvtot2, nsig, kmap,
                    vmap, sigma2, ivtop);
   free(kmap);
   ndtop = 0; ndmtop = 0;
@@ -456,13 +456,13 @@ int main(argc, argv)
   sigma[0] = 0;
   /* allocate space for morg + isym */
   isym = (int *) mallocq(nl);
-  isym[0] = 0; 
+  isym[0] = 0;
   for (k = 1; k < nvtot; ++k)
     isym[k] = 0;
   nl *= (size_t) neigp;
   pmorgwk = (int *) mallocq(nl);
   pmorgwk[0] = 0;
-  nl = (size_t) nbasis; 
+  nl = (size_t) nbasis;
   nl *= (size_t) nvtot * sizeof(double);  /* eigenvector size */
   /* allocate space for eigenvectors */
   seig_alloc(eigv, neig, nl, pmorgwk, nvtot);
@@ -475,7 +475,7 @@ int main(argc, argv)
       for (ixv = 0; ixv < nxvib; ++ixv) {
         eig->rhok[ixv] = rhokv[kd + nrhok * ixv] + val * drhokv[ixv];
       }
-      eig->irhok = kd; 
+      eig->irhok = kd;
       ++eig;
     }
   }
@@ -483,15 +483,15 @@ int main(argc, argv)
   dcopy(nxvib, &val, 0, eig->rhok, 1);
   eig->irhok = 0;
   eig = NULL;
-  vref = -0.5 + 0.5 * tiny / nsym; 
+  vref = -0.5 + 0.5 * tiny / nsym;
   for (k = 0; k < nsym; ++k) {  /* set up sigma values */
     kk = k + 1;
-    isig = kk >> 1; 
+    isig = kk >> 1;
     if (ODD(kk)) {
       isig = -isig;      /* isig = 0,+1,-1,.. */
-    } 
+    }
     for (iv = k; iv < nvtot; iv += nsym)
-      sigma[iv] = isig; 
+      sigma[iv] = isig;
     eig = &eigv[0];
     for (kk = 0; kk <= neig; ++kk) {
       /* set up morg values for each sigma value */
@@ -502,7 +502,7 @@ int main(argc, argv)
         } else {
           /* abs(rhok - morg) < 0.5 * nsym          */
           val = (eig->rhok[ixv] - isig) / nsym;
-          kd = (int) floor(val + 0.5); 
+          kd = (int) floor(val + 0.5);
           val -= kd; /* abs(val) <= 0.5 */
           if (val < vref) {
             --kd; val += 1.;
@@ -513,7 +513,7 @@ int main(argc, argv)
           kd = isig + nsym * kd;
         }
         pmorg = eig->morg;
-        for (iv = k; iv < nvib; iv += nsym) 
+        for (iv = k; iv < nvib; iv += nsym)
           pmorg[iv + ixvv] = kd;
         ixvv += nvib;
       }
@@ -565,21 +565,21 @@ int main(argc, argv)
   }
   ixvv = 0;
   for (ixv = 0; ixv < nxblks; ++ixv) { /* sort rhokdif */
-    for (i = ixv + nxblks; i < ncalc; i += nxblks) { 
+    for (i = ixv + nxblks; i < ncalc; i += nxblks) {
       kk = i; vmin = rhokdif[i];
       for (k = i + nxblks; k < ncalc; k += nxblks) {
         val = rhokdif[k];
         if (val < vmin) {
           vmin = val; kk = k;
         }
-      }  
+      }
       if (kk > i) {
-        isig = ioffv[kk]; ioffv[kk] = ioffv[i]; ioffv[i] = isig; 
+        isig = ioffv[kk]; ioffv[kk] = ioffv[i]; ioffv[i] = isig;
         kd   = ixeig[kk]; ixeig[kk] = ixeig[i]; ixeig[i] = kd;
         rhokdif[kk] = rhokdif[i]; rhokdif[i] = vmin;
       }
       kk = ixpt0[i - nxblks];
-      val = rhokdif[kk]; 
+      val = rhokdif[kk];
       if (fabs(val - vmin) > tiny) {
         ixpt0[i] = i;
         continue;
@@ -589,7 +589,7 @@ int main(argc, argv)
       iv  = eigv[ixeig[ i]].irhok;
       if (ivp < iv) continue;
       if (ivp == iv && ioffv[kk] <= ioffv[i]) continue;
-      isig = ioffv[kk]; ioffv[kk] = ioffv[i]; ioffv[i] = isig; 
+      isig = ioffv[kk]; ioffv[kk] = ioffv[i]; ioffv[i] = isig;
       kd   = ixeig[kk]; ixeig[kk] = ixeig[i]; ixeig[i] = kd;
     }
     ixvv += nvib;
@@ -616,12 +616,12 @@ int main(argc, argv)
   pxpecp->nval = nsym;
   pxpecp->kdel = 0;
   ivx = nxvib;
-  if (isoffd) ivx = -ivx; 
+  if (isoffd) ivx = -ivx;
   pxpecp->ixvib = ivx;
   ntyp0 = ntyp;
   pxpecp->isunit = ntyp;
   pxpecp = NULL;
-  par[0]->idval = 0; idtmp = 0; kdel0 = -1; 
+  par[0]->idval = 0; idtmp = 0; kdel0 = -1;
   for (ipar = 0; ipar < npar; ++ipar) { /* read parameters */
     if (fgetstr(card, 82, luin) <= 0)
       break;
@@ -663,7 +663,7 @@ int main(argc, argv)
     }
     parp = par[ipar];
     parp->offset = 0;
-    parp->parval = dval[3]; 
+    parp->parval = dval[3];
     parp->parerr = dval[4];
     parp->flg = 0;
     if (idtst == 99L && mv == 0 && nv > 0 && nv < 25 && ivp == iv) {
@@ -682,11 +682,11 @@ int main(argc, argv)
       parp->labl[NLABL] = '\0';
     }
     ivp = ivv;
-    if (ivv == 99) 
+    if (ivv == 99)
       ivp = 0;
     parp->idval = idtmp;
     ntyp = getparv(nv, mv, ivp, nvib2, parp, pxpecv);
-    kdel = ideqv(&idtmp, &val); 
+    kdel = ideqv(&idtmp, &val);
     k = mv;
     if (nv < 0) ++k;
     if (nvib2 > 0 && nv <= -25) ++k;
@@ -729,7 +729,7 @@ int main(argc, argv)
         ntyp = getparv(nv, mv, ivvp, nvib2, parr, pxpecv);
       }
     }
-    if (parp->idval < 0 && kdel != kdel0) 
+    if (parp->idval < 0 && kdel != kdel0)
       parp->idval = -parp->idval;
     kdel0 = kdel;
   }
@@ -825,7 +825,7 @@ int main(argc, argv)
   if (nxrho == 0) {
     fprintf(luout, " rho = %15.10f\n", rho);
   } else {
-    for (i = 0; i < nxvib; ++i) 
+    for (i = 0; i < nxvib; ++i)
       fprintf(luout, " rho (%1d) = %15.10f\n", i, rhov[i]);
   }
   egywk = &eigval[negy]; egy = egyp = egywk; eig = eigv;
@@ -835,24 +835,24 @@ int main(argc, argv)
   }
   for (i = 0; i < ncalc; ++i) {
     /* calculate eigenvectors in order of rho K*/
-    isig = ioffv[i]; 
+    isig = ioffv[i];
     ixv = isig / nvib; isigx = isig - ixv * nvib;
-    kk = ixeig[i]; 
-    eig = &eigv[kk]; m = eig->morg[isig]; 
+    kk = ixeig[i];
+    eig = &eigv[kk]; m = eig->morg[isig];
     val = eig->rhok[ixv] - m;
     if (val < 0.)
       rhokdif[i] = -rhokdif[i];
     lu = NULL; egy  = egywk;
-    k = eig->irhok; 
+    k = eig->irhok;
     if (k == 0) {
-      ift = kk / nrhok; 
+      ift = kk / nrhok;
       if (ift < nft)
         egy = &eigval[nvtot * ift];
       if (isigx == 0)
         lu = luout;
     }
     eigvec0 = eig->eigvec;
-    iv = ixpt0[i]; 
+    iv = ixpt0[i];
     if (iv == i) {
       printf(" rhoK = %9.6f, %2d %2d \n", val, krhok[k], sigma[isigx]);
       egyp = egy;
@@ -895,7 +895,7 @@ int main(argc, argv)
     if (sigma[ivp] == 0) {
       iv = ivp;
       /* determine symmetry for rhoK = 0.5 * nsym and 0 */
-      eigvec0 = eigvec0p + ivvp; 
+      eigvec0 = eigvec0p + ivvp;
       eigvec1 = eigvec1p + ivvp;
       ivv = 0;
       valm[0] = 0.; valm[1] = 0.; vmax = 0;
@@ -909,7 +909,7 @@ int main(argc, argv)
             mv = maxm + ((mv + 1) >> 1); mm = mv - 1;
             k = (mv > maxm)? maxm: mv;
             vref = 0.;
-            for (m = 1; m <= k; ++m) { 
+            for (m = 1; m <= k; ++m) {
               /* mv - 1, mv */
               vref += eigvec[mv - m] * eigvec[mm + m];
             }
@@ -933,11 +933,11 @@ int main(argc, argv)
       }
       nneg = 0;
       if (vmax < 0.) nneg = 1;
-      val = 2.* valm[0]; vref = 2. * valm[1]; 
+      val = 2.* valm[0]; vref = 2. * valm[1];
       isym[iv] = 0;
       if (val < 0.)
         isym[iv] = 3;
-      if (vref < 0.) 
+      if (vref < 0.)
         isym[iv] ^= 1;
       fprintf(luout, "%3d %3d  %9.6f %9.6f\n", iv, isym[iv] & 3, val, vref);
     } else {
@@ -970,11 +970,11 @@ int main(argc, argv)
   }
   for (i = 1; i < ncalc; ++i) { /* fix negative rhoK */
     if (rhokdif[i] >= 0.) continue;
-    isig = ioffv[i]; 
+    isig = ioffv[i];
     ixv = isig / nvib; isigx = isig - ixv * nvib;
-    kk   = ixeig[i]; 
-    eig  = &eigv[kk]; 
-    eigvec0 = eig->eigvec; 
+    kk   = ixeig[i];
+    eig  = &eigv[kk];
+    eigvec0 = eig->eigvec;
     for (ii = 0; ii < nnblk; ii += nsym) {
       iv = ii + isig;
       eigvec = &eigvec0[iv * nbasis];
@@ -988,7 +988,7 @@ int main(argc, argv)
         }
         if (morgsym[ixv] != 0) {
           mv = maxm; mm = mv - 1;
-          for (m = 1; m <= mv; ++m) { 
+          for (m = 1; m <= mv; ++m) {
             /* mv - 1, mv */
             vref = eigvec[mv - m];
             eigvec[mv - m] = eigvec[mm + m];
@@ -1008,7 +1008,7 @@ int main(argc, argv)
   egyp = NULL;
   eigvec1 = NULL; egy = NULL;
   if (eigvalk != NULL) { /* need energy vs K */
-    egy = eigvalk; 
+    egy = eigvalk;
     kk = (kmax0 + 1) * nvtot;
     dcopy(kk, eigval, 1, egy, 1);
     if (kmax0 < kmax) {
@@ -1016,12 +1016,12 @@ int main(argc, argv)
       eig = &eigv[neig]; eig->irhok = 0; pmorg = eig->morg;
       for (kk = kmax0 + 1; kk <= kmax; ++kk) {
         for (ixv = 0; ixv < nxblks; ++ixv) {
-          isig = ixv * nvib;    
+          isig = ixv * nvib;
           for (isigx = 0; isigx < nsym; ++isigx) {
-            val = kk * rhov[ixv]; eig->rhok[ixv] = val; 
-            val = (val - sigma[isigx]) / nsym; 
+            val = kk * rhov[ixv]; eig->rhok[ixv] = val;
+            val = (val - sigma[isigx]) / nsym;
             pmorg[isig] = sigma[isigx] + nsym * (int)floor(val + 0.5);
-            iamdiag(luout, nvib, pxpecv, eig, egy, isig); 
+            iamdiag(luout, nvib, pxpecv, eig, egy, isig);
             ++isig;
           }
         }
@@ -1031,14 +1031,14 @@ int main(argc, argv)
     }
     if (eigvalk2 != NULL) {
       if (nvib2 > 0) {
-        egy = eigvalk; egyp = eigvalk2; 
+        egy = eigvalk; egyp = eigvalk2;
         for (kk = 0; kk <= kmax; ++kk) {
           for (k = 0; k < nvtot2; ++k) {
             iv = vmap[k].ix1; ivp = vmap[k].ix2;
             egyp[k] = egy[iv] + egy[ivp];
           }
           egy += nvtot; egyp += nvtot2;
-        } 
+        }
         egy = NULL; egyp = NULL;
       } else {
         kk = nvtot * (kmax + 1);
@@ -1073,9 +1073,9 @@ int main(argc, argv)
       if (val < vmin) {
         vmin = val; kk = k;
       }
-    }  
+    }
     if (kk > i) {
-      isig = ioffv[kk]; ioffv[kk] = ioffv[i]; ioffv[i] = isig; 
+      isig = ioffv[kk]; ioffv[kk] = ioffv[i]; ioffv[i] = isig;
       kd = ixeig[kk]; ixeig[kk] = ixeig[i]; ixeig[i] = kd;
       rhokdif[kk] = rhokdif[i]; rhokdif[i] = vmin;
     }
@@ -1154,37 +1154,37 @@ int main(argc, argv)
         mm = 0;
         for (;;) {/* read option cards */
           if (fgetstr(card, 82, lupar) < 0) break;
-          fputs(card, lubak); fputc('\n', lubak); 
+          fputs(card, lubak); fputc('\n', lubak);
           if (readopt(card, dval, 8) <= 0) break;
           m = (int) dval[0];
           if (mm == 0) mm = m;
           if (dval[7] > -0.5) break;
         }
         headok = TRUE;
-        if (nvtot2 != mm) 
+        if (nvtot2 != mm)
           printf("%s (%3d) does not match .iam (%3d)\n",
-                 "WARNING: # states in .par file", mm, nvtot2); 
+                 "WARNING: # states in .par file", mm, nvtot2);
       }
     }
     fclose(lupar);
   }
   luint = NULL;
-  if (ndip >  0) 
+  if (ndip >  0)
     luint = fopen(cfil[eint], "r");
-  if (luint != NULL){ 
+  if (luint != NULL){
     if (fgetstr(title, 82, luint) > 0 &&
         fgetstr(card, 82, luint) > 0) {
       fclose(luint);
       luint = fopen(cfil[eint], "w");
       if (luint != NULL) {
-        fputs(title, luint); fputc('\n', luint); 
+        fputs(title, luint); fputc('\n', luint);
         fputs(card, luint); fputc('\n', luint);
       }
     } else if (luint != NULL) {
       fclose(luint); luint = NULL;
     }
-  }  
-  if (luint == NULL && ndip > 0) 
+  }
+  if (luint == NULL && ndip > 0)
     luint = fopenq(cfil[eint], "w");
   nnpar = 0;
   nl = (size_t) (2 * nft) * sizeof(double);
@@ -1202,7 +1202,7 @@ int main(argc, argv)
     hsym = FALSE;
     for (iv = 0; iv < nvtot; ++iv) isym[iv] &= 0x7ffe;
   }
-  if (hsym && !nofc) 
+  if (hsym && !nofc)
     nxrho = 1;
   if (nxrho > 0) {
     ivv = 0;
@@ -1257,15 +1257,15 @@ int main(argc, argv)
       if (vmap[k].iqv < 0) continue;
       i = vmap[k].inew;
       vmapsym[i] = (vmap[k].iqsig & 3) + (vmap[k].iqv << 2);
-    }     
+    }
     nvtotsq = ndmtop * ndmtop; nxpec = nvtotsq * nft;
   } else {
     vmapsym = (int *) mallocq(sizeof(int)); vmapsym[0] = 0;
   }
-  xpec2top = (double *) mallocq(sizeof(double)); 
+  xpec2top = (double *) mallocq(sizeof(double));
   xpec2top[0] = 0.;
   /* assemble expectation values */
-  nprn = nftp; 
+  nprn = nftp;
   strcpy(card, " 0.0  / egy");
   pbgn = strchr(card, '/') - 1; pstr = pbgn + 2;
   for (ipar = 0; ipar < npar; ipar = iend + 1) {
@@ -1286,7 +1286,7 @@ int main(argc, argv)
       pbgn = strchr(card, '/') - 1; pstr = pbgn + 2;
       txpec[0] = parp->parval;
       pxpecp = parp->ptxpec;
-      if (pxpecp == NULL) break; 
+      if (pxpecp == NULL) break;
       if (isdip > 0) {
         didtmp = 9900.; mv = 99;
         if (nvfac == 100)
@@ -1302,7 +1302,7 @@ int main(argc, argv)
             if ((parp->flg & MV12) != 0) nv += 25;
             i = (nv + 9) / 10;
           } else {
-            if ((parp->flg & MV12) != 0) nv += 25;            
+            if ((parp->flg & MV12) != 0) nv += 25;
             i = (nv - 1) / 10;
           }
           nv += i * 10;
@@ -1327,7 +1327,7 @@ int main(argc, argv)
       continue;
     if (idtyp == 800099L) {
       if (eigvalk2 == NULL) continue;
-      for (iv = 0; iv < nvtot2; ++iv) {       
+      for (iv = 0; iv < nvtot2; ++iv) {
         val = 0.;
         egy = &eigvalk2[iv];
         if (sigma2[iv] >= 0 && iv > 0) {
@@ -1346,14 +1346,14 @@ int main(argc, argv)
       continue;
     }
     pxpecp = parp->ptxpec; kdel = -2;
-    if (pxpecp != NULL) kdel = pxpecp->kdel; 
+    if (pxpecp != NULL) kdel = pxpecp->kdel;
     if (nvib2 > 0) {
       k = iend - ipar + 1;
       if (kdel > 0) ++k;
       if (k > ndtop) {
         free(xpec2top);
         ndtop = k;
-        nl = (size_t) nxpec; 
+        nl = (size_t) nxpec;
         nl = nl * ndtop * sizeof(double);
         xpec2top = (double *)mallocq(nl);
       }
@@ -1363,13 +1363,13 @@ int main(argc, argv)
         parq = par[k];
         get2top(parq, pdtmp, nvtot, nft, nsym, vmapsym, ivtop, nvtop);
       }
-      pdtmp = NULL; 
+      pdtmp = NULL;
     }
     voff = vref = 0.;
     for (ivx = 0; ivx < nvtot2; ivx += nsig) {
       for (ivxp = 0; ivxp <= ivx; ivxp += nsig) {
         if (nvib2 > 0) {
-          isymtau = ksymtau ^ isym[vmap[ivx].ix1] ^ isym[vmap[ivxp].ix1] ^ 
+          isymtau = ksymtau ^ isym[vmap[ivx].ix1] ^ isym[vmap[ivxp].ix1] ^
             isym[vmap[ivx].ix2] ^ isym[vmap[ivxp].ix2];
         } else {
           isymtau = ksymtau ^ isym[ivx] ^ isym[ivxp];
@@ -1383,7 +1383,7 @@ int main(argc, argv)
           if (nvp > iv) nvp = iv;
           for (ivp = ivxp; ivp <= nvp; ++ivp) {
             /* loops over sigma within torsion state */
-            isig = sigma2[iv]; isigp = sigma2[ivp];            
+            isig = sigma2[iv]; isigp = sigma2[ivp];
             val = 0.;
             if (iv == ivp)
               val = voff;
@@ -1405,7 +1405,7 @@ int main(argc, argv)
                 daxpy(nft, val, pdtmp, nvtotsq, txpec, 1);
               }
             }
-            pxpecp = NULL; pdtmp = NULL; 
+            pxpecp = NULL; pdtmp = NULL;
             kdoff = 0;
             if (nofc) {
               nprn = ksign(kdel, nft, txpec, pxfc);
@@ -1427,7 +1427,7 @@ int main(argc, argv)
             if (isig  == nsymb) isig = 0;
             if (isigp == nsymb) isigp = 0;
             ldel = isigp - isig;
-            idtmp = ivp * nvfac + iv; 
+            idtmp = ivp * nvfac + iv;
             if (ldel < 0)
               idtmp = iv * nvfac + ivp;
             didtmp = (double) idtmp;
@@ -1445,11 +1445,11 @@ int main(argc, argv)
               didtmp = -99.;
               if (nvfac == 100)
                 didtmp = -9999.;
-              nnpar += wrpar(lu, &didtmp, 1, 0, kflgm, xfc, 1, pbgn, 
+              nnpar += wrpar(lu, &didtmp, 1, 0, kflgm, xfc, 1, pbgn,
                              nvfac2, drhok);
               didtmp = 0;
             }
-            wrpar(luout, &didtmp, 1, isdip, kflg, txpec, nft, pbgn, 
+            wrpar(luout, &didtmp, 1, isdip, kflg, txpec, nft, pbgn,
                   nft, drhok);
             if (iv == ivp)
               pxfc[0] -= vref;
@@ -1461,7 +1461,7 @@ int main(argc, argv)
                 if ((k + k) >= ktest) kk -= ktest;
                 ang0 = (double)kk;
                 if (ODD(kdel)) ang0 += 0.5;
-                ang0 *= rhoang; ang = ang0; 
+                ang0 *= rhoang; ang = ang0;
                 val = pxfc[0];
                 for (kk = 1; kk < nft; kk += 2) {
                   val += pxfc[kk] * cos(ang) + pxfc[kk + 1] * sin(ang);
@@ -1470,14 +1470,14 @@ int main(argc, argv)
                 egy[k] = val;
               }
               pbgn[0] = '/'; pbgn[1] = ':';
-              nnpar += wrpar(luout, &didtmp, 1, isdip, kflg, egy, ktest, 
+              nnpar += wrpar(luout, &didtmp, 1, isdip, kflg, egy, ktest,
                              pbgn, ktest, 1.);
               pbgn[0] = ' '; pbgn[1] = '/';
             }
-            if (lsym && ldel != 0) continue;  
+            if (lsym && ldel != 0) continue;
             didtmpv[nvs] = -didtmp;
             if (ldel == 0) {
-              if (isig >= 0) { 
+              if (isig >= 0) {
                 pxfc1 = pxfc;
               } else {
                 for (k = 0; k < nprn; ++k) {
@@ -1490,8 +1490,8 @@ int main(argc, argv)
                   if (val > amp) amp = val;
                   val = 0;
                   for (; k < nprn; k += 2) {
-                    val += fabs(pxfc[k]); 
-                    if (rezero) 
+                    val += fabs(pxfc[k]);
+                    if (rezero)
                       pxfc[k] = 0.;
                     if (k == 0) --k;
                   }
@@ -1503,7 +1503,7 @@ int main(argc, argv)
                 k = 2 - (isymtau & 2);
                 val = dnrm2(nprn, pxfc, 1) + tiny;
                 if (val > amp) amp = val;
-                val = 0; 
+                val = 0;
                 for (; k < nprn; k += 2) {
                   val += fabs(pxfc1[k]);
                   if (rezero) pxfc1[k] = 0.;
@@ -1519,7 +1519,7 @@ int main(argc, argv)
             }
           }                     /*ivp loop */
         }                       /* iv loop */
-        nnpar += wrpar(lu, didtmpv, nvs, isdip, kflgm, xfc, nprn, 
+        nnpar += wrpar(lu, didtmpv, nvs, isdip, kflgm, xfc, nprn,
                        pbgn, -nvfac2, drhok);
         pxfc1 = NULL; pxfc = NULL; kflgm = -1;
       }                         /*ivxp loop */
@@ -1544,11 +1544,11 @@ int main(argc, argv)
       if (headok) {
         fprintf(lupar,"%8ld%s\n", nnpar, &card[k]);
       } else {
-        fputs(card, lupar); fputc('\n', lupar); 
+        fputs(card, lupar); fputc('\n', lupar);
       }
       for (;;) {/* read */
         if (fgetstr(card, 82, lubak) < 0) break;
-        fputs(card, lupar); fputc('\n', lupar); 
+        fputs(card, lupar); fputc('\n', lupar);
       }
     }
   }
@@ -1577,7 +1577,7 @@ int main(argc, argv)
   vmapsym = NULL;
   free(par);
   par = NULL;
-  free(vmap); 
+  free(vmap);
   free(sigma2);
   free(isym);
   free(sigma);
@@ -1647,12 +1647,12 @@ int iamdiag(lu, nvib, pxpecv, eig, egy, ioff)
     t = (double *) mallocq(nl);
     if (nxvib > 1) nl *= nxvib;
     tv = (double *) mallocq(nl);
-    dcopy(nxall, &zero, 0, fval, 1); 
-    dcopy(nsq, &zero, 0, tv, 1); 
-    for (k = 1; k < nxvib; ++k) 
+    dcopy(nxall, &zero, 0, fval, 1);
+    dcopy(nsq, &zero, 0, tv, 1);
+    for (k = 1; k < nxvib; ++k)
       dcopy(nsq, &zero, 0, &tv[k * nsq], 1);
     nf = 0;
-    minv = 1024; 
+    minv = 1024;
     iend = pxpec0->kdel;
     for (i = 1; i <= iend; ++i) {
       val = pxpecv[i]->xval;
@@ -1663,7 +1663,7 @@ int iamdiag(lu, nvib, pxpecv, eig, egy, ioff)
       if (pxpecv[i]->mval == 0) {       /*  calculate potential terms */
         if (nv > 0 && nv < minv && (iv % 11) == 0)
           minv = nv;
-        if (nv > 0) 
+        if (nv > 0)
           val *= 0.5;
         k = nv / nsym;
         if (iv == 0) {
@@ -1671,7 +1671,7 @@ int iamdiag(lu, nvib, pxpecv, eig, egy, ioff)
         } else {
           ivp = iv / 10; iv -= ivp * 10; /* iv >= ivp */
           if (iv < ivp) continue;
-          if (nxvib < 0) 
+          if (nxvib < 0)
             ixv = (iv + ivp * nbasis) * mbasis;
           else
             ixv = nsq * iv;
@@ -1690,7 +1690,7 @@ int iamdiag(lu, nvib, pxpecv, eig, egy, ioff)
         }
         for (knt = 0; knt < 2; ++knt) {
           ixv = k;
-          if (k < 0) { 
+          if (k < 0) {
             k = -k; ixv = k * nbasis;
           }
           for (kk = k; kk < mbasis; ++kk) {
@@ -1701,7 +1701,7 @@ int iamdiag(lu, nvib, pxpecv, eig, egy, ioff)
           nv = 0;
         }
         if (nv == 0) continue;
-        val *= -2.; 
+        val *= -2.;
         ixv = 0;
         for (kk = 0; kk < mbasis; ++kk) {
           pt[ixv] += val; ixv += np;
@@ -1725,26 +1725,26 @@ int iamdiag(lu, nvib, pxpecv, eig, egy, ioff)
   }
   nvib0 = nvib / nsym;
   pt = tv;
-  if (ixvib > 0) 
+  if (ixvib > 0)
     pt = &tv[ixvib * nsq];
   dcopy(nsq, pt, 1, t, 1);
   /* calculate kinetic energy */
-  rhokx = eig->morg[ioff] - eig->rhok[ixvib]; 
+  rhokx = eig->morg[ioff] - eig->rhok[ixvib];
   isdgn = 0;
   if (init <= 0 || fabs(rhokx - 0.5 * nsym) < tiny)
     isdgn = isdgn0;
   kd = 0; kk = 0;
-  iv = 0; nv = mbasis;  
+  iv = 0; nv = mbasis;
   for (ixv = 0; ixv < nxdim; ++ixv) {
     val = fval[ixv + ixvib];
     m = mbgn;
     for (k = 0; k < nv; ++k) {
       tmp = m + rhokx;
       t[iv] += val * tmp * tmp;
-#if MYDEBUG_EIG 
+#if MYDEBUG_EIG
       if (lu != 0) {
         kkp = kk;
-        for (i = kk; i < nbasis; ++i) { 
+        for (i = kk; i < nbasis; ++i) {
           pmix = t[iv + i - kkp];
           if (fabs(pmix) < tiny) continue;
           fprintf(lu, " %4d%4d%15.6e", i, kk, pmix);
@@ -1754,12 +1754,12 @@ int iamdiag(lu, nvib, pxpecv, eig, egy, ioff)
         }
       }
 #endif
-      m += nsym; iv += np; 
+      m += nsym; iv += np;
       ++kk;
     }
     rhokx += morgsym[ixv + 1] - morgsym[ixv];
   }
-#if MYDEBUG_EIG 
+#if MYDEBUG_EIG
   if (lu != 0) fputc('\n',lu);
 #endif
   /* diagonalize */
@@ -1768,11 +1768,11 @@ int iamdiag(lu, nvib, pxpecv, eig, egy, ioff)
   m = pxpec0->mval; ivp = 0; nlim = nvib0; ixv = 0;
   for (iv = ioff; iv < iend; iv += nsym) { /* loop over states */
     val = tegy[ivp]; pt = &t[ivp * nbasis]; pmix = twk[ivp];
-#if MYDEBUG_EIG 
+#if MYDEBUG_EIG
     if (lu != 0) {
       kd = 0;
       fprintf(lu, "eignvector %3d\n", iv);
-      for (i = 0; i < nbasis; ++i) { 
+      for (i = 0; i < nbasis; ++i) {
         tmp = pt[i];
         fprintf(lu, " %3d%15.6e", i, tmp);
         if (++kd > 4) {
@@ -1795,9 +1795,9 @@ int iamdiag(lu, nvib, pxpecv, eig, egy, ioff)
     if (ivp >= nlim) {
       ++ixv; nlim = ivp + nvib0;
     }
-    ivdgn = -1; 
+    ivdgn = -1;
     if (isdgn != 0 && nxvib > 0) {
-      vsym = (1.e-10) * fabs(val); i = ivp;       
+      vsym = (1.e-10) * fabs(val); i = ivp;
       /* find energy degeneracy */
       if (fabs(tegy[ivp] - val) < vsym) {
         ivdgn = ivp;
@@ -1814,7 +1814,7 @@ int iamdiag(lu, nvib, pxpecv, eig, egy, ioff)
         if (m == mm) {
           i += iv / isdgn;
           vsym = 2. * vsym + pt[m] * pt[m];
-          sv += pt[m] * ptt[m]; 
+          sv += pt[m] * ptt[m];
         }
         cv = 1. - vsym;
         tmp = sqrt(cv * cv + sv * sv);
@@ -1828,14 +1828,14 @@ int iamdiag(lu, nvib, pxpecv, eig, egy, ioff)
     if (init == 0) {
       init = -1;
       egy0 = val;
-      if (lu != NULL) 
-        fprintf(lu, 
+      if (lu != NULL)
+        fprintf(lu,
                 "  v,    rho*K, vmix, pmix, energy relative to %15.6f\n",
                 egy0 / c);
     }
     val -= egy0;
     if (lu != NULL)
-      fprintf(lu, "%3d %9.6f %2d %9.6f %15.6f\n", 
+      fprintf(lu, "%3d %9.6f %2d %9.6f %15.6f\n",
               iv, eig->rhok[ixvib], kmix, pmix, val / c);
     egy[iv] = val;
     icol = iv * nbasis;
@@ -1887,9 +1887,9 @@ int expec(ityp, indx, pxpecv, nvib, eigm, eigp, noff, isym)
     nblk = nvib; nvtot = nblk * nxvib;
     ibgn1 = ixv1 * nblk; ixv1p = 0; ixv1m = 0;
     ibgn2 = ixv2 * nblk; ixv2p = 0; ixv2m = 0;
-  } else { 
+  } else {
     nblk = -nxvib * nvib; nvtot = nblk;
-    ibgn1 = 0; ixv1p = ixv1 * mbasis; ixv1m = ixv1 * nvib; 
+    ibgn1 = 0; ixv1p = ixv1 * mbasis; ixv1m = ixv1 * nvib;
     ibgn2 = 0; ixv2p = ixv2 * mbasis; ixv2m = ixv2 * nvib;
   }
   iend1 = ibgn1 + nblk - 1;
@@ -1910,14 +1910,14 @@ int expec(ityp, indx, pxpecv, nvib, eigm, eigp, noff, isym)
   /* loop through vibrational states */
   for (iv2s = ibgn2; iv2s <= iend2; ++iv2s) {
     iv2d = (int) isym[iv2s] >> 2;
-    if (iv2d == 0) 
+    if (iv2d == 0)
       iv2z = iv2s;
     isig2 = iv2s - iv2z;
     nlim = (iend1 < iv2s)? iend1: iv2s;
-    ivv0  = iv2s * nvtot; 
+    ivv0  = iv2s * nvtot;
     for (iv1s = ibgn1; iv1s <= nlim; ++iv1s) { /* iv1s <= iv2s */
       iv1d = (int) isym[iv1s] >> 2;
-      if (iv1d == 0) 
+      if (iv1d == 0)
         iv1z = iv1s;
       isig1 = iv1s - iv1z;
       if (nvcmp == 0 && isig1 != isig2) continue;
@@ -1926,7 +1926,7 @@ int expec(ityp, indx, pxpecv, nvib, eigm, eigp, noff, isym)
       isum = 0;
       for (state = state0; state >= 0; --state) {
         if (state == 1) {
-          if (nv0 == 0) 
+          if (nv0 == 0)
             state = 0;
           iv1 = iv1z + isig2;
           iv2 = iv2z + isig1;
@@ -1942,9 +1942,9 @@ int expec(ityp, indx, pxpecv, nvib, eigm, eigp, noff, isym)
         idel = nv + mket - mbra;
         if (nsym > 1) {
           if ((idel % nsym) == 0) { /*  check for good symmetry */
-            idel /= nsym; 
+            idel /= nsym;
           } else {
-            continue; 
+            continue;
           }
         }
         if (idel > 0) {
@@ -1963,7 +1963,7 @@ int expec(ityp, indx, pxpecv, nvib, eigm, eigp, noff, isym)
         if (mv == 0) {
           tmp = ddot(nx, eigvbra, 1, eigvket, 1);
         } else {              /* mv > 0 */
-          pabra = (mbra - maxm) - eigbra->rhok[ixv1];            
+          pabra = (mbra - maxm) - eigbra->rhok[ixv1];
           paket = (mket - maxm) - eigket->rhok[ixv2];
           if (mv == 2 && nv == 0 && iv1s == 2 && iv2s == 2 && kd == 0)
             tmp = 0.;
@@ -1997,7 +1997,7 @@ int expec(ityp, indx, pxpecv, nvib, eigm, eigp, noff, isym)
       }
       result[ivv] = fac * sumv[0];
     }   /* iv1 loop */
-    nn = nlim - ibgn1; 
+    nn = nlim - ibgn1;
     ivv = iv2s  + nvtot * ibgn1; ivv0 += ibgn1;
     if (state0 >= 2)
       dcopy(nn, &result[ivv0 + noff], 1, &result[ivv + noff], nvtot);
@@ -2028,13 +2028,13 @@ int getparv(nv, mv, iv, nvib2, parp, pxpecv)
   nsym = pxpec0->nval;
   md = pxpec0->mval;
   nlim = pxpec0->isunit;
-  kd = ideqv(&ityp, &val); 
-  if (mv >= 100) 
+  kd = ideqv(&ityp, &val);
+  if (mv >= 100)
     mv -= 100;
   nknt = 1; isunit = 0;
   if (nv == 0 && mv == 0 && pxpec0->ixvib >= 0) {
     isunit = kd + 1;
-  } else if (nv <= -25 || nv >= 25) { 
+  } else if (nv <= -25 || nv >= 25) {
     isunit = -1;
   }
   if (nvib2 > 0) {
@@ -2043,7 +2043,7 @@ int getparv(nv, mv, iv, nvib2, parp, pxpecv)
       if (iv == 11) {
         parp->ptxpec = NULL; parp->ptxpecx = NULL;
         return n;
-      } 
+      }
     }
   }
   for(knt = 0; knt < nknt; ++knt) {
@@ -2058,15 +2058,15 @@ int getparv(nv, mv, iv, nvib2, parp, pxpecv)
             inham = TRUE;
           } else if (mv == 0 && nv >= 0) {
             inham = TRUE;
-          } 
+          }
         }
       } else {
         if (mv == 0 && nv >= 0) {
           inham = TRUE;
         }
-      } 
+      }
     }
-    val = 0.; 
+    val = 0.;
     if (inham && isunit == 0) {
       val = parp->parval; kd = -1;
       parp->flg |= MHAM;
@@ -2091,7 +2091,7 @@ int getparv(nv, mv, iv, nvib2, parp, pxpecv)
         iend = i;
         break;
       }
-      if (k == 0 && pxpeci->nval == nv && pxpeci->mval == mv && 
+      if (k == 0 && pxpeci->nval == nv && pxpeci->mval == mv &&
           pxpeci->ixvib == iv) {
         /* full match */
         pxpecp = pxpeci;
@@ -2099,7 +2099,7 @@ int getparv(nv, mv, iv, nvib2, parp, pxpecv)
         if (kd < 0) pxpecp->xval += val;
         break;
       }
-    } 
+    }
     if (n >= nlim) {
       printf("pexpecv too small :%d\n", nlim);
       exit(EXIT_FAILURE);
@@ -2119,9 +2119,9 @@ int getparv(nv, mv, iv, nvib2, parp, pxpecv)
     parp->ptxpec = pxpecp;
     iv = 11 - iv;
     if (isunit >= 0) {
-      if (kd < 0) 
+      if (kd < 0)
         kd = 0;
-      if (isunit == 0) 
+      if (isunit == 0)
         isunit = 1 + kd;
       mv = 0; nv = 0;
     }
@@ -2137,13 +2137,13 @@ int ideqv(pidtmp, pfac)
   static struct {
     double fac;
     int ityp, kd;
-  } cmpv[] = { 
+  } cmpv[] = {
     {-2.0,  4, 2},
-    { 0.5, 21, 2}, 
+    { 0.5, 21, 2},
     {-1.0, 40, 1},
     { 1.0, 60, 1},
     {-1.0, 61, 1},
-    { 1.0, 41, 1}, 
+    { 1.0, 41, 1},
     { 0.5, 22, 2},
     {-2.0, 12, 2},
     { 1.0,  0, 0},
@@ -2152,7 +2152,7 @@ int ideqv(pidtmp, pfac)
   int kdret, i, ii, key;
 
   kdret = 0;
-  *pfac = 1.; 
+  *pfac = 1.;
   idtmp = (*pidtmp);
   if (idtmp < 0)
     idtmp = -idtmp;
@@ -2167,7 +2167,7 @@ int ideqv(pidtmp, pfac)
       kdret = 1;
     }
   } else {
-    key = (int) ((idtmp / IDIV) % 100); 
+    key = (int) ((idtmp / IDIV) % 100);
     if (key != 0) {
       for (i = 0; (ii = cmpv[i].ityp) != 0; ++i) {
         if (ii == key) {
@@ -2222,14 +2222,14 @@ int ksign(kdel, nft, txpec, xfc)
     val0 = txpec[0]; kp = 1;
   }
   km = nft - 1;
-  xfc[0] = val0; 
+  xfc[0] = val0;
   for (k = 1; k < iret; k += 2) {
     dif = 0.5 * (txpec[kp] - txpec[km]);
     xfc[k] = txpec[kp] - dif - val0;
     xfc[k + 1] = dif;
     --km; ++kp;
   }
-  for (k = iret; k < nft; ++k) 
+  for (k = iret; k < nft; ++k)
     xfc[k] = 0.;
   return iret;
 }
@@ -2312,7 +2312,7 @@ void seig_alloc(SEIG *eigv, const int nvec, const size_t nfill,
 }
 int init2top(FILE *lu, int nvib2, int nsym, int nvib, int nvtot,
               int nsig, short *kmap, S2TOP *vmap, int *sigma2, int *ivtop)
-{  
+{
   S2TOP *pmap, *pmapp;
   int i, iv, iv1, iv2, k, kk, nline, isig1, isig2, isig, isold, nvt, nvtop;
   sigma2[0] = 0;
@@ -2320,8 +2320,8 @@ int init2top(FILE *lu, int nvib2, int nsym, int nvib, int nvtot,
   ivtop[0] = 0; k= 0;
   do {
     pmap = &vmap[k];
-    sigma2[k] = 0; 
-    pmap->iqv = -16; pmap->iqsig = 0;   
+    sigma2[k] = 0;
+    pmap->iqv = -16; pmap->iqsig = 0;
     pmap->ix1 = 0; pmap->ix2 = 0; pmap->inew = 0;
      ++k;
   } while (k < nvtot);
@@ -2331,10 +2331,10 @@ int init2top(FILE *lu, int nvib2, int nsym, int nvib, int nvtot,
   nline = (int) kmap[0] * ND2TOP + 1;
   /* user input equivalent states */
   for (k = 1; k < nline; k += ND2TOP) {
-    iv = (int) kmap[k]; 
+    iv = (int) kmap[k];
     if (iv < 0 || iv >= nvtot) continue;
     pmap = &vmap[iv];
-    isig1 = (int) kmap[k + 2]; 
+    isig1 = (int) kmap[k + 2];
     if (isig1 < 0) isig1 += nsym;
     if (isig1 >= nsym) continue;
     isig2 = (int) kmap[k + 3];
@@ -2407,7 +2407,7 @@ int init2top(FILE *lu, int nvib2, int nsym, int nvib, int nvtot,
       pmap->ix2 += (pmapp->ix2 / nsym) * nsym;
       break;
     }
-  } 
+  }
   pmap = NULL; pmapp = NULL;
   /* find index for states */
   for (k = 0; k < nvtot; ++k) {
@@ -2430,7 +2430,7 @@ int init2top(FILE *lu, int nvib2, int nsym, int nvib, int nvtot,
     isig1 = pmap->ix1; iv1 = isig1 / nsym; isig1 -= iv1 * nsym;
     isig2 = pmap->ix2; iv2 = isig2 / nsym; isig2 -= iv2 * nsym;
     if (pmap->iqv == 3) {
-      iv = pmap->inew - nsym * nsym; 
+      iv = pmap->inew - nsym * nsym;
       for (kk = 0; kk < nvtot; ++kk) {
         pmapp = &vmap[kk];
         if (pmapp->inew == iv) {
@@ -2440,15 +2440,15 @@ int init2top(FILE *lu, int nvib2, int nsym, int nvib, int nvtot,
       }
     }
     if (pmap->iqsig == 3) {
-      iv = pmap->inew + (nsym - 1) * (isig2 - isig1); 
+      iv = pmap->inew + (nsym - 1) * (isig2 - isig1);
       for (kk = 0; kk < nvtot; ++kk) {
         pmapp = &vmap[kk];
         if (pmapp->inew == iv) {
           if (pmapp->iqsig == 0) pmapp->iqsig = 2;
         }
       }
-    }         
-  } 
+    }
+  }
   pmap = NULL; pmapp = NULL;
   /* fill in sigma */
   isold = 0; kk = 0; iv2 = 0;
@@ -2474,7 +2474,7 @@ int init2top(FILE *lu, int nvib2, int nsym, int nvib, int nvtot,
     }
     if (isold == 0) {
       if (isig1 !=  0 && isig2 != 0) ++kk;
-      if (kk == 0) kk = 1; 
+      if (kk == 0) kk = 1;
       sigma2[k] = kk; isold = 1;
     }
   }
@@ -2495,7 +2495,7 @@ int init2top(FILE *lu, int nvib2, int nsym, int nvib, int nvtot,
     if (isig == 3) isig = -1;
     isig1 = pmap->ix1; isig2 = pmap->ix2;
     iv2 = pmap->ix2 / nsym; iv1 = pmap->ix1 / nsym;
-    fprintf(lu,"%3d: %2d %3d %3d, %2d %2d%2d, %3d %3d\n", k, 
+    fprintf(lu,"%3d: %2d %3d %3d, %2d %2d%2d, %3d %3d\n", k,
             isig, isig1, isig2, i, iv1, iv2, sigma2[k], pmap->inew);
   }
   return nvtop;
@@ -2510,45 +2510,45 @@ int get2top(SIPAR *ppar,/*@out@*/ double *xpec2, int nvtot, int nft, int nsym,
   int nsymsq, iv, ivp, iv1, iv1p, iv2, iv2p, isig1, isig1p, isig2, isig2p, ivv;
   int ix, ix1, ix2, ndm2, noff, noff2, ioff, isig, isunit1, isunit2;
   int kdel, ndtot, ndtot2, ift, nft2, iret, nvib, nv1, nv2, isigp;
-  kdel = -2; 
+  kdel = -2;
   pxpec1 = ppar->ptxpec;\
   if (pxpec1 != NULL)  kdel = pxpec1->kdel;
   nsymsq = nsym * nsym; ndm2 = nsymsq * (nvtop >> 1); ndtot2 = ndm2 * ndm2;
   dxpec = xpec2; xpec2[0] = 0.;
-  nft2 = nft; 
-  if (kdel > 0) 
+  nft2 = nft;
+  if (kdel > 0)
     nft2 = nft2 << 1;
   for (ift = 0; ift < nft2; ++ift) {
     if (ift > 0) dxpec += ndtot2;
     dcopy(ndtot2, &zero, 0, dxpec, 1);
   }
   if (pxpec1 == NULL) return 0;
-  pxpec2 = ppar->ptxpecx; 
+  pxpec2 = ppar->ptxpecx;
   if (pxpec2 == NULL) return 0;
   dxpec1 = pxpec1->xpec; dxpec2 = pxpec2->xpec;
   if (dxpec1 == NULL || dxpec2 == NULL) return 0;
   noff2 = ndtot2 * nft; ndtot = nvtot * nvtot; nvib = nvtot >> 1;
   noff  = ndtot  * nft; iret = 0;
   isunit1 = pxpec1->isunit; isunit2 = pxpec2->isunit;
-  nv1 = pxpec1->nval; nv2 = pxpec2->nval; 
+  nv1 = pxpec1->nval; nv2 = pxpec2->nval;
   /* load operators */
   ioff = 0;
   for (iv = 0; iv < ndm2; ++iv) {
-    ivv = iv / nsymsq; isig = iv - ivv * nsymsq; 
+    ivv = iv / nsymsq; isig = iv - ivv * nsymsq;
     isig1 = isig  / nsym; isig2 = isig - isig1 * nsym;
-    ivv = ivv << 1; 
-    iv1 = isig1 + nsym * ivtop[ivv]; 
+    ivv = ivv << 1;
+    iv1 = isig1 + nsym * ivtop[ivv];
     iv2 = isig2 + nsym * ivtop[ivv + 1] + nvib;
     for (ivp = 0; ivp < ndm2; ++ivp) {
       ivv = ivp / nsymsq; isigp = ivp - ivv * nsymsq;
       isig1p = isigp  / nsym; isig2p = isigp - isig1p * nsym;
       if (nv1 == 0 && isig1p != isig1) continue;
       if (nv2 == 0 && isig2p != isig2) continue;
-      ivv = ivv << 1; 
-      iv1p = isig1p + nsym * ivtop[ivv]; 
+      ivv = ivv << 1;
+      iv1p = isig1p + nsym * ivtop[ivv];
       iv2p = isig2p + nsym * ivtop[ivv + 1] + nvib;
-      if (isunit1 == 1 && iv1p != iv1) continue; 
-      if (isunit2 == 1 && iv2p != iv2) continue; 
+      if (isunit1 == 1 && iv1p != iv1) continue;
+      if (isunit2 == 1 && iv2p != iv2) continue;
       ix1 = iv1 + nvtot * iv1p; ix2 = iv2 + nvtot * iv2p;
       va1 = dxpec1[ix1]; va2 = dxpec2[ix2];
       ix = iv + ndm2 * ivp;
@@ -2571,21 +2571,21 @@ int get2top(SIPAR *ppar,/*@out@*/ double *xpec2, int nvtot, int nft, int nsym,
       }
     }
   }
-  /* sigma symmetry */ 
+  /* sigma symmetry */
   for (iv = 0; iv < ndm2; ++iv) {
-    if ((vmapsym[iv] & 3) == 0) continue; 
+    if ((vmapsym[iv] & 3) == 0) continue;
     ivv = iv / nsymsq; isig = iv - ivv * nsymsq;
     isig1 = isig  / nsym; isig2 = isig - isig1 * nsym;
     if (isig1 >= isig2) continue;
     ivv = iv + (nsym - 1) * (isig2 - isig1);
-    ix1 = iv * ndm2; ix2 = ivv * ndm2; 
+    ix1 = iv * ndm2; ix2 = ivv * ndm2;
     for (ift = 0; ift < nft2; ++ift) {
       if (ift > 0) {
         ix1 += ndtot2; ix2 += ndtot2;
       }
       drot(ndm2, &xpec2[ix1], 1, &xpec2[ix2], 1, rthalf, rthalf);
     }
-    ix1 = iv; ix2 = ivv; 
+    ix1 = iv; ix2 = ivv;
     for (ift = 0; ift < nft2; ++ift) {
       if (ift > 0) {
         ix1 += ndtot2; ix2 += ndtot2;
@@ -2593,12 +2593,12 @@ int get2top(SIPAR *ppar,/*@out@*/ double *xpec2, int nvtot, int nft, int nsym,
       drot(ndm2, &xpec2[ix1], ndm2, &xpec2[ix2], ndm2, rthalf, rthalf);
     }
   }
-  /* vibrational symmetry */ 
+  /* vibrational symmetry */
   for (iv = 0; iv < ndm2; ++iv) {
-    if ((vmapsym[iv] & 0x0c) == 0) continue; 
+    if ((vmapsym[iv] & 0x0c) == 0) continue;
     ivv = iv / nsymsq;
-    ivv = ivv << 1; 
-    iv1 = ivtop[ivv]; 
+    ivv = ivv << 1;
+    iv1 = ivtop[ivv];
     iv2 = ivtop[ivv + 1];
     if (iv1 >= iv2) continue;
     iv1p = ivtop[ivv + 2]; iv2p = ivtop[ivv + 3];
@@ -2610,7 +2610,7 @@ int get2top(SIPAR *ppar,/*@out@*/ double *xpec2, int nvtot, int nft, int nsym,
       }
       drot(ndm2, &xpec2[ix1], 1, &xpec2[ix2], 1, rthalf, rthalf);
     }
-    ix1 = iv; ix2 = ivv; 
+    ix1 = iv; ix2 = ivv;
     for (ift = 0; ift < nft2; ++ift) {
       if (ift > 0) {
         ix1 += ndtot2; ix2 += ndtot2;
@@ -2657,7 +2657,7 @@ int get2top(SIPAR *ppar,/*@out@*/ double *xpec2, int nvtot, int nft, int nsym,
   }
   return iret;
 } /* get2top */
-  
+
 int wrpar(lu, id, nid, isdip, kflg, t, nt, labl, nfmt, drhok)
      FILE *lu;
      double *id;
@@ -2699,7 +2699,7 @@ int wrpar(lu, id, nid, isdip, kflg, t, nt, labl, nfmt, drhok)
       if (dnrm2(nt, t, 1) > cmp) {
         for (k = 0; k < nt; ++k) {
           kk = k;
-          if ((k + k) > nfmt) kk -= nfmt; 
+          if ((k + k) > nfmt) kk -= nfmt;
           tmp = kk * drhok; ++nret;
           fprintf(lu, fmt2, fid, tmp, t[k], labl);
         }
@@ -2732,7 +2732,7 @@ int wrpar(lu, id, nid, isdip, kflg, t, nt, labl, nfmt, drhok)
   } else {                      /* parameters */
     finc *= 1.e7;
     fidc = 0.;
-    fidd = finc * 10; 
+    fidd = finc * 10;
     fida = fidd;
     if (n > 98)
       n = 98;
@@ -2743,7 +2743,7 @@ int wrpar(lu, id, nid, isdip, kflg, t, nt, labl, nfmt, drhok)
   for (i = 0; i < nid; ++i) {
     fid = id[i]; tval = (*tv);
     if (fabs(tval) > cmp) {
-      if (kflg == -2) { 
+      if (kflg == -2) {
         fid = fabs(fid);
         kflg = -1;
       }
@@ -2759,7 +2759,7 @@ int wrpar(lu, id, nid, isdip, kflg, t, nt, labl, nfmt, drhok)
   if (tmp < tiny * nid)
     return nret;
   k = 0;
-  if (isdip > 0) 
+  if (isdip > 0)
     ++k;
   for (kk = 1; kk <= n; kk += 2) {
     if ((++k) > 10) {
@@ -2771,11 +2771,11 @@ int wrpar(lu, id, nid, isdip, kflg, t, nt, labl, nfmt, drhok)
     for (i = 0; i < nid; ++i) {
       idtmp = (long) id[i]; idd = idtmp / 100;
       ires = (int)(idtmp - 100 * idd);
-      if (ires < 0) ires = - ires; 
+      if (ires < 0) ires = - ires;
       fid = fidc + (double)idd; tval = (*tv);
       fids = fid + fidd;
       if (fabs(tval) > cmp) {
-        if (kflg == -2) { 
+        if (kflg == -2) {
           fid = fabs(fid);
           kflg = -1;
         }
@@ -2786,7 +2786,7 @@ int wrpar(lu, id, nid, isdip, kflg, t, nt, labl, nfmt, drhok)
       tvp = tv + 1;
       tval = (*tvp);
       if (fabs(tval) > cmp) {
-        if (kflg == -2) { 
+        if (kflg == -2) {
           fids = fabs(fids);
           kflg = -1;
         }
