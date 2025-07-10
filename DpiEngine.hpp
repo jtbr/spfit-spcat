@@ -4,6 +4,7 @@
 #include "CalculationEngine.hpp"
 #include "DpiContext.hpp"
 
+// Engine for diatomic and linear molecules (?)
 class DpiEngine : public CalculationEngine {
   public:
     DpiEngine();

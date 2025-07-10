@@ -448,16 +448,22 @@ bool CalFit::initializeParameters(const CalFitInput &input)
     if (m_inpcor > 0)
     {
       // "Supplied variance" path
-      // Assume 'var' is standard packed LOWER Cholesky factor L of Covariance.
-      // (If getvar truly gives UPPER, then var is U, and fit=U. Logic might need U^T U.)
-      // For now, proceed as if var = L_packed_lower.
+      // Assume 'var' is a packed UPPER triangular matrix in column-major (Fortran) order.
+      // This corresponds to the output of LAPACK's `dpotrf` for the Cholesky decomposition
+      // of a covariance matrix, where A = U^T U and U is upper triangular.
+      // We want to form the full lower triangular matrix L from this U, where L = U^T.
 
-      // 4.1. Form full lower triangular `fit` matrix (L) from `var` (L_packed_lower).
+      // 4.1. Form full lower triangular `fit` matrix (L) from `var` (U_packed_colmajor).
       // `var` (member this->var) holds U_packed_colmajor from getvar.
-      // Create a temporary L_packed_colmajor from this->var (U_packed).
+      // Create a temporary L_packed_colmajor from this->var (U_packed_colmajor).
       std::vector<double> l_packed_temp(standard_packed_elements);
-      // Transpose U_packed in this->var to L_packed in l_packed_temp
-      // U_ij is var[j*(j+1)/2 + i] for i<=j. We want L_ij = U_ji.
+      // Transpose U_packed_colmajor in this->var to L_packed_colmajor in l_packed_temp
+      // U_ij is var[j*(j+1)/2 + i] for i<=j (Fortran column-major packing).
+      // We want L_ij = U_ji.
+      // For column-major packed U, U_ij is stored at var[j*(j+1)/2 + i] (for i <= j).
+      // For column-major packed L, L_ij is stored at l_packed_temp[i*(i+1)/2 + j] (for j <= i).
+      // So, L_ij = U_ji means l_packed_temp[i*(i+1)/2 + j] = var[i*(i+1)/2 + j] (if j <= i)
+      // This is effectively transposing the packed matrix.
       // L_packed_colmajor stores L00, L10,L11, L20,L21,L22,...
       int k_l_packed = 0;
       for (int j_col_L = 0; j_col_L < m_nfit; ++j_col_L)
@@ -517,7 +523,7 @@ bool CalFit::initializeParameters(const CalFitInput &input)
       double *pfit_col_start = fit;
       for (int k_col = 0; k_col < m_nfit; ++k_col)
       {
-        current_scale_factor = dpar[k_col]; // D_inv_kk
+        current_scale_factor = dpar[k_col]; // D_inv_kk, (This dpar is from getpar, not related to lsqfit's enorm)
         // Scale L_inv(k_col:end, k_col)
         dscal(m_nfit - k_col, current_scale_factor, pfit_col_start + k_col, 1);
         pfit_col_start += ndfit;
@@ -536,7 +542,7 @@ bool CalFit::initializeParameters(const CalFitInput &input)
       //    (which `lsqfit`'s `dkold` save implies for the derivative part `dk(0:nr-1,0:nr-1)`), then just pack it.
       //    The original code: `dcopy(nt, pdk, 1, pdkold, 1);` saves the full solution block.
       //    The `dcopy(n,pfit,ndfit,pfitb,1)` from `main.c`'s "Supplied Variance" implies `fit` had the symmetric matrix.
-      //    Let's assume `fit` after unscaling IS the symmetric Inverse Covariance.
+      //    Now `fit` after unscaling IS the symmetric Inverse Covariance.
       fitbgn[0] = fit[0];
       double *pfitb_ptr = fitbgn;
       pfit_col_start = fit; // `fit` is m_nfit x ndfit (contains symmetric InvCov)
