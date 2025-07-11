@@ -58,6 +58,10 @@ def run_commands_and_move_outputs_dynamic(output_subdir_name, suite_base_path='.
                     os.chdir(temp_dir)
                     #print(f"    Changed CWD to: {os.getcwd()}")
 
+                    # output_dir_path is inside the current molecule_example_path
+                    output_dir_path_abs = os.path.join(molecule_example_abspath, output_subdir_name)
+                    os.makedirs(output_dir_path_abs, exist_ok=True)
+
                     # --- Run SPFIT ---
                     spfit_success = False
                     spfit_command = [os.path.join(EXE_PATH, "spfit"), local_basename]
@@ -69,14 +73,19 @@ def run_commands_and_move_outputs_dynamic(output_subdir_name, suite_base_path='.
                             os.chdir(original_cwd) # Change back before continuing to next molecule
                             continue
 
+                        spfit_log_path = os.path.join(output_dir_path_abs, f"{local_basename}_spfit.log")
                         spfit_result = subprocess.run(spfit_command, capture_output=True, text=True, check=False, timeout=600)
+                        with open(spfit_log_path, "w") as f:
+                            f.write("--- SPFIT STDOUT ---\n")
+                            f.write(spfit_result.stdout)
+                            f.write("\n--- SPFIT STDERR ---\n")
+                            f.write(spfit_result.stderr)
                         if spfit_result.returncode == 0:
                             print("    SPFIT completed successfully.")
                             spfit_success = True
                         else:
                             print(f"    SPFIT failed with return code {spfit_result.returncode}.")
-                            # print(f"    SPFIT stdout:\n{spfit_result.stdout}") # Can be very verbose
-                            # print(f"    SPFIT stderr:\n{spfit_result.stderr}")
+                            print(f"    SPFIT output logged to {spfit_log_path}")
                     except subprocess.TimeoutExpired:
                         print("    SPFIT command timed out.")
                     except Exception as e:
@@ -93,14 +102,19 @@ def run_commands_and_move_outputs_dynamic(output_subdir_name, suite_base_path='.
                             spcat_command = [os.path.join(EXE_PATH, "spcat"), local_basename]
                             print(f"    Running SPCAT: {' '.join(spcat_command)}")
                             try:
+                                spcat_log_path = os.path.join(output_dir_path_abs, f"{local_basename}_spcat.log")
                                 spcat_result = subprocess.run(spcat_command, capture_output=True, text=True, check=False, timeout=1000)
+                                with open(spcat_log_path, "w") as f:
+                                    f.write("--- SPCAT STDOUT ---\n")
+                                    f.write(spcat_result.stdout)
+                                    f.write("\n--- SPCAT STDERR ---\n")
+                                    f.write(spcat_result.stderr)
                                 if spcat_result.returncode == 0:
                                     print("    SPCAT completed successfully.")
                                     spcat_success = True
                                 else:
                                     print(f"    SPCAT failed with return code {spcat_result.returncode}.")
-                                    # print(f"    SPCAT stdout:\n{spcat_result.stdout}")
-                                    # print(f"    SPCAT stderr:\n{spcat_result.stderr}")
+                                    print(f"    SPCAT output logged to {spcat_log_path}")
                             except subprocess.TimeoutExpired:
                                 print("    SPCAT command timed out.")
                             except Exception as e:
@@ -109,10 +123,6 @@ def run_commands_and_move_outputs_dynamic(output_subdir_name, suite_base_path='.
                         print("    Skipping SPCAT due to SPFIT failure or non-completion.")
 
                     # --- Move all relevant output files ---
-                    # output_dir_path is inside the current molecule_example_path
-                    output_dir_path_abs = os.path.join(molecule_example_abspath, output_subdir_name)
-                    os.makedirs(output_dir_path_abs, exist_ok=True)
-
                     files_to_move = []
                     if spfit_success: # If SPFIT at least ran, try to move its outputs
                         for ext in SPFIT_OUTPUT_EXTENSIONS:

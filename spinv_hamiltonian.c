@@ -61,7 +61,7 @@ int hamx(struct SpinvContext *ctx, const int iblk, const int nsize, const int np
   double *pscr; /* Scratch space for debugging Hamiltonian */
 #endif
   long ndm;             /* Leading dimension of matrix t (nsize) */
-  int ipar, ncos, ispn, jspn, nsqj, iiwt[5], ndmd, alpha, mkd; /* ipar: parameter index; ncos: number of non-zero direction cosine elements; ispn,jspn: packed spin state for bra/ket; nsqj: power of N(N+1); iiwt: cached weights for current block; ndmd: nsize+1 for diagonal indexing; alpha: Itot symmetry component; mkd: mask for dircos */
+  int ipar, ncos, ispn, jspn, nsqj, iiwt[5], ndmd, alpha, mkd, njqt; /* ipar: parameter index; ncos: number of non-zero direction cosine elements; ispn,jspn: packed spin state for bra/ket; nsqj: power of N(N+1); iiwt: cached weights for current block; ndmd: nsize+1 for diagonal indexing; alpha: Itot symmetry component; mkd: mask for dircos */
   int i, ii, lt, n_sub_block_size, ibase, jbase, kbgni, kbgnj, nsblk, idflags, ipbase; /* i,ii: loop counters; lt: tensor L order; n_sub_block_size: current sub-block size; ibase,jbase: base index for bra/ket sub-block; kbgni,kbgnj: K_begin for bra/ket; nsblk: number of sub-blocks in current F block; idflags: flags from SPAR struct; ipbase: base parameter index for constrained params */
   int kd, ld, nd, ni, nj, ivbase, jvbase, ivmin, ifc, iz, jz, npair, ldel; /* kd: Delta K; ld: dir.cos. L order; nd: N_bra - N_ket; ni,nj: N_bra, N_ket; ivbase,jvbase: vib. index for bra/ket; ivmin: min(ivbase,jvbase); ifc: Fourier coeff index; iz,jz: matrix indices; npair: number of spin couplings; ldel: Delta l */
   int si1, si2, iff, ijd, ikq, ins, neuler, sznz, ixx, jxx, kl, isgn, isunit; /* si1,si2: spin indices; iff: 2*F; ijd: ixx-jxx; ikq: K^2 power; ins: N.S power; neuler: Euler type; sznz: SzNz type; ixx,jxx: sub-block loop indices; kl: loff flags for dircos; isgn: sign factor for matrix element; isunit: flag if operator is unit matrix type */
@@ -121,6 +121,7 @@ int hamx(struct SpinvContext *ctx, const int iblk, const int nsize, const int np
           sqj[i] = sqj[i - 1] * sqnn;
         }
       }
+
       for (jxx = 0; jxx <= ixx; ++jxx) { /* Loop over 'ket' sub-blocks (only jxx <= ixx for lower triangle + diagonal) */
         ijd = ixx - jxx; /* Difference in sub-block indices */
         jbase = ctx->ibkptr[jxx]; /* Starting row/col index for this 'ket' sub-block */
@@ -206,7 +207,7 @@ int hamx(struct SpinvContext *ctx, const int iblk, const int nsize, const int np
               sznzfix(ctx, sznz, ni, nj, ctx->ixcom, ctx->jxcom, ctx->iscom, ctx->jscom); /* Reset N values in ixcom/jxcom if changed by SzNz */
             /* Parse the BCD parameter ID into its components */
             kl = idpars(spar_now, &ikq, &neuler, &lt, &ld, &kd, &ins,
-                        &si1, &si2, &sznz, &ifc, &alpha, &ldel, &kavg);
+                        &si1, &si2, &sznz, &ifc, &alpha, &ldel, &kavg, &njqt);
             if (sznz > 0) { /* If this is an SzNz type operator */
               sznz = sznzfix(ctx, sznz, ni, nj, ctx->ixcom, ctx->jxcom, ctx->iscom, ctx->jscom); /* Modify N in ixcom/jxcom, returns new sznz state */
               if (sznz == 0) continue;    /* Operator invalid for these N values, get next parameter */
@@ -958,7 +959,7 @@ double rmatrx(const int dir_cos_order, const int vib_tensor_order,
  * @return int Always 0.
  */
 int symnsq(struct SpinvContext *ctx, const int n_sq_power, const int n_s_power,
-           const int *iscom_bra_qns, const int *jscom_ket_qns, double *matrix_element_factor) /* Renamed parameters */
+           const int *iscom_bra_qns, const int *jscom_ket_qns, double *matrix_element_factor)
 {
   double n_n_plus_1_power_factor, dot_N_S_bra, dot_N_S_ket, factor_bra_side, factor_ket_side;          /* Renamed x, dotns, dotnsp, zr, zl */
   int delta_2N, first_spin_qn_bra_times_2, N_bra_times_2, N_ket_times_2, J_bra_times_2, J_ket_times_2; /* Renamed modf, ispn, nni, nnj, j */

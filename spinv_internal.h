@@ -220,7 +220,7 @@ int idpars(SPAR * pspar, /*@out@*/ int *ksq, /*@out@*/ int *itp,
                   /*@out@*/ int *l, /*@out@*/ int *ld, /*@out@*/ int *kdel,
                   /*@out@*/ int *ins, /*@out@*/ int *si1, /*@out@*/ int *si2,
                   /*@out@*/ int *sznz, /*@out@*/ int *ifc, /*@out@*/ int *alpha,
-                  /*@out@*/ int *ldel,/*@out@*/ int *kavg);
+                  /*@out@*/ int *ldel,/*@out@*/ int *kavg, /*@out@*/ int *njq);
 int getll(struct SpinvContext *ctx, const int llf, const int ld, const int ln, const int kd, /* signature was wrong in original code */
                   const int si1, const int si2, int *lscom, const int *iscom,
                   const int *jscom);

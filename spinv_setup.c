@@ -1107,7 +1107,7 @@ int setblk(struct SpinvContext *ctx, FILE *lu, const int npar, bcd_t *idpar, con
   int nodd, isym, jsym, ixzt, i, k, kl, lt, n, kdiag, nvibm, neven, nsize, alpha;
   int kd, ld, ii, jj, im, kk, ni, nj, iv, jv, ivmin, ix, lv, lx, npair, ldel;
   int knnmin, ntstat, si1, si2, iff, ikq, jjt, ins, neuler, sznz, iff0;
-  int iwt, gsym, maxblk, maxsblk, itmp, nd, ifc, nf, kavg;
+  int iwt, gsym, maxblk, maxsblk, itmp, nd, ifc, nf, kavg, njqt;
   unsigned int ivsym;
   int ivwt[3], jvwt[3];
   char ctmp;
@@ -1249,7 +1249,7 @@ int setblk(struct SpinvContext *ctx, FILE *lu, const int npar, bcd_t *idpar, con
         if (sznz < 0)
           sznzfix(ctx, sznz, ni, nj, ctx->ixcom, ctx->jxcom, ctx->iscom, ctx->jscom);
         kl = idpars(spar_now, &ikq, &neuler, &lt, &ld, &kd, &ins, &si1, &si2,
-                    &sznz, &ifc, &alpha, &ldel, &kavg);
+                    &sznz, &ifc, &alpha, &ldel, &kavg, &njqt);
         if (ODD(neuler))
           continue;
         if (sznz > 0)
@@ -1779,7 +1779,7 @@ int pasort(struct SpinvContext *ctx, FILE *lu, const int npar, bcd_t *idpar, con
         ctx->nsqmax = njqt;
       isym = (int)spar_now->ipsym;
       idpars(spar_now, &ikq, &neuler, &lt, &ld, &kd, &ins, &si1, &si2,
-             &sznz, &ifc, &alpha, &ldel, &kavg);
+             &sznz, &ifc, &alpha, &ldel, &kavg, &njqt);
       iiv1 = pvib1->spt;
       iiv2 = pvib2->spt;
       if (si1 > 0 &&
@@ -1993,7 +1993,7 @@ int pasort(struct SpinvContext *ctx, FILE *lu, const int npar, bcd_t *idpar, con
             break;
           spar_last = spar_now;
           klp = idpars(spar_now, &ikqp, &neulerp, &ltp, &ldp, &kdp, &insp,
-                       &si1p, &si2p, &sznzp, &ifcp, &alphap, &ldelp, &kavgp);
+                       &si1p, &si2p, &sznzp, &ifcp, &alphap, &ldelp, &kavgp, &njqt);
           klp &= MMASK;
           /* check for same K dependence */
           if (ikq == ikqp && ld == ldp && kd == kdp && kl == klp &&

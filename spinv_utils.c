@@ -334,13 +334,14 @@ int idpari(struct SpinvContext *ctx, bcd_t *idval, int itp, SPAR *pspar)
  * @param alpha_sym_out Output: I_tot alpha symmetry component. Renamed alpha.
  * @param l_delta_out Output: change in l. Renamed ldel.
  * @param k_avg_out Output: K_avg value if applicable. Renamed kavg.
+ * @param njq_out Output: Power of N(N+1) operator
  * @return int Flags from the pspar structure.
  */
 int idpars(SPAR *pspar, int *ksq_out, int *itp_out,
            int *tensor_order_N_out, int *dir_cos_order_out, int *k_delta_out,
            int *n_dot_s_power_out, int *spin1_idx_out, int *spin2_idx_out,
            int *sznz_type_out, int *fourier_coeff_idx_out, int *alpha_sym_out,
-           int *l_delta_out, int *k_avg_out) /* Renamed parameters for clarity */
+           int *l_delta_out, int *k_avg_out, int *njq_out) /* Renamed parameters for clarity */
 {
   /*     subroutine to parse parameter identifiers to subfields */ /* Original comment */
   /*     on entry: */ /* Original comment */
@@ -367,6 +368,7 @@ int idpars(SPAR *pspar, int *ksq_out, int *itp_out,
   *alpha_sym_out = (int)pspar->alpha;
   *l_delta_out = (int)pspar->mldel;
   *k_avg_out = (int)pspar->kavg;
+  *njq_out = (int)pspar->njq;
   flags_return = (int)pspar->flags;
   return flags_return;
 } /* idpars */
