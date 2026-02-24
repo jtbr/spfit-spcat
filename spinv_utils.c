@@ -77,9 +77,11 @@ int idpari(struct SpinvContext *ctx, bcd_t *idval, int itp, SPAR *pspar)
   pspar->msznz = C0;
   pspar->fc = C0;
   exval = 0;
-  ibtmp = idval[0];
-  nsx = (int)(ibtmp & 0x0f);
-  ksq = (int)(ibtmp >> 4);
+  // The actual KSQ and NJQ are in idval[1] (which is idpar[ibcd + 2])
+  // idval[0] contains the last two digits of the parameter ID
+  ibtmp = idval[0]; // TODO: SHOULD read from the SECOND BCD element idval[1] (BUG in original code??!)
+  nsx = (int)(ibtmp & 0x0f); // Lower nibble is NJQ
+  ksq = (int)(ibtmp >> 4);   // Upper nibble is KSQ
   ity = bcd2i(idval[1]);
   itysav = ity * 10 + ksq;
   ibtmp = idval[2];

@@ -54,6 +54,7 @@ def run_commands_and_move_outputs_dynamic(output_subdir_name, suite_base_path='.
                         if os.path.isfile(src_path):
                             dst_path = os.path.join(temp_dir, filename)
                             shutil.copy2(src_path, dst_path)
+                            os.chmod(dst_path, 0o644)
 
                     os.chdir(temp_dir)
                     #print(f"    Changed CWD to: {os.getcwd()}")

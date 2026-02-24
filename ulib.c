@@ -672,7 +672,7 @@ const int nfit, iflg;
           }
           k = 0;
         }
-        if (k < nv && fabs(*pvar = dval[k]) < 1.01) {
+        if (k < nv && fabs(*pvar = dval[k]) < 1.01) {  /* TODO: this seems to be erroneous (?) */
           ++k;
           ++pvar;
         } else {

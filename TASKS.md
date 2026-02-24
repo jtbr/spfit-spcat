@@ -43,6 +43,9 @@ This document outlines the prioritized tasks for modernizing the SPFIT/SPCAT sof
 
 ## In Progress Tasks
 
+- [ ] **Task X: Investigate suspected bug in `inpcor > 0` logic**
+    - **Description**: The original C code for the "Supplied Variance" (`inpcor > 0`) case in `calfit-orig.cpp` has a loop for unscaling the inverted matrix: `for (n = 1; i <= nfit; ++n)`. The loop uses `i` in its condition but `n` as the counter, which is suspicious and may be a bug. The C++ refactoring in `CalFit.cpp` has implemented this differently. If tests that use `inpcor > 0` fail, this discrepancy should be investigated as a potential source of error.
+
 - [ ] **Task 4: Modularization and Decoupling with C++ Interface**
     - **Description**: Refactor the core SPFIT/SPCAT functionality to be more modular, using C structs/C++ classes for inputs/outputs, and creating a clean C++ interface layer. This is crucial for enabling programmatic use from modern software like Python.
     - **Implementation Plan**: Implementing a Strategy Pattern for Calculation Engines.

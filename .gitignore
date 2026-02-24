@@ -17,5 +17,8 @@ iambak
 iamcalc
 # CMake artefacts
 build/
+# test outputs:
+spfit_spcat_test_suite/*/*/*/*
+spfit_spcat_test_suite/temp*
 
 *~

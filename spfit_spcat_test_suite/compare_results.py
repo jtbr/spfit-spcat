@@ -201,9 +201,9 @@ def main_comparison(new_output_dir_name, ref_output_dir_name):
     print(f"Comparing '{ref_output_dir_name}/' with '{new_output_dir_name}/'")
     print("=" * 70)
 
-    comparison_file_types = [".fit",  ".cat", ".out"]
+    comparison_file_types = [".fit", ".cat", ".out"]
     if COMPARE_INTERMEDIATE_FILES:
-        comparison_file_types += [".par", ".var"]
+        comparison_file_types = [".fit", ".par", ".var", ".cat", ".out"]
 
 
     n_comparable_examples = 0

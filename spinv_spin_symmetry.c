@@ -102,7 +102,7 @@ int getsp(struct SpinvContext *ctx, const bcd_t *ispnx, SVIB *pvinfo)
     }
     nl *= (size_t)ii;
     --ii;
-    iis[i] = (short)ii;
+    iis[i] = (short)ii; /* TODO: should this be ii - 1? */
     if (ii > ctx->glob.mxspin)
       ctx->glob.mxspin = ii;
   }

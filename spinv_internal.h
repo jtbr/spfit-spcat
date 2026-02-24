@@ -228,8 +228,8 @@ int getmask(struct SpinvContext* ctx, const int *xbra, const int *xket, const in
                   const int loff, const int alpha);
 double rmatrx(const int ld, const int lv, const int *ixcom,
                   const int *jxcom);
-int symnsq(struct SpinvContext* ctx, const int inq, const int ins, const int *iscom,
-                  const int *jscom, double *z);
+int symnsq(struct SpinvContext *ctx, const int n_sq_power, const int n_s_power,
+           const int *iscom_bra_qns, const int *jscom_ket_qns, double *matrix_element_factor);
 int symksq(const int ikq, const int ksi, const int ksj, const int n,
                   double *wk, short *ix, short *jx);
 int dpmake(const int nsize, double *dp, const double *t,
