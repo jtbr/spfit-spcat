@@ -45,6 +45,7 @@ This document outlines the prioritized tasks for modernizing the SPFIT/SPCAT sof
 
 - [ ] **Task X: Investigate suspected bug in `inpcor > 0` logic**
     - **Description**: The original C code for the "Supplied Variance" (`inpcor > 0`) case in `calfit-orig.cpp` has a loop for unscaling the inverted matrix: `for (n = 1; i <= nfit; ++n)`. The loop uses `i` in its condition but `n` as the counter, which is suspicious and may be a bug. The C++ refactoring in `CalFit.cpp` has implemented this differently. If tests that use `inpcor > 0` fail, this discrepancy should be investigated as a potential source of error.
+    - **Status**: Not yet triggered by any test cases currently failing.
 
 - [ ] **Task 4: Modularization and Decoupling with C++ Interface**
     - **Description**: Refactor the core SPFIT/SPCAT functionality to be more modular, using C structs/C++ classes for inputs/outputs, and creating a clean C++ interface layer. This is crucial for enabling programmatic use from modern software like Python.
@@ -75,22 +76,32 @@ This document outlines the prioritized tasks for modernizing the SPFIT/SPCAT sof
               - **Define Clear C++ APIs**: Create well-defined C++ class interfaces (e.g., `Spfit`, `Spcat`) with methods that encapsulate core functionalities. These methods should take C++ data structures as input and return C++ data structures as output.
               - **Separate I/O from Logic**: Modify core calculation functions to operate on in-memory data structures (passed via the new C++/C structs/classes) rather than directly performing file I/O. Create separate C++ utility functions or methods for reading from and writing to files.
               - **Leverage C++ Features**: Utilize RAII (Resource Acquisition Is Initialization) with `std::unique_ptr` and `std::vector` for robust memory management within the new C++ interface layer.
-    - **Progress**: Steps 1-5 are complete. Step 6 is partially complete with significant progress on `CalFit` class (renamed from `Spfit` for clarity).
+    - **Progress**: Steps 1-5 complete. Step 6 substantially complete — **46/55 test files match reference**.
       - **Completed in Step 6**:
-        - Created `CalFit` class with methods for parameter initialization (`initializeParameters`), spectral line processing (`processLines`), and formatting (`parer`, `qnfmt2`).
-        - Implemented core logic for reading and processing spectral lines (`linein`, `lineix`, `getblk`).
-        - Updated `fit_main.cpp` to use the `CalFit` class integrated with the calculation engine.
-        - Implemented iterative fitting logic in `performIteration` using the Marquardt-Levenberg algorithm.
-        - Implemented error calculation and statistics in `calculateErrors`.
-        - Completed I/O separation by implementing `readInput` and `writeOutput` in `CalFitIO` for handling file operations (these are not fully utilized yet; there are still scratch files being used.)
+        - `CalFit` class with `initializeParameters`, `processLinesAndSetupBlocks`, `performIteration`, `finalizeOutputData`.
+        - `CalFit_helpers.cpp` split out for helper functions (`linein`, `lineix`, `getblk`, `getdbk`, `dnuadd`, `parer`, `qnfmt2`).
+        - `CalFitIO` with `readInput` / `writeOutput` (calls `getpar`, `getvar`, `putvar`).
+        - `fit_main.cpp` integrated end-to-end with `CalFit`.
+        - **Major bug fixed**: `performIteration` was reading `fitbgn` (upper-tri packed) as lower-tri packed, misplacing diagonal constraint values. For molecules with fixed parameters this caused the wrong parameters to be fixed/floated. Fixed by mirroring the original dcopy/daxpy loop. (41→46 files passing.)
+        - Dependent parameter handling corrected (negative-ID params not updated during iterations).
+        - `lsqfit` matrix orientation corrected (lower triangular input required).
+        - `specfc` conditional scaling and unconditional call in `hamx` corrected.
+        - NITR / NLINE output header values corrected.
       - **Remaining in Step 6**:
-        - Debug current issues in reproducing correct functionality (a number of discrepancies in output files remain, compared with the baseline outputs.)
-        - Once this is validated, commit a new baseline to git
-        - Refactor `cat_main.cpp` into a `CalCat` class following the same modularization pattern.
-        - Make full use of `CalFitIO` and remove use of scratch files.
-        - Note that some input/output files are shared between `fit` and `cal` and it may make sense that IO is modularized by file type and shared between `CalCat` and `CalFit`. This needs to be explored first.
-        - we may need to refactor linein and getlin and possibly other code to remove dependencies on file IO and separate that from the logic
-    - **Details**: The refactoring has focused on disentangling file I/O from calculation logic within the `CalFit` class. Temporary file (or in-memory file) placeholders are in use until full I/O separation is achieved.
+        - 4 examples still failing: `h2s` (tiny .cat rounding), `fso3` (aF ~2 ppm), `ch3cn_MeCN` (parameter diffs), `ch3oh` (converges to wrong minimum, internal rotation).
+        - Investigate `ch3oh` / `ch3cn_MeCN`: compare `CalFit_helpers.cpp:dnuadd` and `jelim` against `calfit-orig.cpp`; compare `spinv_hamiltonian.c` against `spinv-orig.c` for Fourier/K-dependent term handling.
+        - Investigate `h2s` / `fso3` tiny differences (may be acceptable tolerance or a minor spcat issue).
+        - Once all tests pass, commit a new validated baseline to git.
+        - Refactor `cat_main.cpp` into a `CalCat` class.
+        - Remove remaining scratch-file usage from `CalFit` (in-memory `tmpfile()` for line data is OK; other scratch files should be eliminated).
+        - Shared I/O files (`.par`, `.var`) between fit and cat should share I/O code — explore before implementing `CalCat`.
+      - **Key matrix layout facts** (see `memory-bank/activeContext.md` for full detail):
+        - `fit` is column-major, leading dimension `ndfit = nfit+1`; element `(r,c) = fit[r + c*ndfit]`.
+        - `fitbgn` and `var` are packed **upper** triangular; column `j` has `j+1` elements.
+        - The "copy fitbgn→fit" loop fills each **row** `n-1` of fit from column `n-1` of fitbgn.
+        - `ndiag = ndfit + 1` is the stride between diagonal elements.
+        - After `lsqfit`, solution for parameter `k` is at `fit[nfit + k*ndfit]`.
+    - **Details**: Temporary in-memory file (`fmemopen`) used for line data; `.fit` output written directly to the `.fit` file. `calfit-orig.cpp` retained as reference (not compiled).
     - **Plan**:
         1.  **Spfit/Spcat Class Structure:**
             *   Create `Spfit` (implemented as `CalFit`) and `Spcat` classes.

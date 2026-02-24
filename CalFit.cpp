@@ -1097,50 +1097,27 @@ bool CalFit::performIteration(const CalFitInput &input, CalFitOutput &output)
     //    `xsqt` will be ||b0||^2 initially.
     xsqir = xsqmw = avgmw = avgir = 0.0; // Initialize statistics
 
-    double *pfitb_packed_L0 = this->fitbgn;             // Source: Packed Lower L0 from previous iteration or initial setup
-    double *pfit_full_L0_col_start = this->fit;         // Destination: Start of current column in full matrix `fit`
-    double *pRHS_in_fit_col_start = this->fit + m_nfit; // Destination: Start of RHS conceptual column in `fit`
+    // Initialize least-squares matrix (fit) from fitbgn and compute initial RHS.
+    // fitbgn is packed UPPER triangular: column j stores j+1 elements (rows 0..j).
+    // We copy it row-by-row into the lower triangular of fit: row n-1 gets n elements
+    // (upper-tri column n-1), placing the prior constraint (1/sigma^2) on the diagonal.
+    // This exactly mirrors calfit-orig.cpp lines 469-480.
+    double *pfitb_ptr = this->fitbgn;        // walks through packed upper-triangular fitbgn
+    double *pfit_ptr  = this->fit;           // advances by 1 each row (fit[0], fit[1], ...)
+    double *pfitd_ptr = this->fit + m_nfit;  // RHS: row m_nfit of fit, accessed with stride ndfit
 
-    // Zero out the RHS part of the `fit` matrix.
-    // This accesses elements fit[0, m_nfit], fit[1, m_nfit], ..., fit[m_nfit-1, m_nfit]
-    // if we consider fit as (m_nfit)x(m_nfit+1) where last column is RHS.
-    // Strided access for column m_nfit:
-    for (int i = 0; i < m_nfit; ++i)
-    {
-      pRHS_in_fit_col_start[i * ndfit] = 0.0; // Accesses elements like fit[i][m_nfit] if row major
-                                              // Or fit[i*ndfit_pitch + m_nfit_col_offset]
-                                              // The dcopy/ddot use ndfit as leading dimension, so this should be strided for RHS.
+    dcopy(m_nfit, &zero_static, 0, pfitd_ptr, ndfit); // zero RHS column
+
+    for (int n = 1; n <= m_nfit; ++n) {
+        // Copy n-element upper-tri column (n-1) of fitbgn into ROW n-1 of fit (columns 0..n-1)
+        dcopy(n, pfitb_ptr, 1, pfit_ptr, ndfit);
+        double val = this->delbgn[n - 1];
+        daxpy(n, val, pfitb_ptr, 1, pfitd_ptr, ndfit); // RHS += delbgn[n-1] * fitbgn_col
+        pfitb_ptr += n;
+        ++pfit_ptr;
     }
 
-    // Form L0 in `fit` (main m_nfit x m_nfit part) and b0=L0*delbgn in `fit` (RHS part).
-    // `pfitb_packed_L0` contains the packed lower triangular L0 (column-major packed).
-    // We need to copy it into `this->fit` (column-major) as a full lower triangular matrix.
-    // And compute RHS = L0 * delbgn.
-
-    // Zero out the `fit` matrix (main m_nfit x m_nfit part)
-    for (int j_col = 0; j_col < m_nfit; ++j_col) {
-        for (int i_row = 0; i_row < m_nfit; ++i_row) {
-            this->fit[i_row + j_col * ndfit] = 0.0;
-        }
-    }
-
-    // Reset pfitb_packed_L0 to the beginning of the packed L0 data
-    pfitb_packed_L0 = this->fitbgn;
-
-    // Populate `fit` as L0 and compute RHS = L0 * delbgn
-    int packed_idx = 0;
-    for (int j_col = 0; j_col < m_nfit; ++j_col) { // Iterate through columns
-        for (int i_row = j_col; i_row < m_nfit; ++i_row) { // Iterate through rows from diagonal down
-            double l0_val = pfitb_packed_L0[packed_idx];
-            this->fit[i_row + j_col * ndfit] = l0_val; // Populate L0
-            pRHS_in_fit_col_start[i_row * ndfit] += l0_val * this->delbgn[j_col]; // Compute RHS
-            packed_idx++;
-        }
-    }
-
-    // Calculate initial sum of squares: xsqt = || L0 * delbgn ||^2
-    // The RHS vector (L0*delbgn) is stored strided in the last "column" of `fit`.
-    xsqt = ddot(m_nfit, pRHS_in_fit_col_start, ndfit, pRHS_in_fit_col_start, ndfit);
+    xsqt = ddot(m_nfit, pfitd_ptr, ndfit, pfitd_ptr, ndfit);
 
     // 4. Loop through experimental lines
     nf_fitted_lines = nrj = nfir = 0;
@@ -1398,12 +1375,12 @@ bool CalFit::performIteration(const CalFitInput &input, CalFitOutput &output)
     // Zero upper triangle of fit matrix (it's symmetric J^T J after jelim)
     // Original did this by iterating columns and memset on elements *before* diagonal.
     // If 'fit' is column major:
-    double *pfit_ptr = this->fit; // Start of matrix
+    double *pfit_zero_upper = this->fit; // Start of matrix
     for (k_loop = 1; k_loop < m_nfit; ++k_loop)
     {
       // For columns 1 to nfit-1
-      pfit_ptr += ndfit;                            // Move to start of column k_loop
-      memset(pfit_ptr, 0, sizeof(double) * k_loop); // Zero k_loop elements from pfit_ptr[0] to pfit_ptr[k_loop-1]
+      pfit_zero_upper += ndfit;                            // Move to start of column k_loop
+      memset(pfit_zero_upper, 0, sizeof(double) * k_loop); // Zero k_loop elements from pfit_ptr[0] to pfit_ptr[k_loop-1]
     }
 
     varv[0] = xsqt + (double)nrj * xerrmx_local * xerrmx_local; // Variance for lsqfit
