@@ -1230,8 +1230,10 @@ bool CalFit::performIteration(const CalFitInput &input, CalFitOutput &output)
           avgmw += adif;
           xsqmw += adif * adif;
         }
-        // Rotate line into FIT matrix (J^T J and J^T diff)
-        // dpar[0...nfit-1] contains derivatives J, dpar[nfit] contains weighted (Obs-Calc)
+        // Rotate line into FIT matrix (J^T J and J^T diff) via Givens rotations.
+        // fit: column-major, ndfit=nfit+1 leading dim; lower-tri nfit×nfit block accumulates
+        //      J^T J; row nfit (stride ndfit) is the J^T*(obs-calc) RHS vector.
+        // dpar[0...nfit-1]: derivatives for this line; dpar[nfit]: weighted (obs-calc).
         jelim(this->fit, this->dpar, ndfit, m_nfit, 1); // ns=1 for one RHS vector
         nf_fitted_lines++;
       }
@@ -1386,9 +1388,12 @@ bool CalFit::performIteration(const CalFitInput &input, CalFitOutput &output)
     varv[0] = xsqt + (double)nrj * xerrmx_local * xerrmx_local; // Variance for lsqfit
     m_marqlast = m_marqp[0];                                    // Save current Marquardt param before lsqfit changes it
 
-    // 5. Call lsqfit
-    // dk=fit, ndm=ndfit, nr=m_nfit, nvec=1 (for one RHS)
-    // dkold=oldfit, ediag=erpar (used for normalized diagonals), enorm=dpar (param shifts/errors)
+    // 5. Call lsqfit (Marquardt-Levenberg solver).
+    // On entry:  fit is column-major (ndfit leading dim), lower-tri nfit×nfit = J^T J,
+    //            row nfit = J^T*(obs-calc) RHS.  Upper triangle has been zeroed above.
+    // On return: fit holds the scaled inverse Cholesky factor (columns scaled by enorm);
+    //            fit[nfit + k*ndfit] = solution delta_p[k] for k=0..nfit-1;
+    //            erpar receives |diag| of the saved factor; dpar receives enorm scaling factors.
     marqflg_lsqfit = lsqfit(this->fit, ndfit, m_nfit, 1, m_marqp, varv,
                             this->oldfit, this->erpar, this->dpar, this->iperm);
 
@@ -1647,18 +1652,18 @@ bool CalFit::performIteration(const CalFitInput &input, CalFitOutput &output)
       }
     }
 
-    // 7. Store `fit` matrix into `var` for next iteration/output (original logic)
+    // 7. Store `fit` matrix into `var` (packed upper-triangular) for output by putvar.
+    // fit is lower-triangular column-major: row n-1 of fit (n elements, cols 0..n-1, stride ndfit)
+    //   → packed into upper-tri var column n-1 (n consecutive elements at var[n*(n-1)/2..]).
+    // After this copy, var[j*(j+1)/2 + i] = fit[i + j*ndfit] for 0<=i<=j<nfit.
+    // Note: prcorr (called later in finalizeOutputData) modifies fit in-place but NOT var.
     pfit_ptr = this->fit;
     double *pvar_ptr = this->var;
     for (int n = 1; n <= m_nfit; ++n) {
-        dcopy(n, pfit_ptr, ndfit, pvar_ptr, 1);
-        pfit_ptr++;
-        pvar_ptr += n;
+        dcopy(n, pfit_ptr, ndfit, pvar_ptr, 1); // row n-1 of fit → var column n-1
+        pfit_ptr++;   // advance to row n (next diagonal start)
+        pvar_ptr += n; // advance past column n-1 in packed storage
     }
-    // If `var` needs to be standard packed UPPER for consistency with getvar:
-    // Need to form symmetric Cov_inv = L_inv^T L_inv, then pack upper of that.
-    // For now, assume `var` stores L_inv (packed lower) for next iteration's `fitbgn`.
-    // This means `fitbgn` in "Supplied Variance" path should also be built from L_inv (packed lower).
 
     // 8. Calculate and print statistics (RMS errors, averages)
     if (nf_fitted_lines > nfir)
@@ -1726,6 +1731,17 @@ bool CalFit::finalizeOutputData(const CalFitInput &input, CalFitOutput &output)
     // lufit might be needed for prcorr
     // This case should ideally not happen if lufit is managed correctly through run
     puts("Warning: lufit stream is null in finalizeOutputData, prcorr might be skipped.");
+  }
+
+  // --- Restore parameters to pre-last-correction state (mirrors calfit-orig.cpp line 750) ---
+  // After the iteration loop, the original code always does dcopy(npar, oldpar, 1, par, 1)
+  // before writing the .par file. This restores par to the values from the START of the last
+  // iteration (i.e., before the last correction was applied). The rationale: the last
+  // correction was predicted to not improve the fit (otherwise the loop would continue), so
+  // the pre-correction parameters represent the best-known solution.
+  if (m_npar > 0 && this->oldpar && this->par)
+  {
+    dcopy(m_npar, this->oldpar, 1, this->par, 1);
   }
 
   // --- Populate CalFitOutput structure ---
@@ -1878,23 +1894,17 @@ bool CalFit::finalizeOutputData(const CalFitInput &input, CalFitOutput &output)
   // Original main.c calls this sequence at the end:
   // rewind(lubak); fgetstr(card, NDCARD, lubak); chtime(card, 82);
   // fputs(card, stdout); puts("FIT COMPLETE");
-  // dcopy(npar, oldpar, 1, par, 1); // Restore par to oldpar if fit diverged or for final state?
-  // This was done if marqflg!=0 inside loop.
-  // If done here, it means parameters from *before the last iteration* are restored.
-  // The current `this->par` holds the latest updated parameters.
-  // Original main.c: after loop, if itr==0, exit.
-  // Then, prcorr, then fclose(lufit).
-  // Then save results: open .par, .var. Put title. Put 2nd line. Put options. Put params.
-  // The params written are `this->par` (latest) and `this->erpar` (latest errors).
-  // The dcopy(oldpar to par) seems to be only for divergence recovery.
+  // Note: the par restore above (dcopy(oldpar → par)) was moved to the top of this function.
+  // See calfit-orig.cpp line 750 for the original unconditional restore.
 
-  // === ORIGINAL BEHAVIOR replication ===
-  // Compute and print/store "correlation" matrix (actually, scaled covariance)
+  // Compute and print the correlation matrix to the .fit file.
+  // prcorr modifies fit in-place (scales columns by 1/dpar[j], then computes M^T M);
+  // this does NOT affect var, which was already copied from fit in performIteration.
+  // fit: column-major, ndfit leading dim; dpar[k] = parfac * ||col k of fit from diag||.
+  // The result written to .fit is sign-invariant (M^T M), so column sign flips in fit
+  // do not affect the printed correlation coefficients.
   if (output.itr > 0 && m_nfit > 0 && this->fit && this->dpar && lufit)
   {
-    // `prcorr` needs the final solution/covariance information.
-    // Pass this->fit (which has been scaled by m_parfac in the update loop)
-    // Pass this->dpar (which has been overwritten with errors in the update loop)
     prcorr(lufit, m_nfit, this->fit, ndfit, this->dpar, 0 /* covariance, not correlation*/);
   }
   // === END ORIGINAL BAHAVIOR replication ===

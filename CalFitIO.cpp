@@ -466,19 +466,15 @@ bool CalFitIO::writeOutput(const std::string &par_filepath_final,
     current_parlbl_ptr += LBLEN;
   }
 
-  // 5. Write Variance/Correlation Data
-  // Original: putvar(luvar, nfit, var, dpar);
-  // `var` is the packed matrix (e.g. L_inv_final_packed_lower or Cov_inv_packed_upper)
-  // `dpar` is the array of scaled errors for the *fitted* parameters.
+  // 5. Write Variance/Correlation Data (putvar scales and prints var to .var file).
+  // var: packed upper-triangular, nfit*(nfit+1)/2 elements; var[j*(j+1)/2 + i] = element(i,j)
+  //   for 0<=i<=j<nfit. Contains the Cholesky factor (copied from fit after last iteration).
+  // dpar: nfit error values; putvar scales row i of var by 1/dpar[i] in-place before printing.
+  // putvar modifies its arguments, so mutable copies are needed.
   if (output.nfit_final > 0)
   {
     if (!output.var_final_for_output.empty() && !output.dpar_final_for_putvar.empty())
     {
-      // putvar expects non-const pointers for var and erpar (dpar here)
-      // Create mutable copies if necessary, or cast const away if putvar guarantees no modification.
-      // Assuming putvar doesn't modify them (though its erpar is usually output for scaling).
-      // The `putvar` from ulib.c *does* modify `var` by scaling it with `erpar`.
-      // So, we need mutable copies.
       std::vector<double> var_copy = output.var_final_for_output;
       std::vector<double> dpar_copy = output.dpar_final_for_putvar;
       putvar(luvar, output.nfit_final, var_copy.data(), dpar_copy.data());
