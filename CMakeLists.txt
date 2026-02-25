@@ -1,19 +1,27 @@
-cmake_minimum_required(VERSION 3.0)
+cmake_minimum_required(VERSION 3.5)
 project(spfit LANGUAGES C CXX DESCRIPTION "SPFIT/SPCAT")
 cmake_policy(SET CMP0057 NEW)
 # set with `cmake [path] -DBUILD_ALL=ON`
 option(BUILD_ALL "Build all executables" OFF)
 
 # TODO re-add debug options
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -O3 -march=native")
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -O3 -march=native")
+# NOTE: -ffp-contract=off disables fused multiply-add (FMA), which change the accumulation order of BLAS dot
+# products, leading to sign-flipped columns in the packed Cholesky factor. This is not essential (results are
+# physically equivalent), but together with use of dblas.c allows exact matching with v2008_baseline.
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -O3 -march=native -ffp-contract=off")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -O3 -march=native -ffp-contract=off")
 
 set(CMAKE_CXX_STANDARD 17)
 
 include_directories(.)
 
 # Find BLAS
-find_package(BLAS) # Removed REQUIRED to allow fallback
+option(USE_SYSTEM_BLAS "Use system BLAS library (OpenBLAS, etc.)" OFF)
+if(USE_SYSTEM_BLAS)
+  find_package(BLAS) # Removed REQUIRED to allow fallback
+else()
+  set(BLAS_FOUND FALSE)
+endif()
 if (BLAS_FOUND)
     message(STATUS "BLAS found, using system BLAS: ${BLAS_LIBRARIES}")
     include_directories(${BLAS_INCLUDE_DIRS}) # Only include if BLAS is found

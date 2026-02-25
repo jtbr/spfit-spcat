@@ -21,6 +21,16 @@ from within the code directory. If you wish to install executables for use throu
 
 The programs should work without modification with any ANSI compliant 'c' compiler on any size computer. All arrays are allocated dynamically, and addressing or memory limits may place a practical limit on the size of matrices that can be used. On modern computers, these should not be binding.
 
+### CMake
+
+CMake is an alternative, more robust build mechanism. To run, choose a make directory. Using `build` as an example:
+
+```sh
+cmake build && cd build
+```
+
+Now you can `make` from the build subdirectory.
+
 ## Documentation and Getting Started
 
 There is a very useful set of notes and usage information available [here](http://info.ifpan.edu.pl/~kisiel/asym/pickett/crib.htm).

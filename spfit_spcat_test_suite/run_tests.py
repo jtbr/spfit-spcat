@@ -7,7 +7,8 @@ import sys
 
 # spcat/spfit executables are in the parent directory to this directory
 EXE_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-
+spfit_path = os.path.join(EXE_PATH, "spfit")
+spcat_path = os.path.join(EXE_PATH, "spcat")
 #OUTPUT_SUBDIR_NAME = "v2008_outputs" # Name of the subdirectory to store outputs
 
 # Define expected output file extensions
@@ -17,6 +18,11 @@ SPCAT_OUTPUT_EXTENSIONS = [".cat", ".out", ".egy", ".str"] # .egy and .str are o
 
 def run_commands_and_move_outputs_dynamic(output_subdir_name, suite_base_path='.', skip=[]):
     original_cwd = os.getcwd()
+
+    # abort if the executables aren't there
+    if not os.path.exists(spfit_path):
+      print("Error: unable to find spfit executable: ", spfit_path)
+      return
 
     print(f"Starting processing (Dynamic Discovery) for test suite in {suite_base_path}")
     print(f"Outputs will be placed in '{output_subdir_name}' subdirectories for each example.")
@@ -65,7 +71,7 @@ def run_commands_and_move_outputs_dynamic(output_subdir_name, suite_base_path='.
 
                     # --- Run SPFIT ---
                     spfit_success = False
-                    spfit_command = [os.path.join(EXE_PATH, "spfit"), local_basename]
+                    spfit_command = [spfit_path, local_basename]
                     print(f"    Running SPFIT: {' '.join(spfit_command)}")
                     try:
                         # Ensure input .par file exists for spfit
@@ -100,7 +106,7 @@ def run_commands_and_move_outputs_dynamic(output_subdir_name, suite_base_path='.
                         elif not os.path.exists(f"{local_basename}.int"):
                             print(f"    ERROR: SPCAT input file {local_basename}.int not found. Skipping SPCAT.")
                         else:
-                            spcat_command = [os.path.join(EXE_PATH, "spcat"), local_basename]
+                            spcat_command = [spcat_path, local_basename]
                             print(f"    Running SPCAT: {' '.join(spcat_command)}")
                             try:
                                 spcat_log_path = os.path.join(output_dir_path_abs, f"{local_basename}_spcat.log")
@@ -162,9 +168,13 @@ def run_commands_and_move_outputs_dynamic(output_subdir_name, suite_base_path='.
         print("-" * 50)
     print("\nAll processing finished.")
 
+# TODO: allow running one or more specific molecules, to be specified after subdirectory
+
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("Provide subdirectory to use for each example's outputs")
+        print(f"Usage: run_tests.py [--all] <subdirectory>")
+        print(f"Where the required subdirectory is the one to use for each example's outputs (placed into each molecule directory)")
+        print(f"      and --all enables the `clclo2` molecule test, which is very slow")
         sys.exit(1)
 
     # NOTE: Skip clclo2 example by default as it's too slow to iterate; use only for full tests

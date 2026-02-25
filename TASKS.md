@@ -40,6 +40,14 @@ This document outlines the prioritized tasks for modernizing the SPFIT/SPCAT sof
     - **Migrate to CMake**: Convert the existing `Makefile` build system to CMake. CMake provides superior cross-platform support, robust dependency tracking, and a more flexible way to define build configurations, including generating project files for various IDEs and creating shared/static libraries.
   - **Constraint**: Quantitative results must remain unchanged, and current functionality must be retained.
   - **Results**: The build system has been migrated to CMake, providing improved cross-platform support and easier integration with modern development environments. Both CMake and Makefile build systems are now supported.
+  - **Critical build requirements for exact numerical reproduction** (discovered during Task 4 Step 6):
+    - Must use **`dblas.c` fallback** instead of OpenBLAS. OpenBLAS uses SIMD/FMA internally in `ddot`/`daxpy`, changing floating-point accumulation order at the ULP level. This is enough to flip the sign of near-zero diagonal elements in `dqrfac`'s Householder reflections, producing sign-flipped Cholesky columns in `.var` output.
+    - Must compile with **`-ffp-contract=off`** to prevent the compiler from generating FMA instructions even in the simple `dblas.c` scalar loops under `-march=native`.
+    - CMake: `cmake .. -DUSE_SYSTEM_BLAS=OFF` (the `USE_SYSTEM_BLAS` option was added for this purpose).
+    - Makefile: with `BLASLIB` undefined, the fallback `$(LBLAS)=dblas.o` is used automatically.
+    - **Why sign of near-zero diagonals matters**: `dqrfac` (lsqfit.c:279) chooses the Householder reflector sign based on `diag < 0.`. For diagonals near zero (e.g., `1e-31`), a 1-ULP difference from FP accumulation order determines the sign. A wrong sign negates an entire Cholesky column in the `.var` output. This is physically equivalent (L·L^T is unchanged), but produces non-identical output vs the 2008 reference binary.
+    - **Note for Task 5**: If performance profiling shows `dblas.c` is a bottleneck, a custom BLAS compiled with `-ffp-contract=off -fno-associative-math` might match the reference while being faster. OpenBLAS cannot be made to match without recompiling it with non-default flags.
+    - We could also create a new baseline using the v2008 code with OpenBLAS and FMA optimizations, which may match our optimized results.
 
 ## In Progress Tasks
 
@@ -76,25 +84,20 @@ This document outlines the prioritized tasks for modernizing the SPFIT/SPCAT sof
               - **Define Clear C++ APIs**: Create well-defined C++ class interfaces (e.g., `Spfit`, `Spcat`) with methods that encapsulate core functionalities. These methods should take C++ data structures as input and return C++ data structures as output.
               - **Separate I/O from Logic**: Modify core calculation functions to operate on in-memory data structures (passed via the new C++/C structs/classes) rather than directly performing file I/O. Create separate C++ utility functions or methods for reading from and writing to files.
               - **Leverage C++ Features**: Utilize RAII (Resource Acquisition Is Initialization) with `std::unique_ptr` and `std::vector` for robust memory management within the new C++ interface layer.
-    - **Progress**: Steps 1-5 complete. Step 6 substantially complete — **46/55 test files match reference**.
+    - **Progress**: Steps 1-6 **COMPLETE — 55/55 test files match reference** (with correct build config).
       - **Completed in Step 6**:
         - `CalFit` class with `initializeParameters`, `processLinesAndSetupBlocks`, `performIteration`, `finalizeOutputData`.
         - `CalFit_helpers.cpp` split out for helper functions (`linein`, `lineix`, `getblk`, `getdbk`, `dnuadd`, `parer`, `qnfmt2`).
         - `CalFitIO` with `readInput` / `writeOutput` (calls `getpar`, `getvar`, `putvar`).
         - `fit_main.cpp` integrated end-to-end with `CalFit`.
-        - **Major bug fixed**: `performIteration` was reading `fitbgn` (upper-tri packed) as lower-tri packed, misplacing diagonal constraint values. For molecules with fixed parameters this caused the wrong parameters to be fixed/floated. Fixed by mirroring the original dcopy/daxpy loop. (41→46 files passing.)
-        - Dependent parameter handling corrected (negative-ID params not updated during iterations).
-        - `lsqfit` matrix orientation corrected (lower triangular input required).
-        - `specfc` conditional scaling and unconditional call in `hamx` corrected.
-        - NITR / NLINE output header values corrected.
+        - **Bug: fitbgn packing mismatch**: `performIteration` was reading `fitbgn` (upper-tri packed) as lower-tri packed. Fixed by mirroring original dcopy/daxpy loop. (41→46 passing)
+        - **Bug: oldpar restore missing**: `dcopy(npar, oldpar, 1, par, 1)` must happen unconditionally after iteration loop before writing `.par`. Restores pre-last-correction parameter values. (46→53 passing)
+        - **Bug: FMA/BLAS sign flips** in `.var` Cholesky output: fixed by using `dblas.c` + `-ffp-contract=off` (see Task 6 build requirements). (53→55 passing)
+        - Dependent parameter handling, `lsqfit` matrix orientation, `specfc`, NITR/NLINE corrected (earlier).
       - **Remaining in Step 6**:
-        - 4 examples still failing: `h2s` (tiny .cat rounding), `fso3` (aF ~2 ppm), `ch3cn_MeCN` (parameter diffs), `ch3oh` (converges to wrong minimum, internal rotation).
-        - Investigate `ch3oh` / `ch3cn_MeCN`: compare `CalFit_helpers.cpp:dnuadd` and `jelim` against `calfit-orig.cpp`; compare `spinv_hamiltonian.c` against `spinv-orig.c` for Fourier/K-dependent term handling.
-        - Investigate `h2s` / `fso3` tiny differences (may be acceptable tolerance or a minor spcat issue).
-        - Once all tests pass, commit a new validated baseline to git.
         - Refactor `cat_main.cpp` into a `CalCat` class.
-        - Remove remaining scratch-file usage from `CalFit` (in-memory `tmpfile()` for line data is OK; other scratch files should be eliminated).
-        - Shared I/O files (`.par`, `.var`) between fit and cat should share I/O code — explore before implementing `CalCat`.
+        - Remove temporary scratch-file usage from `CalFit` (in-memory `tmpfile()` for line data).
+        - Shared I/O code for `.par`/`.var` between fit and cat — explore before implementing `CalCat`.
       - **Key matrix layout facts** (see `memory-bank/activeContext.md` for full detail):
         - `fit` is column-major, leading dimension `ndfit = nfit+1`; element `(r,c) = fit[r + c*ndfit]`.
         - `fitbgn` and `var` are packed **upper** triangular; column `j` has `j+1` elements.

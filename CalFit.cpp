@@ -920,13 +920,13 @@ bool CalFit::performIteration(const CalFitInput &input, CalFitOutput &output)
   double bigd, bigf, bigdIR, bigfIR, bigdMW, bigfMW;
   int ifac, iblk, lblk = 0, iflg_line, line_idx, icnt_progress, nfir;
   int lstf = 0, nitr_actual;
-  int k_loop, iblnd, lblnd, initl_getdbk, noptn_dummy, ibase, nf_fitted_lines, itd_dummy; // Renamed n, nfmt, etc.
-  int maxf_dummy, nrj;
+  int k_loop, iblnd, lblnd, initl_getdbk, ibase, nf_fitted_lines; // Renamed n, nfmt, etc.
+  int nrj;
   int marqflg_lsqfit;
   int nsize_block; // Renamed nsize
   int ndfree;
   short qnum_line[2 * MAXQN]; // MAXQN from lsqfit.h or calpgm.h
-  char ch_par, pare_str[64], aqnum_str[6 * MAXQN + 2], card_iter_log[NDCARD];
+  char pare_str[64], aqnum_str[6 * MAXQN + 2], card_iter_log[NDCARD];
   int idx_getdbk_local; // Local variable for 'indx' output from getdbk
   double rms_for_this_iter_report_and_condition;
 
@@ -1357,9 +1357,10 @@ bool CalFit::performIteration(const CalFitInput &input, CalFitOutput &output)
     // --- Crucial check before RMS calculations ---
     if (nf_fitted_lines < 1)
     {
-      if (lufit && m_nfit > 0)
+      if (lufit && m_nfit > 0) {
         fprintf(lufit, "WARNING: No lines were included in the fit for this iteration (nf_fitted_lines=0).\n");
         printf("WARNING: No lines were included in the fit for this iteration (nf_fitted_lines=0).\n");
+      }
       // What to do if no lines are fitted?
       // Original: if (nf < 1) nf = 1;
       // This prevents division by zero in RMS calculations.

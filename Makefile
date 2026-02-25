@@ -1,16 +1,15 @@
 CC=gcc
 #CFLAGS=-g -Od -Wall -Wextra  # debug
 #CFLAGS=-O3 -Wall  # optimized for distribution
-CFLAGS=-O3 -Wall -Wextra -march=native -I.  # optimized for speed on current device (-Ofast is faster but math results may differ very slightly)
+CFLAGS=-O3 -Wall -Wextra -march=native -ffp-contract=off -I.  # optimized for speed on current device (-Ofast is faster but math results may differ very slightly)
 EXEQ=spfit spcat calmrg  # dpcat and dpfit are optional variations to spcat and spfit respectively
 EXEA=${EXEQ} moiam stark termval sortn calbak reassign sortegy iambak iamcalc #is broken
 #next line for atlas blas
 #BLASLIB=-lcblas -latlas
 #OpenBLAS from libopenblas-dev apt package
-BLASLIB=-lopenblas
-#next line for supplied fallback routines
-#BLASLIB=
-ifndef ($(BLASLIB))
+#BLASLIB=-lopenblas
+#if BLASLIB undefined, use supplied fallback BLAS routines
+ifndef BLASLIB
 	LBLAS=dblas.o
 endif
 default: ${EXEQ}
@@ -23,19 +22,19 @@ clean:
 SPLIB_OBJFILES=ulib.o cnjj.o slibgcc.o catutil.o lsqfit.o
 SPINV_OBJFILES=spinv_setup.o spinv_spin_symmetry.o spinv_linalg_sort.o spinv_hamiltonian.o spinv_utils.o
 OBJFILES=dpi.o spinit.o $(SPLIB_OBJFILES) $(SPINV_OBJFILES) SpinvEngine.o DpiEngine.o
-spfit: fit_main.o CalFit.o CalFit_helpers.o CalFitIO.o subfit.o $(OBJFILES); g++ -o $@ $^ $(BLASLIB) -lm
-spcat: cat_main.o sortsub.o $(OBJFILES); g++ -o $@ $^ $(BLASLIB) -lm
+spfit: fit_main.o CalFit.o CalFit_helpers.o CalFitIO.o subfit.o $(OBJFILES) $(LBLAS); g++ -o $@ $^ $(BLASLIB) -lm
+spcat: cat_main.o sortsub.o $(OBJFILES) $(LBLAS); g++ -o $@ $^ $(BLASLIB) -lm
 calmrg: calmrg.o splib.a; gcc -o $@ $^ $(BLASLIB) -lm
 calbak: calbak.o splib.a; gcc -o $@ $^ $(BLASLIB) -lm
 termval: termval.o splib.a; gcc -o $@ $^ $(BLASLIB) -lm
-stark: stark.o splib.a ; gcc -o $@ $^ $(BLASLIB) -lm
+stark: stark.o splib.a; gcc -o $@ $^ $(BLASLIB) -lm
 moiam: moiam.o ftran.o splib.a; gcc -o $@ $^ $(BLASLIB) -lm
 iamcalc: iamcalc.o readopt.o ftran.o splib.a; gcc -o $@ $^ $(BLASLIB) -lm
-#cnvwn: cnvwn.o splib.a ; gcc -o $@ $^ $(BLASLIB) -lm
+#cnvwn: cnvwn.o splib.a ; gcc -o $@ $^
 sortn: sortn.o sortsub.o; gcc -o $@ $^
-reassign: reassign.o splib.a ; gcc -o $@ $^ $(BLASLIB) -lm
-sortegy: sortegy.o splib.a ; gcc -o $@ $^ $(BLASLIB) -lm
-iambak: iambak.o splib.a readopt.o ; gcc -o $@ $^ $(BLASLIB) -lm
+reassign: reassign.o splib.a; gcc -o $@ $^ $(BLASLIB) -lm
+sortegy: sortegy.o splib.a; gcc -o $@ $^ $(BLASLIB) -lm
+iambak: iambak.o splib.a readopt.o; gcc -o $@ $^ $(BLASLIB) -lm
 
 splib.a: ulib.o cnjj.o slibgcc.o catutil.o lsqfit.o $(LBLAS)
 	ar r splib.a $^
