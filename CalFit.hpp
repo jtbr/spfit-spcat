@@ -142,7 +142,7 @@ private:
   // Scalar state variables, set from CalFitInput
   int m_npar; // Actual number of parameters after getpar
   int m_nfit;
-  int ndfit, ndiag;
+  int ndfit; // leading dimension of fit matrix = nfit+1; element (r,c) = fit[r + c*ndfit]
   int m_catqn;
   long m_nsize_p;     // Changed from int to long based on maxmem return type if necessary (or keep size_t)
   int m_nxpar_actual; // Derived from input.nxpar_from_file and parameters
@@ -184,7 +184,7 @@ private:
   // Helper methods (kept as private, implementations copied from original, now in CalFit_helpers.cpp)
   int qnfmt2(int nqn, short *qnum, char *aqnum);
   int parer(double par_val, double errx, double dif, char *ptmp);
-  int linein(FILE *luin, int *nline_val, int iqnfmt);
+  int linein(const std::vector<std::string> &lines, int *nline_val, int iqnfmt);
   int lineix(FILE *lu, int flg, int nline_val, int nblkpf_val, int iqnfmt_val);
   int getblk(int *iblk, int *indx, short *iqnum, int nblkpf_val, int ipos, int nqn_val);
 };

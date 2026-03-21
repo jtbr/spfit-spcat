@@ -144,6 +144,9 @@ endif()
 if("spcat" IN_LIST EXECUTABLES)
   add_executable_plus(spcat TRUE # This target uses BLAS
     cat_main.cpp
+    CalCat.cpp
+    CalCat_helpers.cpp
+    CalCatIO.cpp
     sortsub.c
     spinv_setup.c
     spinv_spin_symmetry.c

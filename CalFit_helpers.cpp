@@ -169,36 +169,65 @@ int CalFit::parer(double par, double errx, double dif, char *ptmp)
  * @param iqnfmt Quantum number format for line input (from setfmt)
  * @return intLargest quantum number encountered
  */
-int CalFit::linein(FILE *luin, int *nline, int iqnfmt) // TODO: iqnfmt is m_nfmt. could remove it(?)
+/**
+ * Parse a pre-read line card (equivalent to getlin without fgetstr).
+ * Returns nc on success, -1 on parse failure, -2 on ncard too small.
+ */
+static int getlin_str(const char *line, int line_len, int nqn, short *idqn,
+                      short *iqn, double *xfreq, double *xerr, double *xwt,
+                      char *card, int ncard)
+{
+  static double terr = 1.e-07;
+  static double txwt = 1.e-30;
+  static double big = 1000.;
+  static int fmt[20] = {3,3,3,3,3,3,3,3,3,3, 3,3,3,3,3,3,3,3,3,3};
+  double val[20];
+  int j, jd, k, nn, nc;
+  char ctmp;
+
+  if (nqn <= 6) { nn = 12; nc = 36; }
+  else { nn = nqn + nqn; nc = nn * 3; }
+  if (ncard <= nc) return -2;
+  if (line_len < nc) return -1;
+  strncpy(card, line, (size_t)(ncard - 1));
+  card[ncard - 1] = '\0';
+
+  dcopy(nn, &big, 0, val, 1);
+  ctmp = card[nc]; card[nc] = '\0';
+  pcard(card, val, nn, fmt);
+  card[nc] = ctmp;
+  for (k = 0; k < nn; ++k) {
+    j = (int)val[k];
+    if (j > 999) { j = 0; jd = idqn[k]; if (jd >= 0) j = iqn[jd]; }
+    iqn[k] = (short)j;
+  }
+  val[0] = 0.; val[1] = 0.01; val[2] = 1.;
+  if (pcard(card + nc, val, 3, NULL) == 0) return -1;
+  *xfreq = val[0];
+  *xerr = val[1];
+  if (fabs(*xerr) < terr) *xerr = terr;
+  *xwt = val[2];
+  if (*xwt < txwt) *xwt = txwt;
+  return nc;
+}
+
+int CalFit::linein(const std::vector<std::string> &lines, int *nline, int iqnfmt)
 {
   /* Local variables */
-  SXLINE *xline;             /* Pointer to line data structure */
-  double xfrqn, xerrn, xwtn; /* Current line frequency, error, weight */
-  double xfrqx, xerrx;       /* Previous line frequency and error */
-  int nqn, nqnu, nqnl;       /* Number of quantum numbers */
-  int kqnu, kqnl;            /* Indices for upper/lower state quantum numbers */
-  int i, iqf, ipace, mxline; /* Loop variables and counters */
-  int mxqn, isblnd, icmp;    /* Max quantum number, blend flag, comparison flag */
-  short nbln, nqnt[20], *iqnum; /* Blend counter, quantum number template, quantum number pointer */
-  char card[NDCARD];         /* Buffer for input lines */
-
-  /*   get lines from input  and stores them */
-
-  /*     LUIN= unit for finding lines */
-  /*     NLINE = number of lines */
-  /*     IQNFMT= qunatum number format for line input */
-  /*     RETURN: largest quantum number */
-  /*******************************************************************/
+  SXLINE *xline;
+  double xfrqn, xerrn, xwtn;
+  double xfrqx, xerrx;
+  int nqn, nqnu, nqnl;
+  int kqnu, kqnl;
+  int i, iqf, ipace, mxline;
+  int mxqn, isblnd, icmp;
+  short nbln, nqnt[20], *iqnum;
+  char card[NDCARD];
 
   mxline = *nline;
   mxqn = 1;
   nbln = 1;
   nqn = deflin(iqnfmt, nqnt);
-  //  printf("DEBUG linein: iqnfmt parameter = %d\n", iqnfmt);
-  //   printf("DEBUG linein: iqnfmt passed to deflin = %d\n", iqnfmt);
-  //   printf("DEBUG linein: nqnt after deflin = %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d \n",
-  //                 nqnt[0], nqnt[1], nqnt[2], nqnt[3], nqnt[4], nqnt[5], nqnt[6], nqnt[7], nqnt[8], nqnt[9],
-  //                 nqnt[10], nqnt[11], nqnt[12], nqnt[13], nqnt[14], nqnt[15], nqnt[16], nqnt[17], nqnt[18], nqnt[19]);
 
   nqnu = nqn - 1;
   if (nqnt[nqnu] < 0)
@@ -209,16 +238,20 @@ int CalFit::linein(FILE *luin, int *nline, int iqnfmt) // TODO: iqnfmt is m_nfmt
   ipace = 100;
   xfrqx = xerrx = 0.;
   icmp = 0;
+  size_t line_idx = 0;
   for (i = 1; i <= mxline; ++i)
   { /*  loop for reading lines */
     xline = lbufof(1, i);
     iqnum = xline->qn;
-    if (getlin(luin, nqn, nqnt, iqnum, &xfrqn, &xerrn, &xwtn,
-               card, NDCARD) < 0)
+    if (line_idx >= lines.size() ||
+        getlin_str(lines[line_idx].c_str(), (int)lines[line_idx].size(),
+                   nqn, nqnt, iqnum, &xfrqn, &xerrn, &xwtn,
+                   card, NDCARD) < 0)
     {
       *nline = i - 1;
       return mxqn;
     }
+    ++line_idx;
     iqf = iqnum[nqnu];
     if (iqf == -1)
     {

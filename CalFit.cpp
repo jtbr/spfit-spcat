@@ -12,7 +12,6 @@
 #include <string.h> // for strcpy
 #include <vector>   // for std::vector
 #include <algorithm>// for std::copy
-#include <sstream>  // for std::stringstream
 #include "CalFitIO.hpp"
 #include "CalFit.hpp"
 #include "lsqfit.h"  // For C functions like dcopy, ddot, mallocq, etc.
@@ -31,7 +30,7 @@ CalFit::CalFit(std::unique_ptr<CalculationEngine> &calc_engine, FILE *final_lufi
     parlbl(nullptr), par(nullptr), erp(nullptr), oldpar(nullptr), erpar(nullptr),
     dpar(nullptr), delbgn(nullptr), fitbgn(nullptr), var(nullptr), oldfit(nullptr),
     fit(nullptr), teig(nullptr), pmix(nullptr), iperm(nullptr), idpar(nullptr),
-    m_npar(0), m_nfit(0), ndfit(0), ndiag(0), m_catqn(0), m_nxpar_actual(0), m_nxfit(0),
+    m_npar(0), m_nfit(0), ndfit(0), m_catqn(0), m_nxpar_actual(0), m_nxfit(0),
     m_inpcor(0), m_xerrmx(0.0), m_parfac(0.0), m_parfac0(0.0), m_fqfacq(0.0),
     m_ndbcd(0), m_nfmt(0), m_itd(0), m_nline(0), m_limlin(0), m_maxf_from_linein(0),
     m_nblkpf_actual(0), m_maxdm_actual(0), m_ndfree0(0), m_nqn_for_iteration(0)
@@ -339,12 +338,10 @@ bool CalFit::initializeParameters(const CalFitInput &input)
     oldfit = nullptr;
     fit = nullptr;
     ndfit = 0;
-    ndiag = 0;
   }
   else
   {
     ndfit = m_nfit + 1;
-    ndiag = ndfit + 1;
 
     size_t nl_maxmem_dummy;
     m_nsize_p = maxmem(&nl_maxmem_dummy);
@@ -703,26 +700,10 @@ bool CalFit::processLinesAndSetupBlocks(const CalFitInput &input)
   printf("DEBUG processLinesAndSetupBlocks: m_nqn_for_iteration: %d, m_nfmt: %d\n", m_nqn_for_iteration, m_nfmt);
 
   // 3. Process Experimental Lines (using this->linein)
-  std::stringstream line_stream;
-  for (const auto &line_str : input.lineData_raw)
-  {
-    line_stream << line_str << '\n';
-  }
-  std::string line_buffer_str = line_stream.str();
-  FILE *temp_line_file = fmemopen((void *)line_buffer_str.c_str(), line_buffer_str.size(), "r");
-  if (!temp_line_file)
-  {
-    // if (lufit)
-    //   fprintf(lufit, "ERROR: Unable to create temporary file for line data.\n");
-    puts("ERROR: Unable to create in-memory file for line data.");
-    return false;
-  }
-
-  int current_nline_val = m_limlin;                                        // Pass current max line count, linein updates it
-  m_maxf_from_linein = this->linein(temp_line_file, &current_nline_val, m_nfmt); // Call CalFit's linein
-  m_nline = current_nline_val;                                             // Update m_nline with actual lines read
-  fclose(temp_line_file);
-  fflush(stdout); // As in original after linein
+  int current_nline_val = m_limlin;
+  m_maxf_from_linein = this->linein(input.lineData_raw, &current_nline_val, m_nfmt);
+  m_nline = current_nline_val;
+  fflush(stdout);
 
   if (m_nline <= 0)
   {
