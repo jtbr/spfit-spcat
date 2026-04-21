@@ -72,7 +72,6 @@ ftran.o:ftran.c
 sortn.o: sortn.c
 sortsub.o: sortsub.c
 dblas.o: dblas.c
-util.o:util.c
 calbak.o:calbak.c
 CalFit.o: CalFit.cpp CalFit.hpp CalculationEngine.hpp
 CalFit_helpers.o: CalFit_helpers.cpp CalFit.hpp

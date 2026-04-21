@@ -52,7 +52,6 @@ set(SOURCE_FILES
     stark.c
     moiam.c
     iamcalc.c  # Even if target is commented out, keep for properties if file exists
-    cnvwn.c
     sortn.c
     reassign.c
     sortegy.c
