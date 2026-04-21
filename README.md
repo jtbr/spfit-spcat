@@ -86,7 +86,7 @@ There is a modern [python wrapper](https://github.com/Ltotheois/Pyckett) availab
 ### Calculation engines
 
 - `SpinvEngine.cpp`, `SpinvEngine.hpp`, `SpinvContext.hpp` — engine for asymmetric/symmetric tops and general molecules
-- `spinv_setup.c`, `spinv_spin_symmetry.c`, `spinv_linalg_sort.c`, `spinv_hamiltonian.c`, `spinv_utils.c`, `spinv_internal.h` — underlying C implementation (parameterized via `SpinvContext`)
+- `spinv_setup.c`, `spinv_spin_symmetry.c`, `spinv_linalg_sort.c`, `spinv_hamiltonian.c`, `spinv_utils.c`, `spinv_internal.h` — underlying C implementation (parameterized via `SpinvContext`; decomposed from Pickett's original single `spinv.c`)
 - `DpiEngine.cpp`, `DpiEngine.hpp`, `DpiContext.hpp` — engine for diatomic/linear molecules with nuclear spin
 - `dpi.c`, `dpi.h` — underlying C implementation (parameterized via `DpiContext`)
 
@@ -95,23 +95,17 @@ There is a modern [python wrapper](https://github.com/Ltotheois/Pyckett) availab
 - `calpgm.h` — central configuration header included by nearly all C/C++ source files
 - `ulib.c` — parameter I/O (`getpar`, `getvar`, `putvar`), error analysis (`calerr`, `prcorr`)
 - `lsqfit.c`, `lsqfit.h` — least-squares fitting (QR factorization, Marquardt-Levenberg solver)
-- `dblas.c` — fallback BLAS routines (required for exact numerical reproduction)
+- `dblas.c` — fallback LINPACK double precision BLAS routines (required for exact numerical reproduction of baseline)
 - `cnjj.c`, `cnjj.h` — Clebsch-Gordan coefficients
 - `slibgcc.c` — system-dependent functions
 - `catutil.c`, `catutil.h` — catalog utility functions
 - `sortsub.c` — frequency sorting routines shared by spcat and the sortn utility
-- `subfit.c` — supplementary fitting routines
+- `subfit.c` — fitting routines supplementary to CalFit
 - `spinit.c`, `spinit.h` — spin initialization
-
-### Documentation
-
-- [`spinv.md`](spinv.md) — SPFIT/SPCAT documentation
-- [`dpi.md`](dpi.md) — DPFIT/DPCAT documentation
-- [`TASKS.md`](TASKS.md) — modernization task list and status
 
 ### Auxiliary programs (legacy, unmodernized)
 
-These are original Pickett utility programs. They compile and link (`make all`) but have not been modernized, tested, or verified against the current codebase. They link against the old `splib.a` static library rather than the new C++ classes.
+These are original Pickett utility programs. They compile and link (`make all`) but have not been modernized, tested, or verified against the current codebase. They link against the old `splib.a` static library (where applicable) rather than the new C++ classes.
 
 **Data preparation / workflow:**
 - `sortn.c` — standalone CLI tool for sorting catalog files by frequency (wraps the `sortn()` function from `sortsub.c`, which is also linked directly into spcat)
@@ -132,24 +126,7 @@ These are original Pickett utility programs. They compile and link (`make all`) 
 - `stark.c` — computes Stark effect coefficients for molecular energy levels
 
 **Runtime support files (not included in repo):**
-- `*.nam` — parameter name files for labeling output (e.g. `sping.nam`, `dpi.nam`). Searched in the current directory, then in the directory specified by the `SPECNAME` environment variable. Not included in this repository; their absence is handled gracefully (output will lack parameter name labels).
-
-## Adjustment of Marquardt-Levenberg Parameter Using a Trust-Region Approach
-
-The *trust region* approach to Marquardt-Levenberg parameter adjustment is described in John. E. Dennis
-and Robert B. Schnabel, Numerical Methods for Unconstrained Optimization and Non-linear Equations,
-Prentice-Hall, 1983. The basic idea is that there is a region over which a linear least squares fit can be
-*trusted*. First the value of each parameter is scaled so that the squares of the derivatives, summed over
-all the lines, is unity. Then a simple least squares fit is attempted with a value of zero for the
-Marquardt-Levenberg parameter, $\lambda$. If the length of the normalized parameter change vector is less than
-the trust region size, then this fit is used. Otherwise, a new $\lambda$ is found in which length of the normalized
-parameter change vector is equal to the trust region size. In the first iteration, the trust region size is set
-to the length of the parameter change vector when the input value of $\lambda$ is used for the fit. For the following
-iterations, the trust region is doubled if it appears that the fit is over-damped. If the fit is diverging, the
-trust region is changed by a factor of 0.1 to 0.5 and the parameters from the last good fit are used again.
-When the trust region is decreased, the corresponding value of $\lambda$ increases. It is a good idea to start a fit
-with the Marquardt-Levenberg parameter, $\lambda$, set to zero. If the fit starts diverging, then the trust region
-will be decreased appropriately.
+- `*.nam` — parameter name files used by `getlbl` in `subfit.c` to label `.fit` output (e.g. `sping.nam`, `dpi.nam`). Searched in the current directory, then in the directory specified by the `SPECNAME` environment variable. Not included in this repository; their absence is handled gracefully (output will lack parameter name labels).
 
 ## Contributions
 
