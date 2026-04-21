@@ -1,6 +1,6 @@
 # SPFIT/SPCAT program for rotational spectroscopy
 
-This repository contains source code for Herb M. Pickett's SPFIT and SPCAT programs for fitting and simulating rotational spectra. Originally called the CalPGM program suite, it also includes DPFIT and DPCAT, as well as auxiliary programs CALMRG, MOIAM, STARK, TERMVAL, SORTN, REASSIGN, SORTEGY, IAMBAK, and IAMCALC. The original code dates to 1989.
+This repository is based upon source code for Herb M. Pickett's SPFIT and SPCAT programs for fitting and simulating rotational spectra. Originally called the CalPGM program suite, it also includes DPFIT and DPCAT, as well as auxiliary programs CALMRG, MOIAM, STARK, TERMVAL, SORTN, REASSIGN, SORTEGY, IAMBAK, and IAMCALC. The original code dates to 1989.
 
 The base version of this code was obtained from the [Cologne Database for Molecular Spectroscopy](https://cdms.astro.uni-koeln.de/classic/predictions/pickett/quelle/), with the latest modifications by Dr. Holger S. P. Müller (the `Pickett_neu.zip` file package).
 
