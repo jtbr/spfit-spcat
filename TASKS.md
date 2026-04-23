@@ -78,7 +78,12 @@ This document outlines the prioritized tasks for modernizing the SPFIT/SPCAT sof
         - Configurable logging: redirect diagnostic output from `stdout`/`lufit` to a user-provided callback or stream.
     - This subsumes the former **Task 8 (Memory Management Refinement)** — the remaining memory management issues are `exit()` calls that leak on error, which this task addresses directly. The RAII pattern in CalFit/CalCat destructors already handles normal cleanup.
 
-- [ ] **Task 9: Python interface and example usage**
+- [ ] **Task 9.0: legacy cleanup**:
+    - Break apart calpgm.h header, into calpgm_types.h, blas_compat.h and headers for cnjj/slib/catutil/slib/ulib/subfit, including only what's needed and keeping them out of C++ headers if possible
+    - Remove slibgcc.c, replacing with simple macros or standard replacements or more modern approaches. `fopenq` may need an to be a static inline helper. `maxmem` logic should be removable.
+    - move legacy apps aside, probably into a `legacy` subdirectory, keeping only spfit/spcat/dpfit/dpcat as the main targets (they should remain buildable/usable). Consider other code reorganization.
+
+- [ ] **Task 9.1: Python interface and example usage**
     - C++ example demonstrating programmatic use of CalFit/CalCat (construct engine, populate Input struct, call `run()`, read Output struct).
     - Python bindings via `pybind11` wrapping CalFit/CalCat.
     - **Design consideration**: CalCat currently streams output via `FILE*`. Python bindings will need either (a) in-memory accumulation in `CalCatOutput`, or (b) a Python callback for each catalog line. Option (a) is simpler; option (b) is more memory-efficient for large catalogs.
