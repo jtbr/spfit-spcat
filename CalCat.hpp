@@ -14,6 +14,7 @@
 #include <memory>
 #include "CalculationEngine.hpp"
 #include "lsqfit.h" // For bcd_t, MAXQN, BOOL, etc.
+#include "Logger.hpp"
 
 #define NTEMP 1001
 #define TMAX 1000
@@ -117,13 +118,15 @@ class CalCat
 {
 public:
   CalCat(std::unique_ptr<CalculationEngine> &calc_engine,
-         FILE *luout, FILE *lucat, FILE *luegy, FILE *lustr);
+         FILE *luout, FILE *lucat, FILE *luegy, FILE *lustr,
+         Logger &logger = Logger::defaultLogger());
   ~CalCat();
 
   bool run(const CalCatInput &input, CalCatOutput &output);
 
 private:
   std::unique_ptr<CalculationEngine> calc;
+  Logger &m_logger;
   FILE *m_luout;
   FILE *m_lucat;
   FILE *m_luegy;

@@ -103,7 +103,8 @@ int main(int argc, char *argv[])
   {
     calc_engine = std::make_unique<SpinvEngine>();
   }
-  printf("Using %s engine.\n", engineType.c_str());
+  Logger &logger = Logger::defaultLogger();
+  logger.info("Using %s engine.", engineType.c_str());
 
   // Get filenames
   file_helpers::parse_file_args(argc, argv, NFILE, fname, ext); // fname[epar]="base.par", etc.
@@ -119,22 +120,22 @@ int main(int argc, char *argv[])
 
   if (filbak(fname[epar], fname[ebak]))
   { // filbak returns 0 on success
-    printf("Warning: Failed to create backup file %s from %s. Proceeding without backup.\n", fname[ebak], fname[epar]);
+    logger.warn("Failed to create backup file %s from %s.", fname[ebak], fname[epar]);
     // Or exit if backup is critical
   }
   else
   {
-    printf("Backup of %s to %s created successfully.\n", fname[epar], fname[ebak]);
+    logger.info("Successfully created backup file %s from %s.", fname[ebak], fname[epar]);
   }
 
   // Open the main .fit output stream
   FILE *lufit_stream = fopen(fname[efit], "w");
   if (!lufit_stream)
   {
-    printf("Error: Unable to open fit output file '%s'.\n", fname[efit]);
+    logger.error("Unable to open fit output file '%s'.", fname[efit]);
     return EXIT_FAILURE;
   }
-//  printf("Successfully opened fit output file '%s' for writing.\n", fname[efit]);
+  //  printf("Successfully opened fit output file '%s' for writing.\n", fname[efit]);
 
   // Prepare input and output structures
   CalFitInput input;
@@ -144,29 +145,25 @@ int main(int argc, char *argv[])
   // We read from the original .par file (fname[epar])
   if (!CalFitIO::readInput(fname[ebak], fname[elin], input, calc_engine, lufit_stream))
   {
-    printf("Failed to read input files using CalFitIO::readInput.\n");
+    logger.error("Failed to read input files.");
     fclose(lufit_stream);
     return EXIT_FAILURE;
   }
-  printf("CalFitIO::readInput completed.\n");
 
   // Create CalFit instance with the selected engine and lufit stream
   // (calFit takes ownership of calc_engine from here)
-  CalFit calFit(calc_engine, lufit_stream);
+  CalFit calFit(calc_engine, lufit_stream, logger);
 
   // Run the fitting process (guard active for duration of run)
   SigintFlag sigint_guard;
   if (!calFit.run(input, output))
   {
-    printf("Fitting process failed in CalFit::run.\n");
-    fclose(lufit_stream); // Close lufit before exiting on error
+    logger.error("Fitting process failed.");
+    fclose(lufit_stream);
     return EXIT_FAILURE;
   }
-  printf("CalFit::run completed.\n");
 
-  // Close the main .fit output stream (owned by main)
   fclose(lufit_stream);
-  printf("Closed fit output file '%s'.\n", fname[efit]);
 
   // Write output data using CalFitIO
   // CalFitIO::writeOutput writes to:
@@ -175,11 +172,10 @@ int main(int argc, char *argv[])
   // fname[ebak] (the backup of the original .par) is kept.
   if (!CalFitIO::writeOutput(fname[epar], fname[ebak], fname[evar], output, input))
   {
-    printf("Failed to write output files using CalFitIO::writeOutput.\n");
+    logger.error("Failed to write output files.");
     return EXIT_FAILURE;
   }
-  printf("CalFitIO::writeOutput completed.\n");
 
-  puts("FIT COMPLETE");
+  logger.info("FIT COMPLETE");
   return 0;
 } // main

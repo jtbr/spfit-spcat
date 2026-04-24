@@ -27,9 +27,11 @@
  * @param cal_engine SpinvEngine or DpiEngine object
  * @param final_lufit_stream The file stream for the main .fit output log.
  */
-CalFit::CalFit(std::unique_ptr<CalculationEngine> &calc_engine, FILE *final_lufit_stream) :
+CalFit::CalFit(std::unique_ptr<CalculationEngine> &calc_engine, FILE *final_lufit_stream,
+               Logger &logger) :
     calc(std::move(calc_engine)),
-    lufit(final_lufit_stream), // Initializer list
+    lufit(final_lufit_stream),
+    m_logger(logger),
     parlbl(nullptr), par(nullptr), erp(nullptr), oldpar(nullptr), erpar(nullptr),
     dpar(nullptr), delbgn(nullptr), fitbgn(nullptr), var(nullptr), oldfit(nullptr),
     fit(nullptr), teig(nullptr), pmix(nullptr), iperm(nullptr), idpar(nullptr),
@@ -39,12 +41,7 @@ CalFit::CalFit(std::unique_ptr<CalculationEngine> &calc_engine, FILE *final_lufi
     m_nblkpf_actual(0), m_maxdm_actual(0), m_ndfree0(0), m_nqn_for_iteration(0)
 {
   if (!lufit)
-  {
-    // Handle error: lufit stream is essential.
-    // This could throw an exception or set an error state.
-    fprintf(stderr, "FATAL: CalFit constructor received NULL lufit stream.\n");
-    // For now, let's proceed, but in a real app, this is critical.
-  }
+    throw IoError("CalFit constructor received NULL lufit stream.", CalErrorCode::FileOpenFailed);
 }
 
 /**
@@ -91,45 +88,15 @@ CalFit::~CalFit()
 // CalFit::run method updated to call these stubs
 bool CalFit::run(const CalFitInput &input, CalFitOutput &output)
 {
-  if (!lufit)
-  {
-    puts("Error: CalFit::run called with NULL lufit stream.");
-    return false;
-  }
-
+  // Note: m_lufit is non-NULL because the constructor throws if not
   if (!initializeParameters(input))
-  {
-    puts("CalFit::initializeParameters failed.");
-    //fprintf(lufit, "ERROR: Parameter initialization failed.\n");
     return false;
-  }
-  puts("CalFit::initializeParameters successful.");
-
   if (!processLinesAndSetupBlocks(input))
-  {
-    puts("CalFit::processLinesAndSetupBlocks failed.");
-    //fprintf(lufit, "ERROR: Line processing and block setup failed.\n");
     return false;
-  }
-  puts("CalFit::processLinesAndSetupBlocks successful.");
-
   if (!performIteration(input, output))
-  {
-    puts("CalFit::performIteration failed.");
-    //fprintf(lufit, "ERROR: Iterative fitting failed.\n");
     return false;
-  }
-  puts("CalFit::performIteration successful.");
-
   if (!finalizeOutputData(input, output))
-  {
-    puts("CalFit::finalizeOutputData failed.");
-    // Don't write to lufit here as it might be part of finalization logic that failed
     return false;
-  }
-  puts("CalFit::finalizeOutputData successful.");
-
-  puts("CalFit::run completed.");
   return true;
 }
 
@@ -208,64 +175,14 @@ bool CalFit::initializeParameters(const CalFitInput &input)
   idpar = nullptr;
 
   size_t parlbl_actual_size = (LBLEN * (size_t)m_npar + 1);
-  parlbl = (char *)calalloc(parlbl_actual_size);
-  if (!parlbl)
-  {
-    perror("calalloc for parlbl failed");
-    return false;
-  }
-
-  par = (double *)calalloc((size_t)m_npar * sizeof(double));
-  if (!par)
-  {
-    perror("calalloc for par failed");
-    free(parlbl);
-    return false;
-  }
-
+  parlbl = (char   *)calalloc(parlbl_actual_size);
+  par    = (double *)calalloc((size_t)m_npar * sizeof(double));
   oldpar = (double *)calalloc((size_t)m_npar * sizeof(double));
-  if (!oldpar)
-  {
-    perror("calalloc for oldpar failed");
-    free(parlbl);
-    free(par);
-    return false;
-  }
-
-  erp = (double *)calalloc((size_t)m_npar * sizeof(double));
-  if (!erp)
-  {
-    perror("calalloc for erp failed");
-    free(parlbl);
-    free(par);
-    free(oldpar);
-    return false;
-  }
-
-  erpar = (double *)calalloc((size_t)m_npar * sizeof(double));
-  if (!erpar)
-  {
-    perror("calalloc for erpar failed");
-    free(parlbl);
-    free(par);
-    free(oldpar);
-    free(erp);
-    return false;
-  }
+  erp    = (double *)calalloc((size_t)m_npar * sizeof(double));
+  erpar  = (double *)calalloc((size_t)m_npar * sizeof(double));
 
   size_t idpar_actual_size = ((size_t)m_npar * m_ndbcd + m_ndbcd + 3);
-  idpar = (bcd_t *)calalloc(idpar_actual_size * sizeof(bcd_t));  // sizeof(bcd_t) == 1
-  if (!idpar)
-  {
-
-    perror("calalloc for idpar failed");
-    free(parlbl);
-    free(par);
-    free(oldpar);
-    free(erp);
-    free(erpar);
-    return false;
-  }
+  idpar = (bcd_t *)calalloc(idpar_actual_size * sizeof(bcd_t));
 
   // --- 3. Copy data from input's vectors ---
   if (input.parlbl_data_flat.size() >= parlbl_actual_size)
@@ -276,16 +193,13 @@ bool CalFit::initializeParameters(const CalFitInput &input)
   {
     memcpy(parlbl, input.parlbl_data_flat.data(), input.parlbl_data_flat.size());
     parlbl[input.parlbl_data_flat.size()] = '\0';
-    // if (lufit)
-    //   fprintf(lufit, "Warning: parlbl_data_flat size from input (%zu) was smaller than expected (%zu).\n", input.parlbl_data_flat.size(), parlbl_actual_size);
-    printf("Warning: parlbl_data_flat size from input (%zu) was smaller than expected (%zu).\n", input.parlbl_data_flat.size(), parlbl_actual_size);
+    m_logger.warn("parlbl_data_flat size from input (%zu) was smaller than expected (%zu).",
+                  input.parlbl_data_flat.size(), parlbl_actual_size);
   }
   else if (m_npar > 0)
   {
     *parlbl = '\0';
-    // if (lufit)
-    //   fprintf(lufit, "Warning: parlbl_data_flat from input was empty for m_npar = %d.\n", m_npar);
-    printf("Warning: parlbl_data_flat from input was empty for m_npar = %d.\n", m_npar);
+    m_logger.warn("parlbl_data_flat from input was empty for m_npar = %d.", m_npar);
   }
 
   if (input.par_initial.size() == (size_t)m_npar)
@@ -295,9 +209,7 @@ bool CalFit::initializeParameters(const CalFitInput &input)
   }
   else if (m_npar > 0)
   {
-    // if (lufit)
-    //   fprintf(lufit, "ERROR: par_initial size mismatch. Expected %d, got %zu.\n", m_npar, input.par_initial.size());
-    printf("ERROR: par_initial size mismatch. Expected %d, got %zu.\n", m_npar, input.par_initial.size());
+    m_logger.error("par_initial size mismatch. Expected %d, got %zu.", m_npar, input.par_initial.size());
     return false;
   }
 
@@ -307,9 +219,7 @@ bool CalFit::initializeParameters(const CalFitInput &input)
   }
   else if (m_npar > 0)
   {
-    // if (lufit)
-    //   fprintf(lufit, "ERROR: erp_initial size mismatch. Expected %d, got %zu.\n", m_npar, input.erp_initial.size());
-    printf("ERROR: erp_initial size mismatch. Expected %d, got %zu.\n", m_npar, input.erp_initial.size());
+    m_logger.error("erp_initial size mismatch. Expected %d, got %zu.", m_npar, input.erp_initial.size());
     return false;
   }
 
@@ -319,20 +229,14 @@ bool CalFit::initializeParameters(const CalFitInput &input)
   }
   else if (m_npar > 0)
   {
-    // if (lufit)
-    //   fprintf(lufit, "ERROR: idpar_data size mismatch. Expected %zu, got %zu.\n", idpar_actual_size, input.idpar_data.size());
-    printf("ERROR: idpar_data size mismatch. Expected %zu, got %zu.\n", idpar_actual_size, input.idpar_data.size());
+    m_logger.error("idpar_data size mismatch. Expected %zu, got %zu.", idpar_actual_size, input.idpar_data.size());
     return false;
   }
 
   // --- Initialize fitting matrices and related arrays (sized by m_nfit) ---
   if (m_nfit <= 0)
   {
-    // if (lufit && m_npar > 0)
-    // {
-    //   fprintf(lufit, "No parameters marked for fitting (nfit = %d).\n", m_nfit);
-    // }
-    printf("No parameters marked for fitting (nfit = %d).\n", m_nfit);
+    m_logger.info("No parameters marked for fitting (nfit = %d).", m_nfit);
     iperm = nullptr;
     dpar = nullptr;
     delbgn = nullptr;
@@ -349,58 +253,18 @@ bool CalFit::initializeParameters(const CalFitInput &input)
     m_nsize_p = INT_MAX;
     if (ndfit > m_nsize_p)
     {
-      // if (lufit)
-      //   fprintf(lufit, "ERROR: Number of independent parameters + 1 (%d) is too big for memory segment (%ld).\n", ndfit, m_nsize_p);
-      printf("Number of independent parameters + 1 (%d) is too big: %ld\n", ndfit, m_nsize_p);
+      m_logger.error("Number of independent parameters + 1 (%d) is too big: %ld", ndfit, m_nsize_p);
       return false;
     }
 
-    iperm = (int *)calalloc((size_t)m_nfit * sizeof(int));
-    if (!iperm)
-    {
-      // if (lufit)
-      //   fprintf(lufit, "ERROR: calalloc for iperm failed.\n");
-      perror("calalloc for iperm failed");
-      return false;
-    }
-
-    dpar = (double *)calalloc((size_t)ndfit * sizeof(double));
-    if (!dpar)
-    {
-      // if (lufit)
-      //   fprintf(lufit, "ERROR: calalloc for dpar failed.\n");
-      perror("calalloc for dpar failed");
-      return false;
-    }
-
+    iperm  = (int    *)calalloc((size_t)m_nfit * sizeof(int));
+    dpar   = (double *)calalloc((size_t)ndfit  * sizeof(double));
     delbgn = (double *)calalloc((size_t)m_nfit * sizeof(double));
-    if (!delbgn)
-    {
-      // if (lufit)
-      //   fprintf(lufit, "ERROR: calalloc for delbgn failed.\n");
-      perror("calalloc for delbgn failed");
-      return false;
-    }
 
     size_t standard_packed_elements = ((size_t)m_nfit * ((size_t)m_nfit + 1)) / 2;
 
     fitbgn = (double *)calalloc(standard_packed_elements * sizeof(double));
-    if (!fitbgn)
-    {
-      // if (lufit)
-      //   fprintf(lufit, "ERROR: calalloc for fitbgn failed.\n");
-      perror("calalloc for fitbgn failed");
-      return false;
-    }
-
-    var = (double *)calalloc(standard_packed_elements * sizeof(double));
-    if (!var)
-    {
-      // if (lufit)
-      //   fprintf(lufit, "ERROR: calalloc for var failed.\n");
-      perror("calalloc for var failed");
-      return false;
-    }
+    var    = (double *)calalloc(standard_packed_elements * sizeof(double));
 
     if (input.var_initial_from_getvar.size() == standard_packed_elements)
     {
@@ -408,37 +272,19 @@ bool CalFit::initializeParameters(const CalFitInput &input)
     }
     else if (!input.var_initial_from_getvar.empty())
     {
-      // if (lufit)
-      //   fprintf(lufit, "ERROR: var_initial_from_getvar size mismatch. Expected %zu (std packed), got %zu.\n", standard_packed_elements, input.var_initial_from_getvar.size());
-      printf("ERROR: var_initial_from_getvar size mismatch. Expected %zu (std packed), got %zu.\n", standard_packed_elements, input.var_initial_from_getvar.size());
+      m_logger.error("var_initial_from_getvar size mismatch. Expected %zu (packed), got %zu.",
+                     standard_packed_elements, input.var_initial_from_getvar.size());
       return false;
     }
     else if (m_nfit > 0)
     {
-      // if (lufit)
-      //   fprintf(lufit, "ERROR: var_initial_from_getvar is empty for nfit > 0.\n");
-      printf("ERROR: var_initial_from_getvar is empty for nfit > 0.\n");
+      m_logger.error("var_initial_from_getvar is empty for nfit > 0.");
       return false;
     }
 
     size_t oldfit_elements = standard_packed_elements + (size_t)m_nfit;
     oldfit = (double *)calalloc(oldfit_elements * sizeof(double));
-    if (!oldfit)
-    {
-      // if (lufit)
-      //   fprintf(lufit, "ERROR: calalloc for oldfit failed.\n");
-      perror("calalloc for oldfit failed");
-      return false;
-    }
-
-    fit = (double *)calalloc((size_t)m_nfit * (size_t)ndfit * sizeof(double));
-    if (!fit)
-    {
-      // if (lufit)
-      //   fprintf(lufit, "ERROR: calalloc for fit failed.\n");
-      perror("calalloc for fit failed");
-      return false;
-    }
+    fit    = (double *)calalloc((size_t)m_nfit * (size_t)ndfit * sizeof(double));
 
     // --- 4. Initialize fitbgn, dpar, oldfit, delbgn based on m_inpcor and this->var ---
     m_ndfree0 = 0;
@@ -623,9 +469,7 @@ bool CalFit::initializeParameters(const CalFitInput &input)
     }
     else if (m_npar > 0)
     {
-      // if (lufit)
-      //   fprintf(lufit, "ERROR: Index out of bounds for idpar in nxfit calculation (param %d).\n", i_par_idx);
-      printf("ERROR: Index out of bounds for idpar in nxfit calculation (param %d).\n", i_par_idx);
+       m_logger.error("Index out of bounds for idpar in nxfit calculation (param %d).\n", i_par_idx);
       // This could be critical, consider returning false
     }
   }
@@ -667,14 +511,7 @@ bool CalFit::processLinesAndSetupBlocks(const CalFitInput &input)
 {
   if (!calc)
   {
-    // if (lufit)
-    //   fprintf(lufit, "ERROR: CalculationEngine is null in processLinesAndSetupBlocks.\n");
-    puts("ERROR: CalculationEngine is null.");
-    return false;
-  }
-  if (!lufit)
-  {
-    puts("ERROR: lufit stream is null in processLinesAndSetupBlocks.");
+    m_logger.error("CalculationEngine is null.");
     return false;
   }
 
@@ -687,9 +524,7 @@ bool CalFit::processLinesAndSetupBlocks(const CalFitInput &input)
   m_nqn_for_iteration = calc->setfmt(&m_nfmt, 1); // iflg=1 usually means primary format
   if (m_nqn_for_iteration <= 0)
   {
-    // if (lufit)
-    //   fprintf(lufit, "ERROR: calc->setfmt failed to set quantum number format (returned %d).\n", m_nqn_for_iteration);
-    printf("ERROR: calc->setfmt failed (returned %d).\n", m_nqn_for_iteration);
+    m_logger.error("calc->setfmt failed (returned %d).", m_nqn_for_iteration);
     return false;
   }
 
@@ -699,7 +534,6 @@ bool CalFit::processLinesAndSetupBlocks(const CalFitInput &input)
   // original also had: nqn = nqn + nqn; (for pairs)  TODO: why does this cause a regression now?
   // m_nqn_for_iteration *= 2;
 
-  printf("DEBUG processLinesAndSetupBlocks: m_nqn_for_iteration: %d, m_nfmt: %d\n", m_nqn_for_iteration, m_nfmt);
 
   // 3. Process Experimental Lines (using this->linein)
   int current_nline_val = m_limlin;
@@ -709,9 +543,7 @@ bool CalFit::processLinesAndSetupBlocks(const CalFitInput &input)
 
   if (m_nline <= 0)
   {
-    // if (lufit)
-    //   fprintf(lufit, "No lines read (NLINE = %d) or linein failed.\n", m_nline);
-    puts("No lines read or linein failed.");
+    m_logger.warn("No lines read or linein failed.");
     // It's possible to have 0 lines and proceed if only calculation is needed,
     // but typically for fitting this is an issue. Let's return false.
     return false;
@@ -731,9 +563,7 @@ bool CalFit::processLinesAndSetupBlocks(const CalFitInput &input)
   // Ensure idpar and par are valid before passing to setblk
   if (!this->idpar || !this->par)
   {
-    // if (lufit)
-    //   fprintf(lufit, "ERROR: idpar or par is null before calc->setblk.\n");
-    puts("ERROR: idpar or par is null before calc->setblk.");
+    m_logger.error("idpar or par is null before calc->setblk.");
     return false;
   }
   int k_from_setblk = calc->setblk(lufit, m_npar, this->idpar, this->par, &m_nblkpf_actual, &m_maxdm_actual);
@@ -746,37 +576,26 @@ bool CalFit::processLinesAndSetupBlocks(const CalFitInput &input)
     getlbl(m_npar, this->idpar, this->parlbl, namfil_cstr, k_from_setblk, LBLEN);
   }
   else
-  {
-    // if (lufit)
-    //   fprintf(lufit, "Warning: parlbl or idpar is null, skipping getlbl.\n");
-    printf("Warning: parlbl or idpar is null, skipping getlbl.\n");
-  }
+    m_logger.warn("parlbl or idpar is null, skipping getlbl.");
 
   // 6. Convert lines and set up links for fitting (this->lineix)
   // lineix takes nitr as flg for detailed output control.
   int bad_lines = this->lineix(lufit, m_nitr_requested, m_nline, m_nblkpf_actual, m_nfmt);
   if (bad_lines > 0)
   {
-    printf("%d bad lines\n", bad_lines);
-    // if (lufit)
-    //   fprintf(lufit, "%d bad lines reported by lineix.\n", bad_lines);
-    printf("%d bad lines reported by lineix.\n", bad_lines);
+    m_logger.info("%d bad lines reported by lineix.", bad_lines);
   }
   fflush(stdout);
 
   // 7. Allocate teig and pmix_block
   if (m_maxdm_actual <= 0)
   {
-    // if (lufit)
-    //   fprintf(lufit, "ERROR: m_maxdm_actual is %d, cannot allocate Hamiltonian matrices.\n", m_maxdm_actual);
-    printf("ERROR: m_maxdm_actual is %d, cannot allocate Hamiltonian matrices.\n", m_maxdm_actual);
+    m_logger.error("m_maxdm_actual is %d, cannot allocate Hamiltonian matrices.", m_maxdm_actual);
     return false;
   }
   if (m_maxdm_actual > m_nsize_p)
   {
-    // if (lufit)
-    //   fprintf(lufit, "ERROR: Hamiltonian dimension (%d) is too big for available memory (%ld).\n", m_maxdm_actual, m_nsize_p);
-    printf("Hamiltonian dimension is too big: %d %ld\n", m_maxdm_actual, m_nsize_p);
+    m_logger.error("Hamiltonian dimension (%d) is too big: %ld", m_maxdm_actual, m_nsize_p);
     return false;
   }
 
@@ -790,46 +609,21 @@ bool CalFit::processLinesAndSetupBlocks(const CalFitInput &input)
 
   size_t maxdm_sq_elements = (size_t)m_maxdm_actual * (size_t)m_maxdm_actual;
   teig = (double *)calalloc(maxdm_sq_elements * sizeof(double));
-  if (!teig)
-  {
-    // if (lufit)
-    //   fprintf(lufit, "ERROR: calalloc for teig failed.\n");
-    perror("calalloc for teig failed");
-    return false;
-  }
 
   size_t num_deriv_params_for_alloc = (m_nfit > 0) ? (size_t)m_nfit : 0;
-  // If m_nfit is 0, deriv_dim is 0, so block is for pmix_scratch + egy.
+  // If m_nfit is 0, deriv_dim is 0, so block is for pmix_scratch + egy only
   // This matches original main.c where (nfit+2) became (0+2)=2.
-
   size_t pmix_block_elements = (size_t)m_maxdm_actual * (2 + num_deriv_params_for_alloc);
 
-  if (pmix_block_elements == 0 && m_maxdm_actual > 0)
-  {
-    // This case implies m_maxdm_actual > 0 but (2 + num_deriv_params_for_alloc) was 0, which is impossible.
-    // It means m_maxdm_actual itself might have been <= 0 before this.
-    // The check `if (m_maxdm_actual <= 0)` before teig allocation should catch this.
-    if (lufit)
-      fprintf(lufit, "Warning: pmix_block_elements calculated as zero unexpectedly with m_maxdm_actual = %d.\n", m_maxdm_actual);
-    pmix = nullptr; // Should not be reached if m_maxdm_actual > 0
-  }
-  else if (pmix_block_elements > 0)
+  // Note: (pmix_block_elements == 0 && m_maxdm_actual > 0) is impossible.
+  if (pmix_block_elements > 0)
   {
     pmix = (double *)calalloc(pmix_block_elements * sizeof(double));
-    if (!pmix)
-    {
-      // if (lufit)
-      //   fprintf(lufit, "ERROR: calalloc for pmix failed.\n");
-      perror("calalloc for pmix failed");
-      free(teig);
-      teig = nullptr; // Clean up teig if pmix fails
-      return false;
-    }
     pmix[0] = 1.0; // As in original main
   }
   else
   {
-    // pmix_block_elements is 0, likely because m_maxdm_actual was 0.
+    // pmix_block_elements == 0 because m_maxdm_actual == 0 (already guarded above).
     pmix = nullptr;
   }
 
@@ -847,14 +641,9 @@ bool CalFit::processLinesAndSetupBlocks(const CalFitInput &input)
 
 bool CalFit::performIteration(const CalFitInput &input, CalFitOutput &output)
 {
-  if (!lufit)
-  {
-    puts("ERROR: lufit stream is null in performIteration.");
-    return false;
-  }
   if (m_nline <= 0 && m_nfit > 0)
   { // No lines to fit but parameters exist
-    printf("WARNING: No lines available to perform iteration, but nfit > 0.\n");
+    m_logger.warn("No lines available to perform iteration, but nfit > 0.");
     // Set some default output and return, or handle as error if fitting is expected.
     output.itr = 0;
     output.xsqbest = 0.0;
@@ -867,7 +656,7 @@ bool CalFit::performIteration(const CalFitInput &input, CalFitOutput &output)
   }
   if (m_nfit <= 0)
   {
-    printf("No parameters to fit (nfit = %d). Skipping iteration loop.\n", m_nfit);
+    m_logger.info("No parameters to fit (nfit = %d). Skipping iteration loop.", m_nfit);
     // Perform a "calculation only" if nitr requested it (e.g. negative nitr in original)
     // For now, just set output and return.
     output.itr = 0;
@@ -951,7 +740,7 @@ bool CalFit::performIteration(const CalFitInput &input, CalFitOutput &output)
     //    Let's use a temporary array for passing current fitted parameter values to dnuadd.
     if (m_nxfit <= 0 && m_nfit > 0)
     { // Should not happen if nxfit correctly calculated
-      printf("Warning: m_nxfit is %d while m_nfit is %d. Problem with parameter exclusion logic.\n", m_nxfit, m_nfit);
+      m_logger.warn("m_nxfit is %d while m_nfit is %d. Problem with parameter exclusion logic.", m_nxfit, m_nfit);
     }
     std::vector<double> current_fitted_params(m_nfit); // Max possible needed for dnuadd
     k_loop = 0;
@@ -1027,16 +816,14 @@ bool CalFit::performIteration(const CalFitInput &input, CalFitOutput &output)
         lblk = iblk;
         if (nsize_block > m_maxdm_actual)
         {
-          // if (lufit)
-          //   fprintf(lufit, "ERROR: Size of block %d (%d) exceeds max dimension %d.\n", iblk, nsize_block, m_maxdm_actual);
-          printf("ERROR: Size of block %d (%d) exceeds max dimension %d.\n", iblk, nsize_block, m_maxdm_actual);
+          m_logger.error("Size of block %d (%d) exceeds max dimension %d.", iblk, nsize_block, m_maxdm_actual);
           return false; // Fatal error
         }
 
         k_loop = (iblk - 1) / m_nblkpf_actual; // Assuming m_nblkpf_actual is F step
         if (lstf != k_loop && caldelay(PR_DELAY) != 0)
         {
-          printf("Starting Quantum %3d\n", k_loop);
+          m_logger.info("Starting Quantum %3d", k_loop);
           fflush(stdout);
           lstf = k_loop;
         }
@@ -1059,8 +846,7 @@ bool CalFit::performIteration(const CalFitInput &input, CalFitOutput &output)
     if (SigintFlag::isTriggered() != 0 && lnext_getdbk != 0)
     { // Exited loop due to interrupt but not finished
       // if (lufit)
-      //   fprintf(lufit, "Iteration interrupted by user.\n");
-      printf("Iteration interrupted.\n");
+      m_logger.info("Iteration interrupted.");
       // Decide how to handle: break outer loop, return error, etc.
       // For now, break outer loop.
       break;
@@ -1068,7 +854,7 @@ bool CalFit::performIteration(const CalFitInput &input, CalFitOutput &output)
     if (lblk > 0)
     { // Check if any blocks were processed
       k_loop = (lblk - 1) / m_nblkpf_actual;
-      printf("Finished Quantum %3d\n", k_loop);
+      m_logger.info("Finished Quantum %3d", k_loop);
       fflush(stdout);
     }
 
@@ -1118,7 +904,7 @@ bool CalFit::performIteration(const CalFitInput &input, CalFitOutput &output)
     { // Loop over lines (line_idx from 1 to m_nline)
       if (icnt_progress <= 0 && caldelay(PR_DELAY) != 0)
       {
-        printf("Fitting Line %d\n", line_idx);
+        m_logger.debug("Fitting Line %d", line_idx);
         fflush(stdout);
         icnt_progress = 50; // Reset counter
       }
@@ -1340,7 +1126,7 @@ bool CalFit::performIteration(const CalFitInput &input, CalFitOutput &output)
     {
       if (lufit && m_nfit > 0) {
         fprintf(lufit, "WARNING: No lines were included in the fit for this iteration (nf_fitted_lines=0).\n");
-        printf("WARNING: No lines were included in the fit for this iteration (nf_fitted_lines=0).\n");
+        m_logger.warn("No lines were included in the fit for this iteration (nf_fitted_lines=0).");
       }
       // What to do if no lines are fitted?
       // Original: if (nf < 1) nf = 1;
@@ -1437,7 +1223,7 @@ bool CalFit::performIteration(const CalFitInput &input, CalFitOutput &output)
     {
       fprintf(lufit, "MARQUARDT PARAMETER = %g, TRUST EXPANSION = %4.2f\n", m_marqp[0], m_marqp[2]);
     }
-    printf("MARQUARDT PARAMETER = %g, TRUST EXPANSION = %4.2f\n", m_marqp[0], m_marqp[2]);
+    m_logger.info("MARQUARDT PARAMETER = %g, TRUST EXPANSION = %4.2f", m_marqp[0], m_marqp[2]);
 
     // parfac scaling logic (from original main.c, uses sum_sq_residuals_at_current_params)
     if (m_parfac0 < 0.0 && sum_sq_residuals_at_current_params >= 0.0)
@@ -1571,9 +1357,8 @@ bool CalFit::performIteration(const CalFitInput &input, CalFitOutput &output)
             // Ensure dpar is allocated
             this->dpar[k_loop] = error_val;
           }
-          else {
-            perror("dcal not allocated saving error vals");
-          }
+          else
+            m_logger.error("dpar not allocated when saving error vals.");
           // Scale column k of `this->fit` by m_parfac
           // This modifies the `this->fit` matrix that will be passed to prcorr.
           dscal(n_elements_for_norm, m_parfac, M_col_k_diag_ptr, 1);
@@ -1677,15 +1462,15 @@ bool CalFit::performIteration(const CalFitInput &input, CalFitOutput &output)
       xsqir = 0;
     }
 
-    printf(" MICROWAVE AVG = %15.6f MHz, IR AVG =%15.5f\n", avgmw, avgir);
+    m_logger.info(" MICROWAVE AVG = %15.6f MHz, IR AVG =%15.5f", avgmw, avgir);
     if (lufit)
       fprintf(lufit, " MICROWAVE AVG = %15.6f MHz, IR AVG =%15.5f\n", avgmw, avgir);
-    printf(" MICROWAVE RMS = %15.6f MHz, IR RMS =%15.5f\n", xsqmw, xsqir);
+    m_logger.info(" MICROWAVE RMS = %15.6f MHz, IR RMS =%15.5f", xsqmw, xsqir);
     if (lufit)
       fprintf(lufit, " MICROWAVE RMS = %15.6f MHz, IR RMS =%15.5f\n", xsqmw, xsqir);
 
     m_itr++; // Increment iteration count
-    printf(" END OF ITERATION %2d OLD, NEW RMS ERROR=%15.5f %15.5f\n", m_itr, rms_for_this_iter_report_and_condition, m_xsqbest);
+    m_logger.info(" END OF ITERATION %2d OLD, NEW RMS ERROR=%15.5f %15.5f", m_itr, rms_for_this_iter_report_and_condition, m_xsqbest);
     if (lufit)
       fprintf(lufit, " END OF ITERATION %2d OLD, NEW RMS ERROR=%15.5f %15.5f\n", m_itr, rms_for_this_iter_report_and_condition, m_xsqbest);
     fflush(stdout);
@@ -1709,11 +1494,8 @@ bool CalFit::performIteration(const CalFitInput &input, CalFitOutput &output)
 bool CalFit::finalizeOutputData(const CalFitInput &input, CalFitOutput &output)
 {
   if (!lufit && output.itr > 0)
-  {
-    // lufit might be needed for prcorr
     // This case should ideally not happen if lufit is managed correctly through run
-    puts("Warning: lufit stream is null in finalizeOutputData, prcorr might be skipped.");
-  }
+    m_logger.warn("lufit stream is null in finalizeOutputData, prcorr will be skipped.");
 
   // --- Restore parameters to pre-last-correction state (mirrors calfit-orig.cpp line 750) ---
   // After the iteration loop, the original code always does dcopy(npar, oldpar, 1, par, 1)
@@ -1742,9 +1524,7 @@ bool CalFit::finalizeOutputData(const CalFitInput &input, CalFitOutput &output)
     }
     else
     {
-      // if (lufit)
-      //   fprintf(lufit, "ERROR: this->par is null in finalizeOutputData.\n");
-      printf("ERROR: this->par is null in finalizeOutputData.\n");
+      m_logger.error("this->par is null in finalizeOutputData.");
       return false;
     }
     // this->erpar should contain the final scaled errors for ALL m_npar parameters
@@ -1755,9 +1535,7 @@ bool CalFit::finalizeOutputData(const CalFitInput &input, CalFitOutput &output)
     }
     else
     {
-      // if (lufit)
-      //   fprintf(lufit, "ERROR: this->erpar is null in finalizeOutputData.\n");
-      printf("ERROR: this->erpar is null in finalizeOutputData.\n");
+      m_logger.error("this->erpar is null in finalizeOutputData.");
       return false;
     }
   }
@@ -1792,9 +1570,7 @@ bool CalFit::finalizeOutputData(const CalFitInput &input, CalFitOutput &output)
     }
     else
     {
-      // if (lufit)
-      //   fprintf(lufit, "ERROR: this->idpar is null.\n");
-      printf("ERROR: this->idpar is null.\n");
+      m_logger.error("this->idpar is null in finalizeOutputData.");
       return false;
     }
 
@@ -1805,22 +1581,17 @@ bool CalFit::finalizeOutputData(const CalFitInput &input, CalFitOutput &output)
     }
     else
     {
-      // if (lufit)
-      //   fprintf(lufit, "ERROR: this->parlbl is null.\n");
-      printf("ERROR: this->parlbl is null.\n");
+      m_logger.error("this->parlbl is null in finalizeOutputData.");
       return false;
     }
 
     if (this->erp)
     {
-      // Original a-priori errors
       output.erp_original_for_output.assign(this->erp, this->erp + m_npar);
     }
     else
     {
-      // if (lufit)
-      //   fprintf(lufit, "ERROR: this->erp is null.\n");
-      printf("ERROR: this->erp is null.\n");
+      m_logger.error("this->erp is null in finalizeOutputData.");
       return false;
     }
   }
@@ -1841,12 +1612,8 @@ bool CalFit::finalizeOutputData(const CalFitInput &input, CalFitOutput &output)
     }
     else
     {
-      if (m_nfit > 0) {
-        // if (lufit)
-        //   fprintf(lufit, "ERROR: this->var is null but nfit > 0.\n");
-        printf("ERROR: this->var is null but nfit > 0.\n");
-        return false;
-      }
+      m_logger.error("this->var is null but nfit > 0.");
+      return false;
     }
 
     // `dpar` from lsqfit's `enorm` output contained 1/norm(L_col_k) or similar scaling factors.

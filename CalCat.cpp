@@ -19,14 +19,18 @@
 #define NCARD 130
 
 CalCat::CalCat(std::unique_ptr<CalculationEngine> &calc_engine,
-               FILE *luout, FILE *lucat, FILE *luegy, FILE *lustr)
+               FILE *luout, FILE *lucat, FILE *luegy, FILE *lustr,
+               Logger &logger)
     : calc(std::move(calc_engine)),
+      m_logger(logger),
       m_luout(luout), m_lucat(lucat), m_luegy(luegy), m_lustr(lustr),
       m_blk(nullptr), m_s(nullptr), m_pmix(nullptr),
       m_par(nullptr), m_derv(nullptr), m_var(nullptr),
       m_idpar(nullptr), m_dip(nullptr), m_idip(nullptr),
       m_nvdip(nullptr), m_isimag(nullptr), m_iqnfmtv(nullptr)
 {
+  if (!m_luout)
+    throw IoError("CalCat constructor received NULL luout stream.", CalErrorCode::FileOpenFailed);
 }
 
 CalCat::~CalCat()
@@ -211,7 +215,7 @@ bool CalCat::setupBlocks(const CalCatInput &input)
 
   int nsize_p = INT_MAX;
   if (m_nfit > nsize_p || m_nfit <= 0) {
-    puts(" memory allocation error for var matrix");
+    m_logger.error("var matrix size invalid (nfit = %d).", m_nfit);
     return false;
   }
 
@@ -359,7 +363,7 @@ bool CalCat::computeCatalog(const CalCatInput &/*input*/, CalCatOutput &output)
         ++pblk;
       }
       if (caldelay(PR_DELAY)) {
-        printf(" STARTING QUANTUM %3d\n", j);
+        m_logger.info(" STARTING QUANTUM %3d", j);
         fflush(stdout);
       }
     }
@@ -670,22 +674,22 @@ bool CalCat::finalizeOutput(const CalCatInput &/*input*/, CalCatOutput &output)
   static char headq[] = "TEMPERATURE - Q(SPIN-ROT.) - log Q(SPIN-ROT.)\n";
 
   if (m_ifdump) {
-    fputs(warn, stdout);
+    m_logger.warn(" WARNING: THERE WAS NO DIAGONALIZATION");
     fputs(warn, m_luout);
   }
-  printf("INITIAL Q = %14.4f, NEW Q IS RELATIVE TO MIN.EGY.= %14.4f\n",
-         m_qrot, output.egymin);
+  m_logger.info("INITIAL Q = %14.4f, NEW Q IS RELATIVE TO MIN.EGY.= %14.4f",
+                m_qrot, output.egymin);
   fprintf(m_luout, "INITIAL Q = %14.4f, NEW Q IS RELATIVE TO MIN.EGY.= %14.4f\n",
           m_qrot, output.egymin);
-  printf(" NUMBER OF LINES = %6ld\n", output.nline);
+  m_logger.info(" NUMBER OF LINES = %6ld", output.nline);
   fprintf(m_luout, " NUMBER OF LINES = %6ld\n", output.nline);
-  fputs(headq, stdout);
+  m_logger.info("TEMPERATURE - Q(SPIN-ROT.) - log Q(SPIN-ROT.)");
   fputs(headq, m_luout);
   for (int i = 0; i < output.ntemp; ++i) {
     double qlog = -100;
     if (output.qsum[i] > m_zero)
       qlog = log10(output.qsum[i]);
-    printf(" %10.3f %14.4f %9.4f\n", output.temp[i], output.qsum[i], qlog);
+    m_logger.info(" %10.3f %14.4f %9.4f", output.temp[i], output.qsum[i], qlog);
     fprintf(m_luout, " %10.3f %14.4f %9.4f\n", output.temp[i], output.qsum[i], qlog);
   }
 

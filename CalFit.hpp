@@ -16,6 +16,7 @@
 // If bcd_t is from lsqfit.h or calpgm.h, ensure those are included before this file if needed by other .hpp files
 // For now, let's assume bcd_t is known. If not, include lsqfit.h or calpgm.h here.
 #include "lsqfit.h" // For bcd_t, MAXQN, etc.
+#include "Logger.hpp"
 
 #define NDCARD 130
 #define LBLEN 10 // Length for parameter labels, as used in original calfit.c
@@ -112,7 +113,8 @@ public:
    * @param calc_engine Calculation Engine implementation object (currently either SpinvEngine or DpiEngine)
    * @param final_lufit_stream The file stream for the main .fit output log.
    */
-  CalFit(std::unique_ptr<CalculationEngine> &calc_engine, FILE *final_lufit_stream);
+  CalFit(std::unique_ptr<CalculationEngine> &calc_engine, FILE *final_lufit_stream,
+         Logger &logger = Logger::defaultLogger());
 
   /**
    * @brief Destructor for CalFit
@@ -130,6 +132,7 @@ public:
 private:
   std::unique_ptr<CalculationEngine> calc;
   FILE *lufit; // Output file for fit results (owned by main, passed in)
+  Logger &m_logger;
 
   // Member variables for storing fitting data (C-style arrays)
   char *parlbl;
