@@ -12,6 +12,8 @@
 #include <assert.h>
 #include <string.h>
 #include <math.h>
+#include <time.h>
+#include <ctype.h>
 #include "calpgm.h"
 
 static double zero = 0.;
@@ -590,7 +592,8 @@ char *plbl;
   fputs("PARAMETERS - A.PRIORI ERROR \n", luout);
   tlbl = plbl;
   parbase = 1.; ibcd = 0; ndbcd = (int) idpar[0]; nd = ndbcd + ndbcd;
-  sbcd = (char *) mallocq ((size_t) nd);
+  sbcd = (char *) malloc ((size_t) nd);
+  if (sbcd == NULL) return -1;
   for (i = 0; i < n; ++i) {         /* loop over input lines */
     if (fgetstr(card, NCARD, lu) <= 0)
       break;                    /* end file */
@@ -965,3 +968,49 @@ bcd_t i2bcd(int ival)
   }
   return (bcd_t)ival;
 } /* i2bcd */
+
+/* Implementations moved here from slibgcc.c */
+
+int chtime(char str[], const int N)
+{ /* Append 24-char timestamp to str, padded with spaces. */
+#define NCTIME 24
+  char buffer[32];
+  time_t curtime;
+  struct tm *loctime;
+  int k, n;
+  n = N;
+  curtime = time(NULL);
+  loctime = localtime(&curtime);
+  if (loctime != NULL) {
+    strftime(buffer, sizeof(buffer), "%a %b %d %H:%M:%S %Y", loctime);
+    k = (int)strlen(str);
+    n -= NCTIME + 2;
+    while (k < n) str[k++] = ' ';
+    str += n;
+    memcpy(str, buffer, (size_t)24);
+    str[NCTIME] = '\n'; str[NCTIME + 1] = '\0';
+  }
+  return 0;
+} /* chtime */
+
+int fgetstr(char *buffer, const int N, FILE *stream)
+{ /* Read one line, strip trailing whitespace; return non-space length or -1 on EOF. */
+  int k, n;
+  n = N;
+  if (stream == NULL || fgets(buffer, n, stream) == NULL) {
+    buffer[0] = '\0';
+    return -1;
+  }
+  k = n = 0;
+  char *pbuf;
+  for (pbuf = buffer; *pbuf != '\0' && *pbuf != '\n'; ++pbuf) {
+    ++k;
+    if (*pbuf != ' ' && !iscntrl((unsigned char)*pbuf)) n = k;
+  }
+  if (*pbuf == '\0') {
+    int c;
+    do { c = fgetc(stream); } while (c != (int)'\n' && c != EOF);
+  }
+  buffer[n] = '\0';
+  return n;
+} /* fgetstr */

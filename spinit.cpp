@@ -13,6 +13,7 @@
 #include "spinit.h"
 #include "spinv_internal.h"
 #include "SpinvContext.hpp"
+#include "CalError.hpp"
 
 /*@null@*/ static ITMIX *itmix_head = NULL;
 /*@null@*/ static SITOT *ithead = NULL;
@@ -170,7 +171,7 @@ void setzitot(struct SpinvContext *ctx, int lv1, int lv2, int lvt, int ii, int n
   }
   if (pret == NULL) return;
   /* allocate container object for calculation */
-  pitot = (SITOT *)mallocq(sizeof(SITOT));
+  pitot = (SITOT *)calalloc(sizeof(SITOT));
   pitot->next = ithead; ithead = pitot;
   pitot->ii = ii; pitot->ltot = ltot;
   pitot->lv1 = lv1; pitot->lv2 = lv2;
@@ -178,7 +179,7 @@ void setzitot(struct SpinvContext *ctx, int lv1, int lv2, int lvt, int ii, int n
   /* find dimensions: */
   /* nn = total number of matrix elements, kblk = number of matrices */
   itmax = pret->nitot; kblk = itmax * (lvt + 1);
-  pitot->ioff = (int *)mallocq((size_t)kblk * sizeof(int));
+  pitot->ioff = (int *)calalloc((size_t)kblk * sizeof(int));
   pitot->ioff[0] = -1;
   ifhalf = (ii * neqi) & 1;
   nn = 0; itbase = pret->mix;
@@ -197,15 +198,15 @@ void setzitot(struct SpinvContext *ctx, int lv1, int lv2, int lvt, int ii, int n
   }
   ipnow = NULL; jpnow = NULL;
   pitot->pret = pret;
-  pitot->val = (double *) mallocq((size_t)nn * sizeof(double));
+  pitot->val = (double *) calalloc((size_t)nn * sizeof(double));
   pitot->val[0] = 0.;
   dcopy(nn, &zero, 0, pitot->val, 1);
   /* set up scratch vector */
-  twk = (double *)mallocq(pret->nditot * sizeof(double));
+  twk = (double *)calalloc(pret->nditot * sizeof(double));
   twk[0] = 0.;
   nm1 = neqi - 1; nt = neqi + nm1; nm2 = nm1 - 1;
   /* allocate space for spin tensor quanta */
-  iscomv = (int *)mallocq((size_t)(3 * nt) * sizeof(int));
+  iscomv = (int *)calalloc((size_t)(3 * nt) * sizeof(int));
   jscomv = &iscomv[nt]; lscomv = &jscomv[nt];
   for (k = nm1; k < nt; ++k) {
     iscomv[k] = ii; jscomv[k] = ii;
@@ -371,8 +372,7 @@ void setzitot(struct SpinvContext *ctx, int lv1, int lv2, int lvt, int ii, int n
   free(twk);
 } /* setzitot */
 
-ITMIX *get_itmix(ii, neqi)
-const int ii, neqi;
+ITMIX *get_itmix(const int ii, const int neqi)
 {
   ITMIX *pret;
   EITMIX *pitmix;
@@ -389,12 +389,12 @@ const int ii, neqi;
   }
   if (neqi < 2 || ii <= 0) return NULL;
   /* allocate container and its elements */
-  pret = (ITMIX *)mallocq(sizeof(ITMIX));
+  pret = (ITMIX *)calalloc(sizeof(ITMIX));
   pret->next = itmix_head; itmix_head = pret; pret->ii = ii;
   pret->neqi = neqi;
   iend = neqi * ii; ibgn = iend & 1;
   nq = iend - ibgn + 2; ntot = nq >> 1; pret->nitot = ntot;
-  pret->mix = (EITMIX *)mallocq((size_t) ntot * sizeof(EITMIX));
+  pret->mix = (EITMIX *)calalloc((size_t) ntot * sizeof(EITMIX));
   if (fc_neqi != neqi) {
     zrfc[0] = 1.; zifc[0] = 0.;
     sum = 2. * acos(-1.) / neqi;
@@ -406,7 +406,7 @@ const int ii, neqi;
   }
   nm1 = neqi - 1; nm2 = nm1 - 1; nl = (size_t) nm1 * sizeof(short);
   itpair = &itpairs[nm2 * nm2 + nm2];
-  swk = (short *)mallocq((size_t)(neqi << 2) * sizeof(short));
+  swk = (short *)calalloc((size_t)(neqi << 2) * sizeof(short));
   ixx = swk; ix = &ixx[nm1]; ix[0] = 0;
   for (k = 0; k < neqi; ++k) {
     ix[k + nm1] = (short)ii;
@@ -430,7 +430,7 @@ const int ii, neqi;
       --k;
     ix[k] += 2;
   } while (ix[0] <= ixx[0]);
-  pret->qnv = (short *)mallocq((size_t)(ntot * (nm1 + 2)) * sizeof(short));
+  pret->qnv = (short *)calalloc((size_t)(ntot * (nm1 + 2)) * sizeof(short));
   pret->qnv[0] = (short) 0; qn = pret->qnv;  qn0 = qn;
   pitmix = itmix_head->mix; pitmix->neven = 0; pitmix->n = 0; pitmix->qn = qn;
   pitmix->offset = qn; pitmix->qsym = qn;
@@ -498,7 +498,7 @@ const int ii, neqi;
   }
   nl = (size_t)(ns + ns); itmix_head->nditot = nl;
   qn = NULL; qn0 = NULL; ixx = NULL; ix = NULL;
-  itmix_head->eigvecv = (double *)mallocq((size_t)neigv * sizeof(double));
+  itmix_head->eigvecv = (double *)calalloc((size_t)neigv * sizeof(double));
   eigvec = itmix_head->eigvecv; pitmix = itmix_head->mix;
   *eigvec = 1.; pitmix->eigvec = eigvec;
   if (neqi == 2) {
@@ -509,8 +509,8 @@ const int ii, neqi;
     free (swk);
     return itmix_head;
   }
-  eigval = (double *)mallocq(nl * sizeof(double));
-  iqsep  = (short *) mallocq(nl * sizeof(short));
+  eigval = (double *)calalloc(nl * sizeof(double));
+  iqsep  = (short *) calalloc(nl * sizeof(short));
   eigval[0] = 0.;
   twk = &eigval[ns];
   ns = neqi >> 1; nitot = 0;
@@ -533,8 +533,7 @@ const int ii, neqi;
         if (k == i) continue;
         val -= ctrans(k, i, ii, qn, neqi, swk);
         if (fabs(val) > 1.e-10) {
-          puts(" center Itot matrix not symmetric");
-          exit(EXIT_FAILURE);
+          throw NumericError("center Itot matrix not symmetric", CalErrorCode::SpinDimensioning);
         }
       }
     }
@@ -581,8 +580,7 @@ const int ii, neqi;
           sum += val * eiga[i];
           val += ctrans(j + ioff, i, ii, qn0, neqi, swk);
           if (fabs(val) > 1.e-10) {
-            puts(" non-center Itot matrix is not antisymmetric");
-            exit(EXIT_FAILURE);
+            throw NumericError("non-center Itot matrix is not antisymmetric", CalErrorCode::SpinDimensioning);
           }
         }
         sum *= cfac;
@@ -605,9 +603,7 @@ const int ii, neqi;
   return itmix_head;
 } /* get_itmix */
 
-double ctrans(i1, i2, ii, qn, nqsym, swk)
-int i1, i2, ii, nqsym;
-short *qn, *swk;
+double ctrans(int i1, int i2, int ii, short *qn, int nqsym, short *swk)
 {
   short *qn1, *qn2, *iperm, *mv, *m;
   double val, ele, fac;

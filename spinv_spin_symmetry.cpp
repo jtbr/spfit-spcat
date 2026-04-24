@@ -30,6 +30,7 @@ getmask(): Creates a selection mask for dircos based on K, L, and I<sub>tot</sub
 #include "spinit.h"
 #include "spinv_internal.h"
 #include "SpinvContext.hpp"
+#include "CalError.hpp"
 
 /**
  * @brief Parses BCD encoded spin quantum numbers and associates them with a vibrational state.
@@ -109,10 +110,7 @@ int getsp(struct SpinvContext *ctx, const bcd_t *ispnx, SVIB *pvinfo)
   nsstat = (int)nl;
   i = (int)(nsstat << ctx->glob.msshft);
   if (i < 0 || (size_t)(i >> ctx->glob.msshft) != nl)
-  {
-    puts("spin problem too big");
-    exit(EXIT_FAILURE);
-  }
+    throw InputError("spin problem too big", CalErrorCode::SpinDimensioning);
   nitot = 0;
   iret = nspinv;
   i = pvinfo->gsym;
@@ -158,9 +156,9 @@ int getsp(struct SpinvContext *ctx, const bcd_t *ispnx, SVIB *pvinfo)
     ssp_now = ssp_now->next;
   } while (ssp_now != NULL);
   nl = (size_t)(nsstat + 1) * (size_t)nset * sizeof(short);
-  jjs = (short *)mallocq(nl);
+  jjs = (short *)calalloc(nl);
   nl = sizeof(SSP);
-  ssp_now = (SSP *)mallocq(nl);
+  ssp_now = (SSP *)calalloc(nl);
   ssp_now->next = ctx->ssp_head.next;
   ctx->ssp_head.next = ssp_now;
   ssp_now->sspt = jjs;
@@ -254,10 +252,7 @@ void setsp(struct SpinvContext *ctx)
         ns *= ival;
       }
       if (i < ctx->nspin)
-      {
-        puts("spins under Itot should be the same");
-        exit(EXIT_FAILURE);
-      }
+        throw InputError("spins under Itot should be the same", CalErrorCode::SpinDimensioning);
       pitmix0 = get_itmix(ii, nitot);
       if (nitot < 3)
         pitmix0 = NULL;

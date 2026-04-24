@@ -9,11 +9,33 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <climits>
+#include <chrono>
 #include "CalCat.hpp"
 #include "calpgm.h"
+#include "CalError.hpp"
 
 #define PR_DELAY 6
 #define NCARD 130
+
+/* chrono-based replacement for caldelay(delay_seconds). */
+static bool calcat_delay(int delay_seconds)
+{
+    using clock = std::chrono::steady_clock;
+    static clock::time_point next_time = clock::now();
+    static int last_delay = -1;
+    auto now = clock::now();
+    if (delay_seconds != last_delay) {
+        last_delay = delay_seconds;
+        next_time = now + std::chrono::seconds(delay_seconds);
+        return delay_seconds <= 0;
+    }
+    if (now >= next_time) {
+        next_time += std::chrono::seconds(delay_seconds);
+        return true;
+    }
+    return false;
+}
 
 CalCat::CalCat(std::unique_ptr<CalculationEngine> &calc_engine,
                FILE *luout, FILE *lucat, FILE *luegy, FILE *lustr)
@@ -146,33 +168,33 @@ bool CalCat::setupBlocks(const CalCatInput &input)
   size_t nl, nlsq;
 
   /* Make working copies of input arrays */
-  m_par = (double *)mallocq((size_t)m_npar * sizeof(double));
+  m_par = (double *)calalloc((size_t)m_npar * sizeof(double));
   memcpy(m_par, input.par.data(), (size_t)m_npar * sizeof(double));
 
-  m_derv = (double *)mallocq((size_t)m_npar * sizeof(double));
+  m_derv = (double *)calalloc((size_t)m_npar * sizeof(double));
   memcpy(m_derv, input.derv.data(), (size_t)m_npar * sizeof(double));
 
   nl = (size_t)(m_npar * input.ndbcd);
-  m_idpar = (bcd_t *)mallocq(nl);
+  m_idpar = (bcd_t *)calalloc(nl);
   memcpy(m_idpar, input.idpar.data(), nl);
 
-  m_var = (double *)mallocq(input.var.size() * sizeof(double));
+  m_var = (double *)calalloc(input.var.size() * sizeof(double));
   memcpy(m_var, input.var.data(), input.var.size() * sizeof(double));
 
-  m_dip = (double *)mallocq((size_t)m_ndip * sizeof(double));
+  m_dip = (double *)calalloc((size_t)m_ndip * sizeof(double));
   memcpy(m_dip, input.dip.data(), (size_t)m_ndip * sizeof(double));
 
   nl = (size_t)(m_ndip * NDECDIP);
-  m_idip = (bcd_t *)mallocq(nl);
+  m_idip = (bcd_t *)calalloc(nl);
   memcpy(m_idip, input.idip.data(), nl);
 
-  m_nvdip = (int *)mallocq((size_t)m_ndip * sizeof(int));
+  m_nvdip = (int *)calalloc((size_t)m_ndip * sizeof(int));
   memcpy(m_nvdip, input.nvdip.data(), (size_t)m_ndip * sizeof(int));
 
-  m_isimag = (int *)mallocq((size_t)m_ndip * sizeof(int));
+  m_isimag = (int *)calalloc((size_t)m_ndip * sizeof(int));
   memcpy(m_isimag, input.isimag.data(), (size_t)m_ndip * sizeof(int));
 
-  m_iqnfmtv = (int *)mallocq((size_t)(m_nfmt << 1) * sizeof(int));
+  m_iqnfmtv = (int *)calalloc((size_t)(m_nfmt << 1) * sizeof(int));
   memcpy(m_iqnfmtv, input.iqnfmtv.data(), (size_t)(m_nfmt << 1) * sizeof(int));
 
   /* Resolve npdip from input — re-derive from npdip and prstr flags */
@@ -206,11 +228,7 @@ bool CalCat::setupBlocks(const CalCatInput &input)
   }
   m_newfmt = m_iqnfmtv[m_nfmt];
 
-  int nsize_p;
-  {
-    size_t nl_tmp;
-    nsize_p = maxmem(&nl_tmp);
-  }
+  int nsize_p = INT_MAX;
   if (m_nfit > nsize_p || m_nfit <= 0) {
     puts(" memory allocation error for var matrix");
     return false;
@@ -226,14 +244,14 @@ bool CalCat::setupBlocks(const CalCatInput &input)
   m_lblk = m_nbkpj * (m_lblk + 1);
 
   nl = (size_t)m_maxdm * sizeof(double);
-  m_pmix = (double *)mallocq(nl);
+  m_pmix = (double *)calalloc(nl);
   m_pmix[0] = 1.;
 
   nlsq = nl * (size_t)m_maxdm;
-  m_s = (double **)mallocq((size_t)m_npdip * sizeof(double *));
-  m_s[0] = (double *)mallocq(nlsq);
+  m_s = (double **)calalloc((size_t)m_npdip * sizeof(double *));
+  m_s[0] = (double *)calalloc(nlsq);
   for (int k = 1; k < m_npdip; ++k) {
-    m_s[k] = (double *)mallocq(nlsq);
+    m_s[k] = (double *)calalloc(nlsq);
   }
 
   /* set up DIAG, NSAV */
@@ -269,12 +287,8 @@ bool CalCat::setupBlocks(const CalCatInput &input)
   nl = (size_t)m_maxdm;
   nl = ((size_t)m_ndel + nl) * nl;
   {
-    size_t nlsq_avail;
-    maxmem(&nlsq_avail);
-    nlsq_avail = nlsq_avail / nl;
+    /* Assume plenty of address space; cap only against NDHEAPC if defined. */
     m_nbsav = m_nsav;
-    if (nlsq_avail < (size_t)m_nbsav)
-      m_nbsav = (int)nlsq_avail;
   }
   nlsq = nl * sizeof(double);
 #ifdef NDHEAPC
@@ -296,14 +310,14 @@ bool CalCat::setupBlocks(const CalCatInput &input)
 
   SBLK *pblk = m_blk;
   for (int i = 0; i <= m_nbsav; ++i) {
-    pblk->egyblk = (double *)mallocq(nl);
+    pblk->egyblk = (double *)calalloc(nl);
     if (m_diag) {
-      pblk->eigblk = (double *)mallocq(nlsq);
+      pblk->eigblk = (double *)calalloc(nlsq);
     }
     ++pblk;
   }
   pblk = NULL;
-  rqexit(1);
+  m_sigint_flag = std::make_unique<SigintFlag>();
 
   /* set up intensity constants */
   m_tmc = -m_tmc;
@@ -356,7 +370,7 @@ bool CalCat::computeCatalog(const CalCatInput &/*input*/, CalCatOutput &output)
     first = m_prfrq;
     int j = (iblk - 1) / m_nbkpj;
     if ((iblk - j * m_nbkpj) == 1) {
-      if (rqexit(0) != 0)
+      if (m_sigint_flag && m_sigint_flag->triggered())
         break;
       SBLK *pblk = m_blk;
       int jblk = iblk + m_nbkpj - m_nsav;
@@ -365,7 +379,7 @@ bool CalCat::computeCatalog(const CalCatInput &/*input*/, CalCatOutput &output)
           pblk->ixblk = 0;
         ++pblk;
       }
-      if (caldelay(PR_DELAY) != 0) {
+      if (calcat_delay(PR_DELAY) != 0) {
         printf(" STARTING QUANTUM %3d\n", j);
         fflush(stdout);
       }
@@ -548,7 +562,7 @@ bool CalCat::computeCatalog(const CalCatInput &/*input*/, CalCatOutput &output)
       double *dvec_str = dvec_local;
       double *dvec_alloc = NULL;
       if (m_npdip > 10) {
-        dvec_alloc = (double *)mallocq((size_t)m_npdip * sizeof(double));
+        dvec_alloc = (double *)calalloc((size_t)m_npdip * sizeof(double));
         dvec_str = dvec_alloc;
       }
       for (int i = 0; i < isiz; ++i) {

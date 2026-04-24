@@ -33,13 +33,13 @@ endif()
 # This list is used for set_source_files_properties
 set(SOURCE_FILES
     fit_main.cpp
-    subfit.c
-    spinv_setup.c
-    spinv_spin_symmetry.c
+    subfit.cpp
+    spinv_setup.cpp
+    spinv_spin_symmetry.cpp
     spinv_linalg_sort.c
-    spinv_hamiltonian.c
-    spinv_utils.c
-    spinit.c
+    spinv_hamiltonian.cpp
+    spinv_utils.cpp
+    spinit.cpp
     CalFit.cpp
     CalFitIO.cpp
     SpinvEngine.cpp
@@ -58,13 +58,15 @@ set(SOURCE_FILES
     iambak.c
     ulib.c
     cnjj.c
-    slibgcc.c
     lsqfit.c
     dblas.c    # dblas.c is in this list
-    dpi.c
+    dpi.cpp
     ftran.c
-    catutil.c  # Added missing common files
-    readopt.c  # Added missing common files
+    catutil.c
+    readopt.c
+    Logger.cpp
+    SigintFlag.cpp
+    file_helpers.cpp
 )
 
 set_source_files_properties(${SOURCE_FILES} PROPERTIES COMPILE_FLAGS "-Wno-missing-field-initializers")
@@ -119,23 +121,25 @@ if("spfit" IN_LIST EXECUTABLES)
     CalFit.cpp
     CalFit_helpers.cpp
     CalFitIO.cpp
-    subfit.c
-    spinv_setup.c
-    spinv_spin_symmetry.c
+    subfit.cpp
+    spinv_setup.cpp
+    spinv_spin_symmetry.cpp
     spinv_linalg_sort.c
-    spinv_hamiltonian.c
-    spinv_utils.c
-    spinit.c
-    dpi.c
+    spinv_hamiltonian.cpp
+    spinv_utils.cpp
+    spinit.cpp
+    dpi.cpp
     SpinvEngine.cpp
     DpiEngine.cpp
     catutil.c
     ulib.c
     cnjj.c
-    slibgcc.c
     lsqfit.c
     # dblas.c removed - macro handles it
     ftran.c
+    Logger.cpp
+    SigintFlag.cpp
+    file_helpers.cpp
   )
 endif()
 
@@ -147,21 +151,23 @@ if("spcat" IN_LIST EXECUTABLES)
     CalCat_helpers.cpp
     CalCatIO.cpp
     sortsub.c
-    spinv_setup.c
-    spinv_spin_symmetry.c
+    spinv_setup.cpp
+    spinv_spin_symmetry.cpp
     spinv_linalg_sort.c
-    spinv_hamiltonian.c
-    spinv_utils.c
-    spinit.c
-    dpi.c
+    spinv_hamiltonian.cpp
+    spinv_utils.cpp
+    spinit.cpp
+    dpi.cpp
     SpinvEngine.cpp
     DpiEngine.cpp
     catutil.c
     ulib.c
     cnjj.c
-    slibgcc.c
     lsqfit.c
     # dblas.c removed - macro handles it
+    Logger.cpp
+    SigintFlag.cpp
+    file_helpers.cpp
   )
 endif()
 

@@ -5,19 +5,41 @@
 /*   Herbert M. Pickett, 20 March 1989 */
 /*   Revised version in C++, 2025 for modernization */
 
-#include <cstring> // for memset
-#include <cmath>   // for fabs, sqrt
-#include "lsqfit.h" // for linear algebra functions and other definitions
-#include <stdio.h>  // for FILE and fprintf
-#include <string.h> // for strcpy
-#include <vector>   // for std::vector
-#include <algorithm>// for std::copy
+#include <cstring>
+#include <cmath>
+#include <climits>
+#include <chrono>
+#include <stdio.h>
+#include <string.h>
+#include <vector>
+#include <algorithm>
 #include "CalFitIO.hpp"
 #include "CalFit.hpp"
-#include "lsqfit.h"  // For C functions like dcopy, ddot, mallocq, etc.
-#include "calpgm.h"  // For MAXCAT, lbufof, maxmem etc.
+#include "lsqfit.h"
+#include "calpgm.h"
+#include "CalError.hpp"
 #include "SpinvEngine.hpp"
 #include "DpiEngine.hpp"
+
+/* chrono-based replacement for caldelay(delay_seconds): returns true if the
+   interval has elapsed since the last true return with the same delay. */
+static bool calfit_delay(int delay_seconds)
+{
+    using clock = std::chrono::steady_clock;
+    static clock::time_point next_time = clock::now();
+    static int last_delay = -1;
+    auto now = clock::now();
+    if (delay_seconds != last_delay) {
+        last_delay = delay_seconds;
+        next_time = now + std::chrono::seconds(delay_seconds);
+        return delay_seconds <= 0;
+    }
+    if (now >= next_time) {
+        next_time += std::chrono::seconds(delay_seconds);
+        return true;
+    }
+    return false;
+}
 
 /**
  * @brief Constructor for CalFit
@@ -205,44 +227,44 @@ bool CalFit::initializeParameters(const CalFitInput &input)
   idpar = nullptr;
 
   size_t parlbl_actual_size = (LBLEN * (size_t)m_npar + 1);
-  parlbl = (char *)mallocq(parlbl_actual_size);
+  parlbl = (char *)calalloc(parlbl_actual_size);
   if (!parlbl)
   {
-    perror("mallocq for parlbl failed");
+    perror("calalloc for parlbl failed");
     return false;
   }
 
-  par = (double *)mallocq((size_t)m_npar * sizeof(double));
+  par = (double *)calalloc((size_t)m_npar * sizeof(double));
   if (!par)
   {
-    perror("mallocq for par failed");
+    perror("calalloc for par failed");
     free(parlbl);
     return false;
   }
 
-  oldpar = (double *)mallocq((size_t)m_npar * sizeof(double));
+  oldpar = (double *)calalloc((size_t)m_npar * sizeof(double));
   if (!oldpar)
   {
-    perror("mallocq for oldpar failed");
+    perror("calalloc for oldpar failed");
     free(parlbl);
     free(par);
     return false;
   }
 
-  erp = (double *)mallocq((size_t)m_npar * sizeof(double));
+  erp = (double *)calalloc((size_t)m_npar * sizeof(double));
   if (!erp)
   {
-    perror("mallocq for erp failed");
+    perror("calalloc for erp failed");
     free(parlbl);
     free(par);
     free(oldpar);
     return false;
   }
 
-  erpar = (double *)mallocq((size_t)m_npar * sizeof(double));
+  erpar = (double *)calalloc((size_t)m_npar * sizeof(double));
   if (!erpar)
   {
-    perror("mallocq for erpar failed");
+    perror("calalloc for erpar failed");
     free(parlbl);
     free(par);
     free(oldpar);
@@ -251,11 +273,11 @@ bool CalFit::initializeParameters(const CalFitInput &input)
   }
 
   size_t idpar_actual_size = ((size_t)m_npar * m_ndbcd + m_ndbcd + 3);
-  idpar = (bcd_t *)mallocq(idpar_actual_size * sizeof(bcd_t));  // sizeof(bcd_t) == 1
+  idpar = (bcd_t *)calalloc(idpar_actual_size * sizeof(bcd_t));  // sizeof(bcd_t) == 1
   if (!idpar)
   {
 
-    perror("mallocq for idpar failed");
+    perror("calalloc for idpar failed");
     free(parlbl);
     free(par);
     free(oldpar);
@@ -343,8 +365,7 @@ bool CalFit::initializeParameters(const CalFitInput &input)
   {
     ndfit = m_nfit + 1;
 
-    size_t nl_maxmem_dummy;
-    m_nsize_p = maxmem(&nl_maxmem_dummy);
+    m_nsize_p = INT_MAX;
     if (ndfit > m_nsize_p)
     {
       // if (lufit)
@@ -353,50 +374,50 @@ bool CalFit::initializeParameters(const CalFitInput &input)
       return false;
     }
 
-    iperm = (int *)mallocq((size_t)m_nfit * sizeof(int));
+    iperm = (int *)calalloc((size_t)m_nfit * sizeof(int));
     if (!iperm)
     {
       // if (lufit)
-      //   fprintf(lufit, "ERROR: mallocq for iperm failed.\n");
-      perror("mallocq for iperm failed");
+      //   fprintf(lufit, "ERROR: calalloc for iperm failed.\n");
+      perror("calalloc for iperm failed");
       return false;
     }
 
-    dpar = (double *)mallocq((size_t)ndfit * sizeof(double));
+    dpar = (double *)calalloc((size_t)ndfit * sizeof(double));
     if (!dpar)
     {
       // if (lufit)
-      //   fprintf(lufit, "ERROR: mallocq for dpar failed.\n");
-      perror("mallocq for dpar failed");
+      //   fprintf(lufit, "ERROR: calalloc for dpar failed.\n");
+      perror("calalloc for dpar failed");
       return false;
     }
 
-    delbgn = (double *)mallocq((size_t)m_nfit * sizeof(double));
+    delbgn = (double *)calalloc((size_t)m_nfit * sizeof(double));
     if (!delbgn)
     {
       // if (lufit)
-      //   fprintf(lufit, "ERROR: mallocq for delbgn failed.\n");
-      perror("mallocq for delbgn failed");
+      //   fprintf(lufit, "ERROR: calalloc for delbgn failed.\n");
+      perror("calalloc for delbgn failed");
       return false;
     }
 
     size_t standard_packed_elements = ((size_t)m_nfit * ((size_t)m_nfit + 1)) / 2;
 
-    fitbgn = (double *)mallocq(standard_packed_elements * sizeof(double));
+    fitbgn = (double *)calalloc(standard_packed_elements * sizeof(double));
     if (!fitbgn)
     {
       // if (lufit)
-      //   fprintf(lufit, "ERROR: mallocq for fitbgn failed.\n");
-      perror("mallocq for fitbgn failed");
+      //   fprintf(lufit, "ERROR: calalloc for fitbgn failed.\n");
+      perror("calalloc for fitbgn failed");
       return false;
     }
 
-    var = (double *)mallocq(standard_packed_elements * sizeof(double));
+    var = (double *)calalloc(standard_packed_elements * sizeof(double));
     if (!var)
     {
       // if (lufit)
-      //   fprintf(lufit, "ERROR: mallocq for var failed.\n");
-      perror("mallocq for var failed");
+      //   fprintf(lufit, "ERROR: calalloc for var failed.\n");
+      perror("calalloc for var failed");
       return false;
     }
 
@@ -420,21 +441,21 @@ bool CalFit::initializeParameters(const CalFitInput &input)
     }
 
     size_t oldfit_elements = standard_packed_elements + (size_t)m_nfit;
-    oldfit = (double *)mallocq(oldfit_elements * sizeof(double));
+    oldfit = (double *)calalloc(oldfit_elements * sizeof(double));
     if (!oldfit)
     {
       // if (lufit)
-      //   fprintf(lufit, "ERROR: mallocq for oldfit failed.\n");
-      perror("mallocq for oldfit failed");
+      //   fprintf(lufit, "ERROR: calalloc for oldfit failed.\n");
+      perror("calalloc for oldfit failed");
       return false;
     }
 
-    fit = (double *)mallocq((size_t)m_nfit * (size_t)ndfit * sizeof(double));
+    fit = (double *)calalloc((size_t)m_nfit * (size_t)ndfit * sizeof(double));
     if (!fit)
     {
       // if (lufit)
-      //   fprintf(lufit, "ERROR: mallocq for fit failed.\n");
-      perror("mallocq for fit failed");
+      //   fprintf(lufit, "ERROR: calalloc for fit failed.\n");
+      perror("calalloc for fit failed");
       return false;
     }
 
@@ -787,12 +808,12 @@ bool CalFit::processLinesAndSetupBlocks(const CalFitInput &input)
   pmix = nullptr;
 
   size_t maxdm_sq_elements = (size_t)m_maxdm_actual * (size_t)m_maxdm_actual;
-  teig = (double *)mallocq(maxdm_sq_elements * sizeof(double));
+  teig = (double *)calalloc(maxdm_sq_elements * sizeof(double));
   if (!teig)
   {
     // if (lufit)
-    //   fprintf(lufit, "ERROR: mallocq for teig failed.\n");
-    perror("mallocq for teig failed");
+    //   fprintf(lufit, "ERROR: calalloc for teig failed.\n");
+    perror("calalloc for teig failed");
     return false;
   }
 
@@ -813,12 +834,12 @@ bool CalFit::processLinesAndSetupBlocks(const CalFitInput &input)
   }
   else if (pmix_block_elements > 0)
   {
-    pmix = (double *)mallocq(pmix_block_elements * sizeof(double));
+    pmix = (double *)calalloc(pmix_block_elements * sizeof(double));
     if (!pmix)
     {
       // if (lufit)
-      //   fprintf(lufit, "ERROR: mallocq for pmix failed.\n");
-      perror("mallocq for pmix failed");
+      //   fprintf(lufit, "ERROR: calalloc for pmix failed.\n");
+      perror("calalloc for pmix failed");
       free(teig);
       teig = nullptr; // Clean up teig if pmix fails
       return false;
@@ -831,7 +852,7 @@ bool CalFit::processLinesAndSetupBlocks(const CalFitInput &input)
     pmix = nullptr;
   }
 
-  rqexit(1); // Initialize/reset interrupt flag system (from calpgm.h, ulib.c)
+  m_sigint_flag = std::make_unique<SigintFlag>(); // install SIGINT handler
 
   return true;
 }
@@ -1016,7 +1037,7 @@ bool CalFit::performIteration(const CalFitInput &input, CalFitOutput &output)
       line_idx = getdbk(&lnext_getdbk, &iblk, &idx_getdbk_local, &initl_getdbk, &ifac); // Get next line info
       if (iblk != lblk)
       { // New block
-        if (rqexit(0) != 0)
+        if ((m_sigint_flag && m_sigint_flag->triggered() ? 1 : 0) != 0)
           break; // Check for user interrupt
 
         // Get block quantum numbers and size
@@ -1034,7 +1055,7 @@ bool CalFit::performIteration(const CalFitInput &input, CalFitOutput &output)
         }
 
         k_loop = (iblk - 1) / m_nblkpf_actual; // Assuming m_nblkpf_actual is F step
-        if (lstf != k_loop && caldelay(PR_DELAY) != 0)
+        if (lstf != k_loop && calfit_delay(PR_DELAY) != 0)
         {
           printf("Starting Quantum %3d\n", k_loop);
           fflush(stdout);
@@ -1056,7 +1077,7 @@ bool CalFit::performIteration(const CalFitInput &input, CalFitOutput &output)
 
     } while (lnext_getdbk != 0); // Repeat until no more energies needed for lines
 
-    if (rqexit(0) != 0 && lnext_getdbk != 0)
+    if ((m_sigint_flag && m_sigint_flag->triggered() ? 1 : 0) != 0 && lnext_getdbk != 0)
     { // Exited loop due to interrupt but not finished
       // if (lufit)
       //   fprintf(lufit, "Iteration interrupted by user.\n");
@@ -1116,7 +1137,7 @@ bool CalFit::performIteration(const CalFitInput &input, CalFitOutput &output)
 
     do
     { // Loop over lines (line_idx from 1 to m_nline)
-      if (icnt_progress <= 0 && caldelay(PR_DELAY) != 0)
+      if (icnt_progress <= 0 && calfit_delay(PR_DELAY) != 0)
       {
         printf("Fitting Line %d\n", line_idx);
         fflush(stdout);

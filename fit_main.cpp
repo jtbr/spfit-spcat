@@ -28,12 +28,12 @@
 #include <string>
 #include <math.h>
 #include <stdlib.h>
-//#include "calpgm.h"
 #include "lsqfit.h"
 #include "SpinvEngine.hpp"
 #include "DpiEngine.hpp"
 #include "CalFit.hpp"
 #include "CalFitIO.hpp"
+#include "file_helpers.hpp"
 
 /**
  * @brief Main function for SPFIT - Spectroscopic Parameter Fitting program
@@ -105,7 +105,7 @@ int main(int argc, char *argv[])
   printf("Using %s engine.\n", engineType.c_str());
 
   // Get filenames
-  filget(argc, argv, NFILE, fname, ext); // fname[epar]="base.par", etc.
+  file_helpers::parse_file_args(argc, argv, NFILE, fname, ext); // fname[epar]="base.par", etc.
 
   // Backup .par file to .bak file
   // Original: filbak(fname[epar], fname[ebak]);

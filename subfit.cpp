@@ -13,14 +13,12 @@
 #include <string.h>
 #include <math.h>
 #include "calpgm.h"
+#include "CalError.hpp"
+#include "file_helpers.hpp"
 
 #define NCARD 130
 
-int getlbl(npar, idpar, parlbl, fil, idiv, lblen)
-int npar, idiv, lblen;
-bcd_t *idpar;
-char *parlbl;
-const char* fil;
+int getlbl(int npar, bcd_t *idpar, char *parlbl, const char *fil, int idiv, int lblen)
 {
 
   static int ipwr[] = {0, 100, 10000};
@@ -64,7 +62,7 @@ const char* fil;
   while (kbgn <= kend) {
     /*   open file of parameter names */
     if (jdiv <= 0) {
-      lu = fopenq(pname, "l");
+      lu = file_helpers::open_input_optional(pname);
       if (lu == NULL)
         break;
       /* first line contains divisor to ignore lower digits of ID */
@@ -117,19 +115,17 @@ const char* fil;
   return 0;
 }                               /* getlbl */
 
-int filbak(flu, fbak)
-char *flu;
-char *fbak;
+int filbak(char *flu, char *fbak)
 {
   /*     FLU= input file name (.par) */
   /*     FBAK =backup file name (.bak) */
   FILE *lu, *lubak;
   char cline[NCARD];
 
-  lu = fopenq(flu, "r");
+  lu = fopen(flu, "r");
   if (!lu) return 1;
-  lubak = fopenq(fbak, "w");
-  if (!lubak) return 1;
+  lubak = fopen(fbak, "w");
+  if (!lubak) { fclose(lu); return 1; }
   while (fgets(cline, NCARD, lu)) {
     fputs(cline, lubak);
   }
@@ -265,7 +261,7 @@ int prcorr(FILE *lufit, int nfit, double *cor, int ndcor, double *err, int norma
   return 0;
 } /* prcorr */
 
-  SXLINE *lbufof(iflg, ipos) int iflg, ipos;
+  SXLINE *lbufof(int iflg, int ipos)
   { /*  FUNCTION TO ACCESS LINE DATA, WITH POSSIBLE STORE */
     /*  iflg = 0, then read line at abs(ipos)             */
     /*  iflg = 1, then read/write line at abs(ipos)       */
@@ -292,10 +288,7 @@ int prcorr(FILE *lufit, int nfit, double *cor, int ndcor, double *err, int norma
         return sret;
       }
       if (dheapv == NULL)
-      {
-        puts(" scratch used before initialization");
-        exit(EXIT_FAILURE);
-      }
+        throw NumericError("scratch used before initialization", CalErrorCode::ScratchFileIo);
       /* find offset from buffer origin */
       if (ipos < 0)
         ipos = -ipos;
@@ -362,10 +355,8 @@ int prcorr(FILE *lufit, int nfit, double *cor, int ndcor, double *err, int norma
         if (lpos != 0)
           lpos *= nbyte;
         if (scratch == NULL || fseek(scratch, (long) lpos, SEEK_SET) != 0
-            || (int) fwrite(pheap, nbyte, (size_t) n, scratch) != n) {
-          puts(" scratch file write error");
-          exit(EXIT_FAILURE);
-        }
+            || (int) fwrite(pheap, nbyte, (size_t) n, scratch) != n)
+          throw NumericError("scratch file write error", CalErrorCode::ScratchFileIo);
       }
     }
     if (relpos == nbuf) {
@@ -387,10 +378,8 @@ int prcorr(FILE *lufit, int nfit, double *cor, int ndcor, double *err, int norma
         if (lpos != 0)
           lpos *= nbyte;
         if (scratch == NULL || fseek(scratch, (long) lpos, SEEK_SET) != 0
-            || (int) fread(pheap, nbyte, (size_t) n, scratch) != n) {
-          printf("scratch file read error at %d\n", ipos);
-          exit(EXIT_FAILURE);
-        }
+            || (int) fread(pheap, nbyte, (size_t) n, scratch) != n)
+          throw NumericError("scratch file read error", CalErrorCode::ScratchFileIo);
       }
     }
     if (pheap != NULL)
@@ -417,7 +406,8 @@ int prcorr(FILE *lufit, int nfit, double *cor, int ndcor, double *err, int norma
       if (ndbl < 1)
         ndbl = 1;
       nbyte = (size_t) ndbl * sizeof(double);
-      maxmem(&lpos);
+      /* On 64-bit, address space is effectively unlimited for this purpose. */
+      lpos = (size_t)((long long)8 * 1024 * 1024 * 1024) / sizeof(double); /* 8 GB cap */
       lpos = lpos / (size_t) ndbl;
       nline = (size_t) ipos;
       if (lpos < nline)
@@ -432,9 +422,9 @@ int prcorr(FILE *lufit, int nfit, double *cor, int ndcor, double *err, int norma
 #endif
       nbuf = (int) nline - 1;
       lpos = nline * nbyte;
-      dheap = (double *) mallocq(lpos);
+      dheap = (double *) calalloc(lpos);
       lpos = (size_t) nbuf *sizeof(double *);
-      dheapv = (double **) mallocq(lpos);
+      dheapv = (double **) calalloc(lpos);
       k = 0;
       pheap = dheap;
       do {
@@ -451,12 +441,9 @@ int prcorr(FILE *lufit, int nfit, double *cor, int ndcor, double *err, int norma
   return sret;
 } /* lbufof */
 
-void dnuadd(npar, nparx, initl, indx, ifac, egy, egyder, nsize, line, par,
-            fac)
-int npar, nparx, initl, indx, ifac;
-double *egy, *egyder;
-int nsize, line;
-const double *par, *fac;
+void dnuadd(int npar, int nparx, int initl, int indx, int ifac,
+            double *egy, double *egyder, int nsize, int line,
+            const double *par, const double *fac)
 {                               /*     subroutine to add energies and derivatives to frequency lists */
   /*  ON INPUT: */
   /*     NPAR   = number of parameters */
@@ -509,11 +496,7 @@ const double *par, *fac;
   }
 }                               /* dnuadd */
 
-double dnuget(iflg, npar, f, line, dvec)
-int iflg, npar;
-double f;
-int line;
-double *dvec;
+double dnuget(int iflg, int npar, double f, int line, double *dvec)
 {
   SXLINE *xline;
   double frq;
@@ -543,8 +526,7 @@ double *dvec;
   return frq;
 }                               /* dnuget */
 
-int getdbk(link, iblk, indx, initl, ifac)
-int *link, *iblk, *indx, *initl, *ifac;
+int getdbk(int *link, int *iblk, int *indx, int *initl, int *ifac)
 {
   SXLINE *xline;
   int iret, init, iup, ilow;
@@ -583,10 +565,7 @@ int *link, *iblk, *indx, *initl, *ifac;
   return iret;
 }                               /* getdbk */
 
-int frqdat(line, ibln, txfrq, txwt, txerr, iqn)
-int line, *ibln;
-double *txfrq, *txwt, *txerr;
-short *iqn;
+int frqdat(int line, int *ibln, double *txfrq, double *txwt, double *txerr, short *iqn)
 {  /*  gets blend code, frequency, weight, error , and quantum numbers */
   static size_t ndqn = 2 * MAXQN * sizeof(short);
   SXLINE *xline;
@@ -599,8 +578,7 @@ short *iqn;
   return xline->ibu;
 }                               /* frqdat */
 
-int lnlink(prvblk, nblk, iblk, line)
-int *prvblk, nblk, iblk, line;
+int lnlink(int *prvblk, int nblk, int iblk, int line)
 {
   int i, last;
   SXLINE *xline;

@@ -60,6 +60,7 @@ setint(): Initializes dipole data from the .int file.
 #include "spinit.h"
 #include "spinv_internal.h"
 #include "SpinvContext.hpp"
+#include "CalError.hpp"
 
 
 /**
@@ -101,7 +102,7 @@ int setint(struct SpinvContext* ctx, FILE *lu, BOOL *ifdiag, int *nsav, const in
     free(ctx->dipinfo);
     ctx->dipinfo = NULL;
   }
-  ctx->dipinfo = (SDIP *)mallocq((size_t)ndip * sizeof(SDIP));
+  ctx->dipinfo = (SDIP *)calalloc((size_t)ndip * sizeof(SDIP));
   ctx->dipinfo0.fac = 0.;
   memcpy(ctx->dipinfo, &ctx->dipinfo0, sizeof(SDIP));
   ctx->nddip = ndip;
@@ -647,7 +648,7 @@ int setopt(struct SpinvContext *ctx, FILE *luin, int *nfmt, int *itd, int *nbcd,
       {
         nvibm = ivib - 1;
         nl = (size_t)ivib * sizeof(SVIB);
-        ctx->vinfo = (SVIB *)mallocq(nl);
+        ctx->vinfo = (SVIB *)calalloc(nl);
         memcpy(ctx->vinfo, &(ctx->vinfo1), sizeof(SVIB));
       }
       else
@@ -908,8 +909,7 @@ int setopt(struct SpinvContext *ctx, FILE *luin, int *nfmt, int *itd, int *nbcd,
   }
   if (k != 0)
   {
-    puts("L DOUBLETS SHOULD BE IN PAIRS");
-    exit(EXIT_FAILURE);
+    throw InputError("L DOUBLETS SHOULD BE IN PAIRS", CalErrorCode::LDoublets);
   }
   k = 0;
   pvinfo = ctx->vinfo;
@@ -938,10 +938,10 @@ int setopt(struct SpinvContext *ctx, FILE *luin, int *nfmt, int *itd, int *nbcd,
   }
   ctx->glob.nbkpj = k;
   nl = (size_t)k * sizeof(int);
-  ctx->moldv = (int *)mallocq(nl);
+  ctx->moldv = (int *)calalloc(nl);
   ctx->moldv[0] = 0;
   nl += sizeof(int);
-  ctx->blkptr = (int *)mallocq(nl);
+  ctx->blkptr = (int *)calalloc(nl);
   ctx->blkptr[0] = 0;
   k = 0;
   pvinfo = ctx->vinfo;
@@ -1529,25 +1529,25 @@ int setblk(struct SpinvContext *ctx, FILE *lu, const int npar, bcd_t *idpar, con
   if (ctx->ndmx < ii)
     ctx->ndmx = ii;
   nl = (size_t)(nsize + ctx->ndmx) * sizeof(double);
-  ctx->wk = (double *)mallocq(nl);
+  ctx->wk = (double *)calalloc(nl);
   ctx->wk[0] = 0.0;
   /* allocate space for sub-block information */
   nl = (size_t)(ctx->ndmx + 1) * sizeof(short);
-  ctx->idx = (short *)mallocq(nl);
+  ctx->idx = (short *)calalloc(nl);
   ctx->idx[0] = 0;
-  ctx->jdx = (short *)mallocq(nl);
+  ctx->jdx = (short *)calalloc(nl);
   ctx->jdx[0] = 0;
   nl = nsize * sizeof(short);
-  ctx->iqnsep = (short *)mallocq(nl);
+  ctx->iqnsep = (short *)calalloc(nl);
   ctx->iqnsep[0] = 0;
   maxblk = maxblk + maxblk;
   nl = maxblk * sizeof(short);
-  ctx->ibkptr = (short *)mallocq(nl);
+  ctx->ibkptr = (short *)calalloc(nl);
   ctx->ibkptr[0] = 0;
-  ctx->ikmin = (short *)mallocq(nl);
+  ctx->ikmin = (short *)calalloc(nl);
   ctx->ikmin[0] = 0;
   nl = (size_t)maxblk * sizeof(int);
-  ctx->ivs = (int *)mallocq(nl);
+  ctx->ivs = (int *)calalloc(nl);
   ctx->ivs[0] = 0;
   ii = ctx->glob.vibfac + 1;
   return (ii * ii);
@@ -1634,13 +1634,11 @@ int pasort(struct SpinvContext *ctx, FILE *lu, const int npar, bcd_t *idpar, con
     ctx->spfac2[i] = 0.25 * sqrt((dtmp + 1.5) / (dtmp - 0.5)) / dtmp;
   }
   /* initialize SPECFC and DIRCOS */
-  #pragma GCC diagnostic push
-  #pragma GCC diagnostic ignored "-Wdiscarded-qualifiers"
-  // zero is used as non-const in specfc & dircos but should not actually be modified with these sets of parameters
-  specfc(ctx, 0, 0, 0, 0, 0, 0, 0, &zero, &szero, &szero);
+  // zero/szero passed as non-const; these calls don't actually modify them
+  specfc(ctx, 0, 0, 0, 0, 0, 0, 0, const_cast<double *>(&zero), &szero, &szero);
   kk = 0;
-  dircos(ctx, idmy, idmy, 0, 0, 0, &zero, &szero, &szero, 0, MODD, 0, &kk);
-  #pragma GCC diagnostic pop
+  dircos(ctx, idmy, idmy, 0, 0, 0, const_cast<double *>(&zero),
+         const_cast<short *>(&szero), const_cast<short *>(&szero), 0, MODD, 0, &kk);
   ifac = ctx->glob.vibfac + 1;
   ndecv = ctx->glob.vibdec;
   ilim = ifac * ifac - 1;
@@ -1650,7 +1648,7 @@ int pasort(struct SpinvContext *ctx, FILE *lu, const int npar, bcd_t *idpar, con
     ctx->ipder = NULL;
   }
   nl = (size_t)npar * sizeof(int);
-  ctx->ipder = (int *)mallocq(nl);
+  ctx->ipder = (int *)calalloc(nl);
   initl = npar;
   kk = 1;
   ityi = 1;
@@ -1765,7 +1763,7 @@ int pasort(struct SpinvContext *ctx, FILE *lu, const int npar, bcd_t *idpar, con
       nitot = ctx->glob.nitot;
       if (spar_free == NULL)
       { /* allocate more structures */
-        spar_free = (SPAR *)mallocq(sizeof(SPAR));
+        spar_free = (SPAR *)calalloc(sizeof(SPAR));
       }
       spar_now = spar_free;
       spar_now->flags = 0;

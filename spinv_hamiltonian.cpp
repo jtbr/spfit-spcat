@@ -28,6 +28,7 @@ dpmake(): Calculates derivative contributions (d<H>/dP).
 #include "spinit.h"
 #include "spinv_internal.h"
 #include "SpinvContext.hpp"
+#include "CalError.hpp"
 
 /*****************************************************************************/
 /**
@@ -71,8 +72,7 @@ int hamx(struct SpinvContext *ctx, const int iblk, const int nsize, const int np
   BOOL newblk, firstpar; /* newblk: if new vibrational pair, re-eval Euler denoms; firstpar: first parameter for a given vib pair and symmetry */
 
   if (ctx->ndmx <= 0) { /* Check if work arrays are allocated */
-    puts("working vectors not allocated");
-    exit(EXIT_FAILURE);
+    throw NumericError("working vectors not allocated", CalErrorCode::WorkingVectorTooShort);
   }
   dbar = &ctx->wk[ctx->ndmx]; /* dbar points to a section of the work array wk, used for accumulating derivatives for a single operator */
   ndm = nsize;      /* Store nsize in ndm (leading dimension for matrix t) */
@@ -227,8 +227,7 @@ int hamx(struct SpinvContext *ctx, const int iblk, const int nsize, const int np
                             ctx->jdx, ijd, kl, mkd, &isunit);
               if (ncos <= 0) {
                 if (ncos == 0) continue; /* No non-zero elements, get next parameter */
-                printf("DIRCOS WORKING VECTOR TOO SHORT IN HAMX BY %d\n", -ncos); /* Error if ncos is negative */
-                exit(EXIT_FAILURE);
+                throw NumericError("DIRCOS WORKING VECTOR TOO SHORT IN HAMX", CalErrorCode::WorkingVectorTooShort);
               }
               if (TEST(idflags, MNOUNIT)) /* If flag says it's not a unit matrix, ensure isunit is 0 */
                 isunit = 0;
@@ -372,8 +371,7 @@ int hamx(struct SpinvContext *ctx, const int iblk, const int nsize, const int np
         /* diagonalize Hamiltonian matrix t, eigenvalues in egy, eigenvectors in t (overwriting H) */
 #if HAM_DEBUG /* Debug block to check matrix before/after diagonalization */
         nd = nsize * nsize;
-        pscr = (double *) mallocq((size_t)nd * sizeof(double)); /* Scratch space */
-        if (pscr == NULL && nd > 0) { perror("mallocq failed for pscr"); exit(EXIT_FAILURE); }
+        pscr = (double *) calalloc((size_t)nd * sizeof(double)); /* Scratch space */
         if (nd > 0) pscr[0] = t[0]; /* To use pscr if nd > 0 */
         dcopy(nd, t, 1, pscr, 1); /* Save original H */
 #endif
@@ -398,9 +396,7 @@ int hamx(struct SpinvContext *ctx, const int iblk, const int nsize, const int np
         }
 #endif
         if (nqnsep < 0) { /* Error during diagonalization */
-          printf(" diagonalization failure, err = %d in block %d, %d\n",
-                 nqnsep, iblk, nsize);
-          exit(EXIT_FAILURE);
+          throw NumericError("diagonalization failure in hamx", CalErrorCode::DiagonalizationFailed);
         }
       	switch (ctx->glob.idiag) { /* Sorting options for eigenvalues/vectors */
       	default:  /* idiag = 0: energy sort of subblock (Wang sub-blocks are sorted internally) */

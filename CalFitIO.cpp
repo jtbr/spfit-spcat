@@ -11,7 +11,8 @@
 #include <vector>    // For std::vector
 #include <math.h>
 #include "CalFitIO.hpp"
-#include "calpgm.h"  // For bcd_t, fgetstr, chtime, pcard, getpar, getvar, mallocq, MAXCAT etc.
+#include "calpgm.h"
+#include "CalError.hpp"
 
 
 /**
@@ -188,7 +189,7 @@ bool CalFitIO::readInput(const std::string &parFile, const std::string &linFile,
   // getpar will log its "PARAMETERS - A.PRIORI ERROR" header and lines to lufit_for_logging
   // `input.ndbcd_from_setopt` is the authoritative value.
   size_t idpar_elem_count = (size_t)input.npar * input.ndbcd_from_setopt + input.ndbcd_from_setopt + 3;
-  bcd_t *temp_idpar = (bcd_t *)mallocq(idpar_elem_count * sizeof(bcd_t));
+  bcd_t *temp_idpar = (bcd_t *)calalloc(idpar_elem_count * sizeof(bcd_t));
   if (!temp_idpar)
   { /* error */
     fclose(lubak_stream_for_par_content);
@@ -196,14 +197,14 @@ bool CalFitIO::readInput(const std::string &parFile, const std::string &linFile,
   }
   temp_idpar[0] = (bcd_t)input.ndbcd_from_setopt; // Set NDEC for getpar
 
-  double *temp_par = (double *)mallocq((size_t)input.npar * sizeof(double));
+  double *temp_par = (double *)calalloc((size_t)input.npar * sizeof(double));
   if (!temp_par)
   {
     free(temp_idpar);
     fclose(lubak_stream_for_par_content);
     return false;
   }
-  double *temp_erp = (double *)mallocq((size_t)input.npar * sizeof(double));
+  double *temp_erp = (double *)calalloc((size_t)input.npar * sizeof(double));
   if (!temp_erp)
   {
     free(temp_idpar);
@@ -213,7 +214,7 @@ bool CalFitIO::readInput(const std::string &parFile, const std::string &linFile,
   }
 
   size_t parlbl_size = (LBLEN * (size_t)input.npar + 1);
-  char *temp_parlbl = (char *)mallocq(parlbl_size);
+  char *temp_parlbl = (char *)calalloc(parlbl_size);
   if (!temp_parlbl)
   {
     free(temp_idpar);
@@ -245,7 +246,7 @@ bool CalFitIO::readInput(const std::string &parFile, const std::string &linFile,
   // if (input.nfit > 0)
   // {
     size_t nlsq_var_count = ((size_t)input.nfit * ((size_t)input.nfit + 1)) / 2;
-    double *temp_var = (double *)mallocq(nlsq_var_count * sizeof(double));
+    double *temp_var = (double *)calalloc(nlsq_var_count * sizeof(double));
     if (!temp_var)
     {
       fclose(lubak_stream_for_par_content);

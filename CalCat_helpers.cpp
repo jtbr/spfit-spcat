@@ -11,6 +11,7 @@
 #include <math.h>
 #include "CalCat.hpp"
 #include "calpgm.h"
+#include "CalError.hpp"
 
 int CalCat::qnfmt(short *iqu, int nqn, char *sqn)
 { /* subroutine to do quick conversion of quantum integers to characters */
@@ -110,10 +111,8 @@ SBLK *CalCat::ibufof(const int ipos, const unsigned int ndel, SBLK *blk)
   if (pmblk->egyblk == NULL) { /* write memory contents to disk */
     if (m_cache.maxrec == 0) {
       m_cache.scratch = tmpfile();
-      if (m_cache.scratch == NULL) {
-        puts("scratch file open error");
-        exit(EXIT_FAILURE);
-      }
+      if (m_cache.scratch == NULL)
+        throw NumericError("scratch file open error", CalErrorCode::ScratchFileIo);
       m_cache.nbsav = m_cache.mempos;
       m_cache.maxdm = pmblk->nsizblk;
       ldisk = (long)ndel;
@@ -157,10 +156,8 @@ SBLK *CalCat::ibufof(const int ipos, const unsigned int ndel, SBLK *blk)
         m_cache.maxrec += m_cache.lsizb;
       }
     }
-    if (lret != len) {
-      puts("heap write error ");
-      exit(EXIT_FAILURE);
-    }
+    if (lret != len)
+      throw NumericError("heap write error", CalErrorCode::ScratchFileIo);
     pdblk->nsizblk = pmblk->nsizblk;
     pdblk->ixblk = pmblk->ixblk;
     pmblk->ixblk = 0;
@@ -185,10 +182,8 @@ SBLK *CalCat::ibufof(const int ipos, const unsigned int ndel, SBLK *blk)
         lret = (long)fread(pvec, sizeof(double), (size_t)len, m_cache.scratch);
       }
     }
-    if (lret != len) {
-      puts("heap read error ");
-      exit(EXIT_FAILURE);
-    }
+    if (lret != len)
+      throw NumericError("heap read error", CalErrorCode::ScratchFileIo);
     pmblk->nsizblk = pdblk->nsizblk;
     pmblk->ixblk = pdblk->ixblk;
     pdblk->ixblk = 0;
@@ -200,7 +195,7 @@ SBLK *CalCat::sblk_alloc(const int nstruct, const unsigned mxdem)
 {
   SBLK *pret, *pblk;
   int k;
-  pret = (SBLK *)mallocq((size_t)nstruct * sizeof(SBLK));
+  pret = (SBLK *)calalloc((size_t)nstruct * sizeof(SBLK));
   pblk = pret;
   k = nstruct;
   do {

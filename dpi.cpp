@@ -14,9 +14,10 @@
 #include <stdlib.h>
 #include <math.h>
 #include <string.h>
-#include "calpgm.h" // TODO: to remove
+#include "calpgm.h"
 #include "DpiContext.hpp"
 #include "dpi.h"
+#include "CalError.hpp"
 
 /* Common Declarations */
 
@@ -70,14 +71,14 @@ int hamx_dpi(struct DpiContext *ctx, const int iblk, const int nsize, const int 
     if (npar <= 0)
       return 0;
     nl = (size_t) npar * sizeof(int);
-    ixpar = (int *) mallocq(nl);
+    ixpar = (int *) calalloc(nl);
     j = nsize << 1;
     if (j < MAXQN) j = MAXQN;
     nl = (size_t) j * sizeof(short);
-    jq = (short *) mallocq(nl);
-    iqnsep = (short *) mallocq(nl);
+    jq = (short *) calalloc(nl);
+    iqnsep = (short *) calalloc(nl);
     nl += sizeof(short);
-    isblk = (short *) mallocq(nl);
+    isblk = (short *) calalloc(nl);
     nl = (size_t) nsize;
     nl *= nl * sizeof(double);
     ioff = 0;
@@ -100,7 +101,7 @@ int hamx_dpi(struct DpiContext *ctx, const int iblk, const int nsize, const int 
       }
       ixpar[j] = (kpar << 7) + iv;
       if (kpar != 0 && wp[kpar] == NULL)
-        wp[kpar] = (double *) mallocq(nl);
+        wp[kpar] = (double *) calalloc(nl);
       if (iv == 99)
         iv = 0;
       if (kpar == 1 && iv == 0 && par[j] < 0.)
@@ -110,13 +111,13 @@ int hamx_dpi(struct DpiContext *ctx, const int iblk, const int nsize, const int 
 	    jj = kk - 4;
       if (kk == 19) --jj;
       if (wp[kk] != NULL && wp[jj] == NULL)
-        wp[jj] = (double *) mallocq(nl);
+        wp[jj] = (double *) calalloc(nl);
     }
     for (kk = 23; kk <= 26; ++kk) { /* fill in required elements */
 	    jj = kk - 3;
       if (kk == 26) --jj;
       if (wp[kk] != NULL && wp[jj] == NULL)
-        wp[jj] = (double *) mallocq(nl);
+        wp[jj] = (double *) calalloc(nl);
     }
     return nsize;
   }
@@ -398,8 +399,7 @@ int hamx_dpi(struct DpiContext *ctx, const int iblk, const int nsize, const int 
   isblk[nsize] = (short) nsize;
   ierr = hdiag(nsize, nsize, t, egy, pmix, iqnsep);
   if (ierr < 0) {
-    printf("diagonalization failure %d\n", ierr);
-    exit(EXIT_FAILURE);
+    throw NumericError("diagonalization failure in dpi hamx", CalErrorCode::DiagonalizationFailed);
   }
   ordblk(nsize, nsize, iqnsep, t, egy, isblk, pmix, jq);
   for (i = 0; i < nsize; ++i)

@@ -16,6 +16,7 @@
 // If bcd_t is from lsqfit.h or calpgm.h, ensure those are included before this file if needed by other .hpp files
 // For now, let's assume bcd_t is known. If not, include lsqfit.h or calpgm.h here.
 #include "lsqfit.h" // For bcd_t, MAXQN, etc.
+#include "SigintFlag.hpp"
 
 #define NDCARD 130
 #define LBLEN 10 // Length for parameter labels, as used in original calfit.c
@@ -165,6 +166,7 @@ private:
   double m_tiny = 1.5e-38; // from original main
 
   char m_namfil_buffer[NDCARD]; // To store namfil if needed, though input has it
+  std::unique_ptr<SigintFlag> m_sigint_flag; // SIGINT handler active during run
 
   // State for iteration loop
   int m_itr; // Current iteration count

@@ -10,6 +10,8 @@
 #include <math.h>
 #include "CalCatIO.hpp"
 #include "calpgm.h"
+#include "CalError.hpp"
+#include "file_helpers.hpp"
 
 #define NCARD 130
 #define NDVEC 10
@@ -35,7 +37,7 @@ bool CalCatIO::readInput(const std::string &intFile,
   }
 
   /* ---- Read .int file ---- */
-  FILE *luint = fopenq(const_cast<char *>(intFile.c_str()), "r");
+  FILE *luint = file_helpers::open_input_optional(intFile.c_str());
 
   /* count lines in .int file */
   for (i = 0; i >= 0; i++) {
@@ -55,7 +57,7 @@ bool CalCatIO::readInput(const std::string &intFile,
     first = (fgetstr(titl, NCARD, luint) <= 0);
   }
 
-  dvec = (double *)mallocq((size_t)NDVEC * sizeof(double));
+  dvec = (double *)calalloc((size_t)NDVEC * sizeof(double));
   dvec[0] = 0;
   dvec[1] = 999;
   dvec[2] = 1000;
@@ -149,7 +151,7 @@ bool CalCatIO::readInput(const std::string &intFile,
     input.npdip = k + 1;
     if (input.npdip > NDVEC) {
       free(dvec);
-      dvec = (double *)mallocq((size_t)input.npdip * sizeof(double));
+      dvec = (double *)calalloc((size_t)input.npdip * sizeof(double));
       dvec[0] = 0.;
     }
   }
@@ -157,7 +159,7 @@ bool CalCatIO::readInput(const std::string &intFile,
   fclose(luint); /* close .INT file */
 
   /* ---- Read .var file ---- */
-  FILE *luvar = fopenq(const_cast<char *>(varFile.c_str()), "r");
+  FILE *luvar = file_helpers::open_input_optional(varFile.c_str());
 
   input.npar = 0;
   input.catqn = MAXCAT;

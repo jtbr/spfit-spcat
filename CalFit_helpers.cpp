@@ -14,8 +14,9 @@
 #include <algorithm>// for std::copy
 #include "CalFitIO.hpp"
 #include "CalFit.hpp"
-#include "lsqfit.h"  // For C functions like dcopy, ddot, mallocq, etc.
-#include "calpgm.h"  // For MAXCAT, lbufof, maxmem etc.
+#include "lsqfit.h"
+#include "calpgm.h"
+#include "CalError.hpp"
 #include "SpinvEngine.hpp"
 #include "DpiEngine.hpp"
 
@@ -362,7 +363,7 @@ int CalFit::lineix(FILE *lu, int flg, int nline, int nblkpf, int iqnfmt)
 
   nbad = 0;
   nblk = 0;
-  prvblk = (int *)mallocq((size_t)(nsort + 1) * sizeof(int));
+  prvblk = (int *)calalloc((size_t)(nsort + 1) * sizeof(int));
   prvblk[0] = 0;
   for (i = 1; i <= nsort; ++i)
   {

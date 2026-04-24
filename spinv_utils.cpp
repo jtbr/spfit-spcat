@@ -26,6 +26,7 @@ getqn(): Gets the full list of quantum numbers for a specific final state index.
 #include "spinit.h"
 #include "spinv_internal.h"
 #include "SpinvContext.hpp"
+#include "CalError.hpp"
 
 /**
  * @brief Parses the non-vibrational part of a BCD parameter identifier into a SPAR structure.
@@ -453,10 +454,7 @@ int intens(struct SpinvContext *ctx, const int iblk, const int isiz, const int j
   bcd_t bijv1, bijv2, bijv3;
 
   if (ctx->ndmx <= 0)
-  {
-    puts("working vectors not allocated");
-    exit(EXIT_FAILURE);
-  }
+    throw NumericError("working vectors not allocated", CalErrorCode::WorkingVectorTooShort);
   dipoff = idipoff;
   if (dipoff >= ctx->nddip)
     dipoff = 0;
@@ -564,10 +562,7 @@ int intens(struct SpinvContext *ctx, const int iblk, const int isiz, const int j
           if (ncos == 0)
             continue;
           if (ncos < 0)
-          {
-            puts("DIRCOS WORKING VECTOR TOO SHORT IN INTENS");
-            exit(EXIT_FAILURE);
-          }
+            throw NumericError("DIRCOS WORKING VECTOR TOO SHORT IN INTENS", CalErrorCode::WorkingVectorTooShort);
           dd = dip[i] * pdip->fac;
           /* correct for special cases */
           switch (icase)
