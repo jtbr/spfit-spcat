@@ -93,11 +93,10 @@ There is a modern [python wrapper](https://github.com/Ltotheois/Pyckett) availab
 ### Libraries
 
 - `calpgm.h` — central configuration header included by nearly all C/C++ source files
-- `ulib.c` — parameter I/O (`getpar`, `getvar`, `putvar`), error analysis (`calerr`, `prcorr`)
+- `ulib.c` — parameter I/O (`getpar`, `getvar`, `putvar`), error analysis (`calerr`, `prcorr`), slib utility functions (`chtime`, `fgetstr`)
 - `lsqfit.c`, `lsqfit.h` — least-squares fitting (QR factorization, Marquardt-Levenberg solver)
 - `dblas.c` — fallback LINPACK double precision BLAS routines (required for exact numerical reproduction of baseline)
 - `cnjj.c`, `cnjj.h` — Clebsch-Gordan coefficients
-- `slibgcc.c` — system-dependent functions
 - `catutil.c`, `catutil.h` — catalog utility functions
 - `sortsub.c` — frequency sorting routines shared by spcat and the sortn utility
 - `subfit.c` — fitting routines supplementary to CalFit

@@ -1,5 +1,0 @@
-#!/bin/sh
-# the former 'dpcat' is now included as an option to spcat
-# the executable spcat is assumed to reside in the same directory as this script
-SCRIPT_DIR=$(dirname $(readlink -f "$0"))
-$SCRIPT_DIR/spcat --dpi $@

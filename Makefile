@@ -5,7 +5,7 @@ CXX=g++
 CFLAGS=-O3 -Wall -Wextra -march=native -ffp-contract=off -I.  # optimized for speed on current device (-Ofast is faster but math results may differ very slightly)
 CXXFLAGS=$(CFLAGS)
 EXEQ=spfit spcat calmrg  # dpcat and dpfit are optional variations to spcat and spfit respectively
-EXEA=${EXEQ} moiam stark termval sortn calbak reassign sortegy iambak iamcalc #is broken
+EXEA=${EXEQ} moiam stark termval sortn calbak reassign sortegy iambak iamcalc
 #next line for atlas blas
 #BLASLIB=-lcblas -latlas
 #OpenBLAS from libopenblas-dev apt package
