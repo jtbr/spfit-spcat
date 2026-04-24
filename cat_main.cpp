@@ -21,6 +21,8 @@
 #include "CalCat.hpp"
 #include "CalCatIO.hpp"
 #include "calpgm.h"
+#include "file_helpers.hpp"
+#include "SigintFlag.hpp"
 
 int main(int argc, char *argv[])
 {
@@ -47,10 +49,10 @@ int main(int argc, char *argv[])
     }
   }
 
-  filget(argc, argv, NFILE, fname, ext);
+  file_helpers::parse_file_args(argc, argv, NFILE, fname, ext);
 
   /* Open output stream */
-  FILE *luout = fopenq(fname[eout], "w");
+  FILE *luout = file_helpers::open_output(fname[eout], "w");
 
   /* Read input data from .int and .var files */
   CalCatInput input;
@@ -67,19 +69,20 @@ int main(int argc, char *argv[])
     iflg %= 1000;
   iflg %= 100;
   if (iflg >= 10) {
-    lustr = fopenq(fname[estr], "w");
+    lustr = file_helpers::open_output(fname[estr], "w");
     iflg %= 10;
   }
   if (iflg != 0) {
-    luegy = fopenq(fname[eegy], "w");
+    luegy = file_helpers::open_output(fname[eegy], "w");
   }
 
   /* Open catalog output stream */
-  FILE *lucat = fopenq(fname[ecat], "w");
+  FILE *lucat = file_helpers::open_output(fname[ecat], "w");
 
   /* Create CalCat instance and run */
   CalCatOutput output;
   {
+    SigintFlag sigint_guard; // (guard active for duration of run)
     CalCat calCat(calc_engine, luout, lucat, luegy, lustr);
     calCat.run(input, output);
   }

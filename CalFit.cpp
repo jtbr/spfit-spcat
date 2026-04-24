@@ -8,7 +8,6 @@
 #include <cstring>
 #include <cmath>
 #include <climits>
-#include <chrono>
 #include <stdio.h>
 #include <string.h>
 #include <vector>
@@ -18,28 +17,10 @@
 #include "lsqfit.h"
 #include "calpgm.h"
 #include "CalError.hpp"
+#include "SigintFlag.hpp"
 #include "SpinvEngine.hpp"
 #include "DpiEngine.hpp"
 
-/* chrono-based replacement for caldelay(delay_seconds): returns true if the
-   interval has elapsed since the last true return with the same delay. */
-static bool calfit_delay(int delay_seconds)
-{
-    using clock = std::chrono::steady_clock;
-    static clock::time_point next_time = clock::now();
-    static int last_delay = -1;
-    auto now = clock::now();
-    if (delay_seconds != last_delay) {
-        last_delay = delay_seconds;
-        next_time = now + std::chrono::seconds(delay_seconds);
-        return delay_seconds <= 0;
-    }
-    if (now >= next_time) {
-        next_time += std::chrono::seconds(delay_seconds);
-        return true;
-    }
-    return false;
-}
 
 /**
  * @brief Constructor for CalFit
@@ -852,8 +833,6 @@ bool CalFit::processLinesAndSetupBlocks(const CalFitInput &input)
     pmix = nullptr;
   }
 
-  m_sigint_flag = std::make_unique<SigintFlag>(); // install SIGINT handler
-
   return true;
 }
 
@@ -1037,7 +1016,7 @@ bool CalFit::performIteration(const CalFitInput &input, CalFitOutput &output)
       line_idx = getdbk(&lnext_getdbk, &iblk, &idx_getdbk_local, &initl_getdbk, &ifac); // Get next line info
       if (iblk != lblk)
       { // New block
-        if ((m_sigint_flag && m_sigint_flag->triggered() ? 1 : 0) != 0)
+        if (SigintFlag::isTriggered() != 0)
           break; // Check for user interrupt
 
         // Get block quantum numbers and size
@@ -1055,7 +1034,7 @@ bool CalFit::performIteration(const CalFitInput &input, CalFitOutput &output)
         }
 
         k_loop = (iblk - 1) / m_nblkpf_actual; // Assuming m_nblkpf_actual is F step
-        if (lstf != k_loop && calfit_delay(PR_DELAY) != 0)
+        if (lstf != k_loop && caldelay(PR_DELAY) != 0)
         {
           printf("Starting Quantum %3d\n", k_loop);
           fflush(stdout);
@@ -1077,7 +1056,7 @@ bool CalFit::performIteration(const CalFitInput &input, CalFitOutput &output)
 
     } while (lnext_getdbk != 0); // Repeat until no more energies needed for lines
 
-    if ((m_sigint_flag && m_sigint_flag->triggered() ? 1 : 0) != 0 && lnext_getdbk != 0)
+    if (SigintFlag::isTriggered() != 0 && lnext_getdbk != 0)
     { // Exited loop due to interrupt but not finished
       // if (lufit)
       //   fprintf(lufit, "Iteration interrupted by user.\n");
@@ -1137,7 +1116,7 @@ bool CalFit::performIteration(const CalFitInput &input, CalFitOutput &output)
 
     do
     { // Loop over lines (line_idx from 1 to m_nline)
-      if (icnt_progress <= 0 && calfit_delay(PR_DELAY) != 0)
+      if (icnt_progress <= 0 && caldelay(PR_DELAY) != 0)
       {
         printf("Fitting Line %d\n", line_idx);
         fflush(stdout);

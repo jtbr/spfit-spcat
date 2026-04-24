@@ -34,6 +34,7 @@
 #include "CalFit.hpp"
 #include "CalFitIO.hpp"
 #include "file_helpers.hpp"
+#include "SigintFlag.hpp"
 
 /**
  * @brief Main function for SPFIT - Spectroscopic Parameter Fitting program
@@ -153,7 +154,8 @@ int main(int argc, char *argv[])
   // (calFit takes ownership of calc_engine from here)
   CalFit calFit(calc_engine, lufit_stream);
 
-  // Run the fitting process
+  // Run the fitting process (guard active for duration of run)
+  SigintFlag sigint_guard;
   if (!calFit.run(input, output))
   {
     printf("Fitting process failed in CalFit::run.\n");

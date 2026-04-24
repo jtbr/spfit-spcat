@@ -10,32 +10,13 @@
 #include <string.h>
 #include <math.h>
 #include <climits>
-#include <chrono>
 #include "CalCat.hpp"
 #include "calpgm.h"
 #include "CalError.hpp"
+#include "SigintFlag.hpp"
 
 #define PR_DELAY 6
 #define NCARD 130
-
-/* chrono-based replacement for caldelay(delay_seconds). */
-static bool calcat_delay(int delay_seconds)
-{
-    using clock = std::chrono::steady_clock;
-    static clock::time_point next_time = clock::now();
-    static int last_delay = -1;
-    auto now = clock::now();
-    if (delay_seconds != last_delay) {
-        last_delay = delay_seconds;
-        next_time = now + std::chrono::seconds(delay_seconds);
-        return delay_seconds <= 0;
-    }
-    if (now >= next_time) {
-        next_time += std::chrono::seconds(delay_seconds);
-        return true;
-    }
-    return false;
-}
 
 CalCat::CalCat(std::unique_ptr<CalculationEngine> &calc_engine,
                FILE *luout, FILE *lucat, FILE *luegy, FILE *lustr)
@@ -317,8 +298,6 @@ bool CalCat::setupBlocks(const CalCatInput &input)
     ++pblk;
   }
   pblk = NULL;
-  m_sigint_flag = std::make_unique<SigintFlag>();
-
   /* set up intensity constants */
   m_tmc = -m_tmc;
   m_tmq = m_tmc / (input.tmq * m_cmc);
@@ -370,7 +349,7 @@ bool CalCat::computeCatalog(const CalCatInput &/*input*/, CalCatOutput &output)
     first = m_prfrq;
     int j = (iblk - 1) / m_nbkpj;
     if ((iblk - j * m_nbkpj) == 1) {
-      if (m_sigint_flag && m_sigint_flag->triggered())
+      if (SigintFlag::isTriggered())
         break;
       SBLK *pblk = m_blk;
       int jblk = iblk + m_nbkpj - m_nsav;
@@ -379,7 +358,7 @@ bool CalCat::computeCatalog(const CalCatInput &/*input*/, CalCatOutput &output)
           pblk->ixblk = 0;
         ++pblk;
       }
-      if (calcat_delay(PR_DELAY) != 0) {
+      if (caldelay(PR_DELAY)) {
         printf(" STARTING QUANTUM %3d\n", j);
         fflush(stdout);
       }

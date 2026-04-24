@@ -8,17 +8,21 @@
 #include <csignal>
 
 /* RAII replacement for rqexit/brkqr: installs SIGINT handler on construction,
-   exposes triggered(), restores prior handler on destruction. */
+   exposes isTriggered(), restores prior handler on destruction. */
 class SigintFlag {
 public:
     SigintFlag();
     ~SigintFlag();
-    bool triggered() const;
+    static bool isTriggered();
 
 private:
     static void handler(int);
     static volatile sig_atomic_t s_flag;
     void (*m_prev_handler)(int);
 };
+
+/* chrono-based replacement for caldelay(): returns true once per interval.
+   Resets the interval when delay_seconds changes. */
+bool caldelay(int delay_seconds);
 
 #endif // SIGINTFLAG_HPP

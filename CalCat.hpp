@@ -14,7 +14,6 @@
 #include <memory>
 #include "CalculationEngine.hpp"
 #include "lsqfit.h" // For bcd_t, MAXQN, BOOL, etc.
-#include "SigintFlag.hpp"
 
 #define NTEMP 1001
 #define TMAX 1000
@@ -144,7 +143,6 @@ private:
 
   // Block cache state (replaces ibufof statics)
   BlockCacheState m_cache;
-  std::unique_ptr<SigintFlag> m_sigint_flag;
 
   // Control flags (derived from iflg)
   BOOL m_prir, m_prder, m_prfrq, m_preig, m_pregy, m_prstr;
