@@ -80,7 +80,7 @@ int init2top(FILE *lu, int nvib2, int nsym, int nvib, int nvtot,
 int get2top(SIPAR *ppar,/*@out@*/ double *xpec2, int nvtot, int nft,
             int nsym, int *vmapsym, int *ivtop, int nvtop);
 int wrpar(/*@null@*/FILE * lu, double *id, int nid, int isdip, int kflg,
-          double *t, int nft, char *labl, int nfmt, double drhok);
+          double *t, int nft, const char *labl, int nfmt, double drhok);
 int ftanal(int flg, int nft, double *xpec, /*@out@ */ double *fc);
 int ksign(int kdel, int nft, double *xpec, /*@out@ */ double *fc);
 void ftfix(int nftp2, int nftp, double *pxfc);
@@ -167,19 +167,19 @@ int main(int argc, char *argv[])
   /*@owned@*/ int *sigma2, *vmapsym;
   /*@owned@*/ short *kmap;
   int *pmorg;
-  char *pstr, *pbgn;
+  const char *pstr; char *pbgn;
   double rho, drhok, val, voff, vref, vmin, vmax, didtmp, valm[2], zval;
   double rhoang, ang, ang0, amp;
   size_t nl;
   long idtyp, idtmp, idtst, nnpar;
   /*@owned@*/ double *didtmpv;
-  int iend, kflg, ipar, nvibsq, maxm, npar, nvib, ift, ncalc, nxvib;
+  int iend, kflg, ipar, maxm, npar, nvib, ift, ncalc, nxvib;
   int ityp, nsym, ntyp, i, k, nbasis, negy, nvfac, nrhok, nft, nft2, nftp, m;
   int nvfac2, kd, kk, iv, ivp, ivv, ivvp, mv, nv, nkk, neig, nxpec, ldel;
-  int isig, isigp, ivx, ivxp, nvs, nvp, kdel, kdel0, kmax, kmax0, ktest, ntyp0;
+  int isig, isigp, ivx, ivxp, nvs, nvp, kdel, kdel0, kmax, kmax0, ktest;
   int neigp, nhalf, nsymb, isymtau, ksymtau, kdoff, nsin, mbasis, nsig, nvtot2;
   int kflg0, kflgm, nprn, isdip, nvtot, nvtotsq, nvtot0, nxrho, ncalcm, nvt2;
-  int ixv, nxblks, nxdim, isigx, ixvv, nnblk, ndip, nvib2, nvt, nvtsq, nsymsq;
+  int ixv, nxblks, nxdim, isigx, ixvv, nnblk, ndip, nvib2, nvt, nsymsq;
   int nvib0, mm, nsigsq, ii, nline2, vtmax, nvtop, ndtop, ndmtop, nneg;
   short iv1,iv2;
   char cval;
@@ -421,7 +421,6 @@ int main(int argc, char *argv[])
     if (nvt > nbasis)
       nvt = nbasis;
     nvib = nvt * nsym;
-    nvtsq = nvt * nvt;
     nbasis *= nxdim;
     nvib0 = nvib;
     if (nvib0 > nvib)
@@ -430,7 +429,7 @@ int main(int argc, char *argv[])
       nvib2 = 0;
     nnblk = nxdim * nvib;
     nvtot = nvib * nxvib; nvtot0 = nvib0 * nxvib;
-    nvibsq = nvib * nvib; nvtotsq = nvtot * nvtot;
+    nvtotsq = nvtot * nvtot;
     if (nvib2 <= 0) {
       nsig = nsym; nvtot2 = nvtot;
       nvtop = 1;
@@ -631,7 +630,6 @@ int main(int argc, char *argv[])
     ivx = nxvib;
     if (isoffd) ivx = -ivx;
     pxpecp->ixvib = ivx;
-    ntyp0 = ntyp;
     pxpecp->isunit = ntyp;
     pxpecp = NULL;
     par[0]->idval = 0; idtmp = 0; kdel0 = -1;
@@ -1617,12 +1615,12 @@ int iamdiag(FILE *lu, int nvib, SXPEC * *pxpecv, SEIG *eig, double *egy, int iof
   static short ibkptr[2];
   static double c, egy0, fval[9];
   static int init = 0;
-  static int mbgn, nsym, nbasis, mbasis, nf, np;
+  static int mbgn, nsym, nbasis, mbasis, np;
   static int nsq, isdgn0, nxvib, nxdim, nxall;
   double *pt, *ptt;
   double vsym, val, rhokx, tmp, pmix, cv, sv;
   int i, iv, ivp, k, icol, nv, nlim, m, ivdgn, minv, isdgn, mm, ixvib;
-  int iend, ixv, ixvp, isig, nvib0, kk, knt, kd, kmix, kkp;
+  int iend, ixv, ixvp, nvib0, kk, knt, kd, kmix;
   size_t nl;
 
   pxpec0 = *pxpecv;
@@ -1641,7 +1639,7 @@ int iamdiag(FILE *lu, int nvib, SXPEC * *pxpecv, SEIG *eig, double *egy, int iof
       free(tv);
       tv = NULL;
     }
-    nbasis = 0; kkp = 0;
+    nbasis = 0;
     if (nvib == 0) return 0;
     nxvib = pxpec0->ixvib; nxdim = 1; nxall = nxvib;
     if (nxvib < 0) {
@@ -1670,7 +1668,6 @@ int iamdiag(FILE *lu, int nvib, SXPEC * *pxpecv, SEIG *eig, double *egy, int iof
     dcopy(nsq, &zero, 0, tv, 1);
     for (k = 1; k < nxvib; ++k)
       dcopy(nsq, &zero, 0, &tv[k * nsq], 1);
-    nf = 0;
     minv = 1024;
     iend = pxpec0->kdel;
     for (i = 1; i <= iend; ++i) {
@@ -1737,10 +1734,10 @@ int iamdiag(FILE *lu, int nvib, SXPEC * *pxpecv, SEIG *eig, double *egy, int iof
   /* begin normal computation */
   if (nvib <= 0) return -1;
   if (nxdim == 1) {
-    ixvib = ioff / nvib; isig = ioff - nvib * ixvib;
+    ixvib = ioff / nvib;
     iend = ioff + nvib;
   } else {
-    ixvib = 0; isig = ioff; iend = nvib * nxdim;
+    ixvib = 0; iend = nvib * nxdim;
   }
   nvib0 = nvib / nsym;
   pt = tv;
@@ -1762,7 +1759,7 @@ int iamdiag(FILE *lu, int nvib, SXPEC * *pxpecv, SEIG *eig, double *egy, int iof
       t[iv] += val * tmp * tmp;
 #if MYDEBUG_EIG
       if (lu != 0) {
-        kkp = kk;
+        int kkp = kk;
         for (i = kk; i < nbasis; ++i) {
           pmix = t[iv + i - kkp];
           if (fabs(pmix) < tiny) continue;
@@ -2663,7 +2660,7 @@ int get2top(SIPAR *ppar,/*@out@*/ double *xpec2, int nvtot, int nft, int nsym,
   return iret;
 } /* get2top */
 
-int wrpar(FILE *lu, double *id, int nid, int isdip, int kflg, double *t, int nt, char *labl, int nfmt, double drhok)
+int wrpar(FILE *lu, double *id, int nid, int isdip, int kflg, double *t, int nt, const char *labl, int nfmt, double drhok)
 {
   /* id = parameter id */
   /* isdip > 0 for dipole, else parameter */
@@ -2677,7 +2674,7 @@ int wrpar(FILE *lu, double *id, int nid, int isdip, int kflg, double *t, int nt,
   static char fmt1[] = "%14.0f%02d %23.15E %s\n";
   static char fmt2[] = "%12.0f %10.6f %23.15E %s\n";
   double fidc, finc, fidd, fida, fids, tmp, fid, tval, *tv, *tvp;
-  int k, kk, nsym, n, i, ires, nret;
+  int k, kk, n, i, ires, nret;
   long idtmp, idd;
   if (lu == NULL) return 0;
   fid = id[0];
@@ -2690,7 +2687,6 @@ int wrpar(FILE *lu, double *id, int nid, int isdip, int kflg, double *t, int nt,
         fprintf(lu, fmt0, fid, tval, labl);
       }
     } else {
-      nsym = kflg - 100;
       if (dnrm2(nt, t, 1) > cmp) {
         for (k = 0; k < nt; ++k) {
           kk = k;

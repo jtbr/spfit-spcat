@@ -6,7 +6,7 @@
 
 int readopt(char *line, double *dval, int nval)
 {
-  int kbgn, iret;
+  int kbgn;
   char c;
   kbgn = -1;
   for(;;) {
@@ -22,7 +22,7 @@ int readopt(char *line, double *dval, int nval)
     if (c < '0' || c > '9') break;
   } 
   if (c != '\0' || kbgn < 1024) {
-    iret = pcard(&line[kbgn], dval, nval, NULL);
+    (void)pcard(&line[kbgn], dval, nval, NULL);
     return kbgn;
   }
   return 0;

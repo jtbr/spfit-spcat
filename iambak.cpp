@@ -40,7 +40,7 @@ int main(int argc, char *argv[])
   char *fin1, *fin2, *fout, *pstr;
   long idtmp, nxpar, ixpar;
   int npar, ipar, kpar, ndec, nvib, iv1, iv2, mv, nv, iend, ifc;
-  int k, nval, ivv, ndecfac, idrho, nxv, nvib2, nsym, kk;
+  int k, nval, ivv, ndecfac, idrho, nxv, nvib2, kk;
   bcd_t bcdpar[NDBCD];
 
   try
@@ -102,7 +102,6 @@ int main(int argc, char *argv[])
     for (k = 0; k < nval; ++k)
       ival[k] = (int)dval[k + 1];
     nvib2 = ival[4];
-    nsym = ival[0];
     if (nval < 5)
       nvib2 = 0;
     npar -= nvib2;

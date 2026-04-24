@@ -44,7 +44,7 @@ typedef /*@owned@*/ /*@null@*/ EXPT *PEXPT;
 typedef /*@dependent@*/ /*@null@*/ EXPT *PDEXPT;
 
 void prline(FILE *lu, int nqn, short *pqn, double frq, double err, double st,
-            char *label);
+            const char *label);
 int lposn(const short *ikey, const int nkey, const int *k12,
           PEXPT *head, /*@out@*/ PDEXPT *ppexpt);
 void dolink(PEXPT *head, PDEXPT pexpt,
@@ -433,7 +433,7 @@ int main(int argc, char *argv[])
 }                               /* main */
 
 void prline(FILE *lu, int nqn, short *pqn, double frq, double err, double st,
-            char *label)
+            const char *label)
 {
   int k;
   for (k = 0; k < nqn; ++k) {

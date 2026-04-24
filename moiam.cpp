@@ -17,7 +17,7 @@ static char card[82];
 extern "C" int ftran(int nft, double *xpec, int pec, double *fc, int flg);
 static int rdinp(FILE * luin, int ndatm, int *nnatm, int *nx, double *wtx,
                  double *dist, double *theta, double *phi, char *istau,
-                 char **xyztag);
+                 const char **xyztag);
 static int coords( /*@null@*/ FILE * lu, int noatm, double *coord, double *wt,
                   int *nx, double *dist, double *theta, double *phi);
 static int gcalc(int natm, double *wt, double *coord, double *dcoord,
@@ -102,7 +102,7 @@ int main(int argc, char *argv[])
 #define NDCON 20
   static struct spar {
     int idv;
-    char *labl;
+    const char *labl;
   } sparv[] = {
     {
     99, "Vp"}, {
@@ -136,7 +136,7 @@ int main(int argc, char *argv[])
   static double coord[ND3ATM], gtmp[NDCON], vpot[10];
   static double wt[NDATM], dist[NDATM], theta[NDATM], phi[NDATM];
   static char istau[NDATM];
-  static char *xyztag[NDATM];
+  static const char *xyztag[NDATM];
   static int nx[4 * NDATM];
   FILE *luin, *luout, *lulist, *luxyz;
   double *pdbl;
@@ -535,14 +535,14 @@ int main(int argc, char *argv[])
 } /* main */
 
 
-int rdinp(FILE *luin, int ndatm, int *natm, int *nx, double *wtx, double *dist, double *theta, double *phi, char *istau, char * *xyztag)
+int rdinp(FILE *luin, int ndatm, int *natm, int *nx, double *wtx, double *dist, double *theta, double *phi, char *istau, const char **xyztag)
 {
 #define BLNK (' ')
 #define NCARD 9
   static struct swt {
-    /*@null@*/ char *symb;
+    /*@null@*/ const char *symb;
     double wt;
-    char *xyztag;
+    const char *xyztag;
   } swtv[] = {
     {"C", 12.,"C "},
     {"H", 1.00782,"H "},
@@ -567,7 +567,7 @@ int rdinp(FILE *luin, int ndatm, int *natm, int *nx, double *wtx, double *dist, 
     {NULL, 0.," "}};
   struct swt *pswt;
   int *nxx;
-  char *pstr;
+  const char *pstr;
   double dvec[NCARD];
   int ioff, k, noatm, nnatm, ich;
 

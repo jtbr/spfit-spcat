@@ -33,7 +33,7 @@ int main(int argc, char *argv[])
   FILE *luin, *luout;
   double xfrq, xerr, xwt;
   short *pqn1, *pqn2;
-  int k, nqn, nqn2, nn, nc, jmax, nrule, k1, k2;
+  int k, nqn, nqn2, nn, nc, jmax, nrule;
   if (argc < 4) {
     puts("usage: reassign keyfile infile outfile");
     exit(EXIT_FAILURE);
@@ -84,12 +84,11 @@ int main(int argc, char *argv[])
     for(;;) {
       nc = getlin(luin, nqn, idqn, iqn, &xfrq, &xerr, &xwt, line, NDLINE);
       if (nc < 0) {
-        fclose(luin); fclose(luout);
         break;
       }
       ++nn;
-      k1 = fixqn(nqn, iqn,  key, head);
-      k2 = fixqn(nqn, pqn2, key, head);
+      fixqn(nqn, iqn,  key, head);
+      fixqn(nqn, pqn2, key, head);
       for (k = 0; k < nqn2; ++k) {
         fprintf(luout, "%3d", (int) iqn[k]);
       }

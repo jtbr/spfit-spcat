@@ -82,7 +82,7 @@ setint(): Initializes dipole data from the .int file.
  */
 int setint(struct SpinvContext* ctx, FILE *lu, BOOL *ifdiag, int *nsav, const int ndip, bcd_t *idip, int *isimag)
 { /*   subroutine to initialize intensity data */
-  static char *bad_msg[] = {"\n", "(1) bad symmetry field\n",
+  static const char *bad_msg[] = {"\n", "(1) bad symmetry field\n",
                             "(2) vib out of range\n", "(3) unknown  dipole type\n",
                             "(4) transition between states of different weight\n",
                             "(5) alpha is not 0\n", "(6) bad spin field\n",
@@ -1572,7 +1572,7 @@ int pasort(struct SpinvContext *ctx, FILE *lu, const int npar, bcd_t *idpar, con
   /*     on entry: */
   /*         NSIZE= block size and dimension */
   /*         IDPAR= list of parameter identifiers ( element 0 is length ) */
-  static char *strej[] = {"\n", "(1) vib symmetry does not match\n",
+  static const char *strej[] = {"\n", "(1) vib symmetry does not match\n",
                           "(2) bad spins\n", "(3) bad spin 1 for SzNz\n",
                           "(4) specified K is beyond Kmax\n", "(5) bad weights for Itot\n",
                           "(6) specify prameters only for l >= 0\n",

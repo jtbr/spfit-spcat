@@ -1,8 +1,11 @@
 cmake_minimum_required(VERSION 3.5)
 project(spfit LANGUAGES C CXX DESCRIPTION "SPFIT/SPCAT")
 cmake_policy(SET CMP0057 NEW)
-# set with `cmake [path] -DBUILD_ALL=ON`
-option(BUILD_ALL "Build all executables" OFF)
+# NOTE: Unlike the hand-maintained Makefile, CMake's `make` and `make all` are identical (both build the
+# default ALL target). There is no cmake equivalent to the Makefile's separate `make` vs `make all` targets.
+# To build legacy utilities via cmake, either use `cmake -DBUILD_ALL=ON` or `make <target>` individually.
+# Use the root Makefile directly if you need `make all` semantics (builds all executables by default).
+option(BUILD_ALL "Build all executables including legacy utilities (cmake -DBUILD_ALL=ON)" OFF)
 
 # TODO re-add debug options
 # NOTE: -ffp-contract=off disables fused multiply-add (FMA), which change the accumulation order of BLAS dot
@@ -101,21 +104,11 @@ macro(add_executable_plus name uses_blas_fallback)
   set_property(TARGET ${name} PROPERTY LINKER_LANGUAGE CXX)
 endmacro()
 
-# Define executables
-set(DEFAULT_EXECUTABLES spfit spcat)
-set(OPTIONAL_EXECUTABLES calmrg moiam stark termval sortn calbak reassign sortegy iambak iamcalc)
-if(BUILD_ALL)  # NOT WORKING? EVEN IF OFF, INCLUDES OPTIONAL_EXECUTABLES!
-    set(EXECUTABLES ${DEFAULT_EXECUTABLES} ${OPTIONAL_EXECUTABLES})
-else()
-    set(EXECUTABLES ${DEFAULT_EXECUTABLES})
-endif()
-
-if(NOT DEFINED EXECUTABLES)
-  set(EXECUTABLES ${DEFAULT_EXECUTABLES})
-endif()
+# Default build: spfit spcat calmrg. Legacy utilities excluded unless -DBUILD_ALL=ON.
+set(OPTIONAL_EXECUTABLES moiam stark termval sortn calbak reassign sortegy iambak iamcalc)
 
 # Add spfit
-if("spfit" IN_LIST EXECUTABLES)
+if(TRUE)
   add_executable_plus(spfit TRUE # This target uses BLAS
     fit_main.cpp
     CalFit.cpp
@@ -144,7 +137,7 @@ if("spfit" IN_LIST EXECUTABLES)
 endif()
 
 # Add spcat
-if("spcat" IN_LIST EXECUTABLES)
+if(TRUE)
   add_executable_plus(spcat TRUE # This target uses BLAS
     cat_main.cpp
     CalCat.cpp
@@ -193,115 +186,73 @@ endif()
 #   )
 # endif()
 
-# --non defaults --
+# Shared helpers required by all legacy executables
+set(CPP_HELPERS file_helpers.cpp SigintFlag.cpp Logger.cpp)
+set(SPLIB ulib.c cnjj.c catutil.c lsqfit.c)
 
-# Add calmrg
-if (NOT DEFINED EXCLUDE_CALMRG AND "calmrg" IN_LIST EXECUTABLES)
-  add_executable_plus(calmrg TRUE # This target uses BLAS
-      calmrg.cpp
-      ulib.c
-      cnjj.c
-      catutil.c
-      lsqfit.c
-  )
-endif()
+# Default: calmrg (matches Makefile default targets: spfit spcat calmrg)
+add_executable_plus(calmrg TRUE
+    calmrg.cpp
+    ${CPP_HELPERS}
+    ${SPLIB}
+)
 
-# Add calbak
-if (NOT DEFINED EXCLUDE_CALBAK AND "calbak" IN_LIST EXECUTABLES)
-  add_executable_plus(calbak TRUE # This target uses BLAS
-      calbak.cpp
-      ulib.c
-      cnjj.c
-      catutil.c
-      lsqfit.c
-  )
-endif()
+# Optional executables — always defined so `make <target>` works individually;
+# excluded from the default `make all` unless -DBUILD_ALL=ON.
+add_executable_plus(calbak TRUE
+    calbak.cpp
+    ${CPP_HELPERS}
+    ${SPLIB}
+)
+add_executable_plus(termval TRUE
+    termval.cpp
+    ${CPP_HELPERS}
+    ${SPLIB}
+)
+add_executable_plus(stark TRUE
+    stark.cpp
+    ${CPP_HELPERS}
+    ${SPLIB}
+)
+add_executable_plus(moiam TRUE
+    moiam.cpp
+    ftran.c
+    ${CPP_HELPERS}
+    ${SPLIB}
+)
+add_executable_plus(iamcalc TRUE
+    iamcalc.cpp
+    ftran.c
+    readopt.c
+    ${CPP_HELPERS}
+    ${SPLIB}
+)
+add_executable_plus(sortn FALSE
+    sortn.cpp
+    sortsub.c
+    ${CPP_HELPERS}
+)
+add_executable_plus(reassign TRUE
+    reassign.cpp
+    ${CPP_HELPERS}
+    ${SPLIB}
+)
+add_executable_plus(sortegy TRUE
+    sortegy.cpp
+    ${CPP_HELPERS}
+    ${SPLIB}
+)
+add_executable_plus(iambak TRUE
+    iambak.cpp
+    readopt.c
+    ${CPP_HELPERS}
+    ${SPLIB}
+)
 
-# Add termval
-if (NOT DEFINED EXCLUDE_TERMVAL AND "termval" IN_LIST EXECUTABLES)
-  add_executable_plus(termval TRUE # This target uses BLAS
-      termval.cpp
-      ulib.c
-      cnjj.c
-      catutil.c
-      lsqfit.c
-  )
-endif()
-
-# Add stark
-if (NOT DEFINED EXCLUDE_STARK AND "stark" IN_LIST EXECUTABLES)
-  add_executable_plus(stark TRUE # This target uses BLAS
-      stark.cpp
-      ulib.c
-      cnjj.c
-      catutil.c
-      lsqfit.c
-  )
-endif()
-
-# Add moiam
-if (NOT DEFINED EXCLUDE_MOIAM AND "moiam" IN_LIST EXECUTABLES)
-  add_executable_plus(moiam TRUE # This target uses BLAS
-      moiam.cpp
-      ftran.c
-      ulib.c
-      cnjj.c
-      catutil.c
-      lsqfit.c
-  )
-endif()
-
-# Add iamcalc (NOT WORKING/OBSOLETE)
-if (NOT DEFINED EXCLUDE_IAMCALC AND "iamcalc" IN_LIST EXECUTABLES)
-  add_executable_plus(iamcalc TRUE # This target uses BLAS
-      iamcalc.cpp
-      ftran.c
-      readopt.c
-      ulib.c
-      cnjj.c
-      catutil.c
-      lsqfit.c
-  )
-endif()
-
-# Add sortn
-if (NOT DEFINED EXCLUDE_SORTN AND "sortn" IN_LIST EXECUTABLES)
-  add_executable_plus(sortn FALSE # This target does NOT use BLAS
-      sortn.cpp
-      sortsub.c
-  )
-endif()
-
-# Add reassign
-if (NOT DEFINED EXCLUDE_REASSIGN AND "reassign" IN_LIST EXECUTABLES)
-  add_executable_plus(reassign TRUE # This target uses BLAS
-      reassign.cpp
-      ulib.c
-      cnjj.c
-      catutil.c
-      lsqfit.c
-  )
-endif()
-
-# Add sortegy
-if (NOT DEFINED EXCLUDE_SORTEGY AND "sortegy" IN_LIST EXECUTABLES)
-  add_executable_plus(sortegy TRUE # This target uses BLAS
-      sortegy.cpp
-      ulib.c
-      cnjj.c
-      catutil.c
-      lsqfit.c
-  )
-endif()
-
-# Add iambak
-if (NOT DEFINED EXCLUDE_IAMBAK AND "iambak" IN_LIST EXECUTABLES)
-  add_executable_plus(iambak TRUE # This target uses BLAS
-      iambak.cpp
-      readopt.c
-      ulib.c
-      cnjj.c
-      catutil.c
-      lsqfit.c
-  )
+# Exclude legacy utilities from default build unless -DBUILD_ALL=ON.
+# Note: targets are still defined above, so `make <target>` always works individually.
+if(NOT BUILD_ALL)
+  foreach(target ${OPTIONAL_EXECUTABLES})
+    set_target_properties(${target} PROPERTIES EXCLUDE_FROM_ALL TRUE)
+  endforeach()
 endif()

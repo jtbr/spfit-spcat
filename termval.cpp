@@ -53,7 +53,7 @@ int main(int argc, char *argv[])
     LINE *last_line, *bgn_line, *crit_line, *pline, *tmpline;
     int *tagv;
     short *pqn;
-    double xerr, clight, xfrq, xfrq0, big, xwt, cdif, egyorg, egy;
+    double xerr, clight, xfrq, xfrq0, xwt, cdif, egyorg, egy;
     double sum, xerr1, xsq, xsq0, dif, dtmp, tiny, xerr0;
     size_t ndline;
     int k, i, nloop, icmp, nqn, norg, nline, oldorg, nfreq, kloop;
@@ -61,7 +61,6 @@ int main(int argc, char *argv[])
 
     clight = 29979.2458;
     tiny = 1.e-15;
-    big = 9999.9999;
     file_helpers::parse_file_args(argc, argv, NFILE, cfil, cext);
     lulin = file_helpers::open_input(cfil[elin]);
     lutrm = file_helpers::open_output(cfil[etrm], "w");
