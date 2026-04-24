@@ -21,6 +21,7 @@
 #include "CalCat.hpp"
 #include "CalCatIO.hpp"
 #include "calpgm.h"
+#include "CalError.hpp"
 #include "file_helpers.hpp"
 #include "SigintFlag.hpp"
 
@@ -84,7 +85,19 @@ int main(int argc, char *argv[])
   {
     SigintFlag sigint_guard; // (guard active for duration of run)
     CalCat calCat(calc_engine, luout, lucat, luegy, lustr);
-    calCat.run(input, output);
+    try
+    {
+      calCat.run(input, output);
+    }
+    catch (const CalError &e)
+    {
+      fprintf(stderr, "Catalog generation failed: %s\n", e.what());
+      if (luegy != luout) fclose(luegy);
+      if (lustr != luout) fclose(lustr);
+      fclose(luout);
+      fclose(lucat);
+      return EXIT_FAILURE;
+    }
   }
 
   /* Close output streams */

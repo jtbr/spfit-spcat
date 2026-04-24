@@ -122,7 +122,7 @@ public:
          Logger &logger = Logger::defaultLogger());
   ~CalCat();
 
-  bool run(const CalCatInput &input, CalCatOutput &output);
+  void run(const CalCatInput &input, CalCatOutput &output);
 
 private:
   std::unique_ptr<CalculationEngine> calc;
@@ -132,11 +132,12 @@ private:
   FILE *m_luegy;
   FILE *m_lustr;
 
-  // Phase methods
-  bool initializeParameters(const CalCatInput &input, CalCatOutput &output);
-  bool setupBlocks(const CalCatInput &input);
-  bool computeCatalog(const CalCatInput &input, CalCatOutput &output);
-  bool finalizeOutput(const CalCatInput &input, CalCatOutput &output);
+  // Phase methods (throw CalError on failure)
+  void validateInput(const CalCatInput &input);
+  void initializeParameters(const CalCatInput &input, CalCatOutput &output);
+  void setupBlocks(const CalCatInput &input);
+  void computeCatalog(const CalCatInput &input, CalCatOutput &output);
+  void finalizeOutput(const CalCatInput &input, CalCatOutput &output);
 
   // Helper methods (in CalCat_helpers.cpp)
   static int qnfmt(short *iqu, int nqn, char *sqn);

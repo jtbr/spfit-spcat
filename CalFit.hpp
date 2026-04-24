@@ -127,7 +127,7 @@ public:
    * @param output Output data for results (will be populated)
    * @return True if fitting is successful, false otherwise
    */
-  bool run(const CalFitInput &input, CalFitOutput &output);
+  void run(const CalFitInput &input, CalFitOutput &output);
 
 private:
   std::unique_ptr<CalculationEngine> calc;
@@ -178,11 +178,12 @@ private:
   // m_parfac is already a member, potentially scaled
   int m_nqn_for_iteration;
 
-  // Methods for breaking down the fitting process
-  bool initializeParameters(const CalFitInput &input);
-  bool processLinesAndSetupBlocks(const CalFitInput &input);
-  bool performIteration(const CalFitInput &input, CalFitOutput &output);
-  bool finalizeOutputData(const CalFitInput &input, CalFitOutput &output); // For populating CalFitOutput
+  // Methods for breaking down the fitting process (throw CalError on failure)
+  void validateInput(const CalFitInput &input);
+  void initializeParameters(const CalFitInput &input);
+  void processLinesAndSetupBlocks(const CalFitInput &input);
+  void performIteration(const CalFitInput &input, CalFitOutput &output);
+  void finalizeOutputData(const CalFitInput &input, CalFitOutput &output);
 
   // Helper methods (kept as private, implementations copied from original, now in CalFit_helpers.cpp)
   int qnfmt2(int nqn, short *qnum, char *aqnum);

@@ -39,20 +39,24 @@ CalCat::~CalCat()
     fclose(m_cache.scratch);
 }
 
-bool CalCat::run(const CalCatInput &input, CalCatOutput &output)
+void CalCat::run(const CalCatInput &input, CalCatOutput &output)
 {
-  if (!initializeParameters(input, output))
-    return false;
-  if (!setupBlocks(input))
-    return false;
-  if (!computeCatalog(input, output))
-    return false;
-  if (!finalizeOutput(input, output))
-    return false;
-  return true;
+  validateInput(input);
+  initializeParameters(input, output);
+  setupBlocks(input);
+  computeCatalog(input, output);
+  finalizeOutput(input, output);
 }
 
-bool CalCat::initializeParameters(const CalCatInput &input, CalCatOutput &output)
+void CalCat::validateInput(const CalCatInput &input)
+{
+  if (input.npar < 0)
+    throw InputError("npar must be non-negative.", CalErrorCode::InvalidParameter);
+  if (input.ndip <= 0)
+    throw InputError("ndip must be positive.", CalErrorCode::InvalidParameter);
+}
+
+void CalCat::initializeParameters(const CalCatInput &input, CalCatOutput &output)
 {
   m_zero = 1.5e-38;
   m_bigerr = 999.9999;
@@ -144,11 +148,9 @@ bool CalCat::initializeParameters(const CalCatInput &input, CalCatOutput &output
   m_pregy = (m_iflg != 0);
 
   output.ifdump = m_ifdump;
-
-  return true;
 }
 
-bool CalCat::setupBlocks(const CalCatInput &input)
+void CalCat::setupBlocks(const CalCatInput &input)
 {
   size_t nl, nlsq;
 
@@ -215,8 +217,8 @@ bool CalCat::setupBlocks(const CalCatInput &input)
 
   int nsize_p = INT_MAX;
   if (m_nfit > nsize_p || m_nfit <= 0) {
-    m_logger.error("var matrix size invalid (nfit = %d).", m_nfit);
-    return false;
+    throw ValidationError("var matrix size invalid (nfit = " + std::to_string(m_nfit) + ").",
+                          CalErrorCode::SizeMismatch);
   }
 
   m_nbkpj = m_lblk;
@@ -317,11 +319,9 @@ bool CalCat::setupBlocks(const CalCatInput &input)
   m_maxqn = calc->getqn(m_inblk, 0, 0, iqni, &isiz);
   if (m_maxqn > MAXQNX)
     m_maxqn = MAXQNX;
-
-  return true;
 }
 
-bool CalCat::computeCatalog(const CalCatInput &/*input*/, CalCatOutput &output)
+void CalCat::computeCatalog(const CalCatInput &/*input*/, CalCatOutput &output)
 {
   char sqn[4 * MAXQN + 2];
   memset(sqn, 0, sizeof(sqn));
@@ -664,11 +664,9 @@ bool CalCat::computeCatalog(const CalCatInput &/*input*/, CalCatOutput &output)
 
   output.nline = nline;
   output.egymin = egymin;
-
-  return true;
 }
 
-bool CalCat::finalizeOutput(const CalCatInput &/*input*/, CalCatOutput &output)
+void CalCat::finalizeOutput(const CalCatInput &/*input*/, CalCatOutput &output)
 {
   static char warn[] = " WARNING: THERE WAS NO DIAGONALIZATION\n";
   static char headq[] = "TEMPERATURE - Q(SPIN-ROT.) - log Q(SPIN-ROT.)\n";
@@ -735,6 +733,4 @@ bool CalCat::finalizeOutput(const CalCatInput &/*input*/, CalCatOutput &output)
   m_var = m_par = m_derv = m_dip = m_pmix = NULL;
   m_idpar = m_idip = NULL;
   m_nvdip = m_isimag = m_iqnfmtv = NULL;
-
-  return true;
 }

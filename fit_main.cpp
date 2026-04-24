@@ -33,6 +33,7 @@
 #include "DpiEngine.hpp"
 #include "CalFit.hpp"
 #include "CalFitIO.hpp"
+#include "CalError.hpp"
 #include "file_helpers.hpp"
 #include "SigintFlag.hpp"
 
@@ -156,9 +157,13 @@ int main(int argc, char *argv[])
 
   // Run the fitting process (guard active for duration of run)
   SigintFlag sigint_guard;
-  if (!calFit.run(input, output))
+  try
   {
-    logger.error("Fitting process failed.");
+    calFit.run(input, output);
+  }
+  catch (const CalError &e)
+  {
+    logger.error("Fitting process failed: %s", e.what());
     fclose(lufit_stream);
     return EXIT_FAILURE;
   }

@@ -85,19 +85,23 @@ CalFit::~CalFit()
   // lufit is owned by main, so CalFit does not close it.
 }
 
-// CalFit::run method updated to call these stubs
-bool CalFit::run(const CalFitInput &input, CalFitOutput &output)
+void CalFit::run(const CalFitInput &input, CalFitOutput &output)
 {
-  // Note: m_lufit is non-NULL because the constructor throws if not
-  if (!initializeParameters(input))
-    return false;
-  if (!processLinesAndSetupBlocks(input))
-    return false;
-  if (!performIteration(input, output))
-    return false;
-  if (!finalizeOutputData(input, output))
-    return false;
-  return true;
+  validateInput(input);
+  initializeParameters(input);
+  processLinesAndSetupBlocks(input);
+  performIteration(input, output);
+  finalizeOutputData(input, output);
+}
+
+void CalFit::validateInput(const CalFitInput &input)
+{
+  if (input.npar < 0)
+    throw InputError("npar must be non-negative.", CalErrorCode::InvalidParameter);
+  if (input.limlin == 0)
+    throw InputError("No lines requested (limlin = 0).", CalErrorCode::MalformedInput);
+  if (input.lineData_raw.empty())
+    throw InputError("No line data provided.", CalErrorCode::MalformedInput);
 }
 
 /**
@@ -105,7 +109,7 @@ bool CalFit::run(const CalFitInput &input, CalFitOutput &output)
  * @param input Input data for fitting
  * @return True if initialization is successful, false otherwise
  */
-bool CalFit::initializeParameters(const CalFitInput &input)
+void CalFit::initializeParameters(const CalFitInput &input)
 {
   // --- 1. Transfer scalar control parameters ---
   m_npar = input.npar;
@@ -210,7 +214,7 @@ bool CalFit::initializeParameters(const CalFitInput &input)
   else if (m_npar > 0)
   {
     m_logger.error("par_initial size mismatch. Expected %d, got %zu.", m_npar, input.par_initial.size());
-    return false;
+    throw InputError("par_initial size mismatch.", CalErrorCode::SizeMismatch);
   }
 
   if (input.erp_initial.size() == (size_t)m_npar)
@@ -220,7 +224,7 @@ bool CalFit::initializeParameters(const CalFitInput &input)
   else if (m_npar > 0)
   {
     m_logger.error("erp_initial size mismatch. Expected %d, got %zu.", m_npar, input.erp_initial.size());
-    return false;
+    throw InputError("erp_initial size mismatch.", CalErrorCode::SizeMismatch);
   }
 
   if (input.idpar_data.size() == idpar_actual_size)
@@ -230,7 +234,7 @@ bool CalFit::initializeParameters(const CalFitInput &input)
   else if (m_npar > 0)
   {
     m_logger.error("idpar_data size mismatch. Expected %zu, got %zu.", idpar_actual_size, input.idpar_data.size());
-    return false;
+    throw InputError("idpar_data size mismatch.", CalErrorCode::SizeMismatch);
   }
 
   // --- Initialize fitting matrices and related arrays (sized by m_nfit) ---
@@ -254,7 +258,7 @@ bool CalFit::initializeParameters(const CalFitInput &input)
     if (ndfit > m_nsize_p)
     {
       m_logger.error("Number of independent parameters + 1 (%d) is too big: %ld", ndfit, m_nsize_p);
-      return false;
+      throw InputError("Too many fit parameters.", CalErrorCode::InvalidParameter);
     }
 
     iperm  = (int    *)calalloc((size_t)m_nfit * sizeof(int));
@@ -274,12 +278,12 @@ bool CalFit::initializeParameters(const CalFitInput &input)
     {
       m_logger.error("var_initial_from_getvar size mismatch. Expected %zu (packed), got %zu.",
                      standard_packed_elements, input.var_initial_from_getvar.size());
-      return false;
+      throw InputError("var_initial size mismatch.", CalErrorCode::SizeMismatch);
     }
     else if (m_nfit > 0)
     {
       m_logger.error("var_initial_from_getvar is empty for nfit > 0.");
-      return false;
+      throw InputError("var_initial is empty.", CalErrorCode::SizeMismatch);
     }
 
     size_t oldfit_elements = standard_packed_elements + (size_t)m_nfit;
@@ -481,9 +485,7 @@ bool CalFit::initializeParameters(const CalFitInput &input)
 
   // --- 6. Call lbufof ---
   lbufof(-m_nfit, m_limlin);
-
-  return true;
-} // initializeParamaters
+} // initializeParameters
 
 
 /* method responsible for:
@@ -507,12 +509,12 @@ bool CalFit::initializeParameters(const CalFitInput &input)
 */
 // In CalFit.cpp
 
-bool CalFit::processLinesAndSetupBlocks(const CalFitInput &input)
+void CalFit::processLinesAndSetupBlocks(const CalFitInput &input)
 {
   if (!calc)
   {
     m_logger.error("CalculationEngine is null.");
-    return false;
+    throw InputError("CalculationEngine is null.", CalErrorCode::NullInput);
   }
 
   // 1. Engine setup (setopt) was DONE by CalFitIO.
@@ -525,7 +527,7 @@ bool CalFit::processLinesAndSetupBlocks(const CalFitInput &input)
   if (m_nqn_for_iteration <= 0)
   {
     m_logger.error("calc->setfmt failed (returned %d).", m_nqn_for_iteration);
-    return false;
+    throw NumericError("setfmt failed.", CalErrorCode::InvalidParameter);
   }
 
   if (m_nqn_for_iteration > MAXCAT) {
@@ -543,10 +545,10 @@ bool CalFit::processLinesAndSetupBlocks(const CalFitInput &input)
 
   if (m_nline <= 0)
   {
-    m_logger.warn("No lines read or linein failed.");
     // It's possible to have 0 lines and proceed if only calculation is needed,
-    // but typically for fitting this is an issue. Let's return false.
-    return false;
+    // but typically for fitting this is an issue so we throw an error.
+    m_logger.error("No lines read or linein failed.");
+    throw InputError("No experimental lines read.", CalErrorCode::MalformedInput);
   }
   if ((size_t)m_nline < m_limlin)
   {
@@ -564,7 +566,7 @@ bool CalFit::processLinesAndSetupBlocks(const CalFitInput &input)
   if (!this->idpar || !this->par)
   {
     m_logger.error("idpar or par is null before calc->setblk.");
-    return false;
+    throw NumericError("idpar or par is null.", CalErrorCode::NullInput);
   }
   int k_from_setblk = calc->setblk(lufit, m_npar, this->idpar, this->par, &m_nblkpf_actual, &m_maxdm_actual);
 
@@ -591,12 +593,12 @@ bool CalFit::processLinesAndSetupBlocks(const CalFitInput &input)
   if (m_maxdm_actual <= 0)
   {
     m_logger.error("m_maxdm_actual is %d, cannot allocate Hamiltonian matrices.", m_maxdm_actual);
-    return false;
+    throw NumericError("Hamiltonian dimension is zero or negative.", CalErrorCode::SpinDimensioning);
   }
   if (m_maxdm_actual > m_nsize_p)
   {
     m_logger.error("Hamiltonian dimension (%d) is too big: %ld", m_maxdm_actual, m_nsize_p);
-    return false;
+    throw NumericError("Hamiltonian dimension too large.", CalErrorCode::SpinDimensioning);
   }
 
   // Free previous if any (shouldn't happen in single run)
@@ -626,8 +628,6 @@ bool CalFit::processLinesAndSetupBlocks(const CalFitInput &input)
     // pmix_block_elements == 0 because m_maxdm_actual == 0 (already guarded above).
     pmix = nullptr;
   }
-
-  return true;
 }
 
 
@@ -639,7 +639,7 @@ bool CalFit::processLinesAndSetupBlocks(const CalFitInput &input)
 #define PR_DELAY 6 // From original main
 
 
-bool CalFit::performIteration(const CalFitInput &input, CalFitOutput &output)
+void CalFit::performIteration(const CalFitInput &input, CalFitOutput &output)
 {
   if (m_nline <= 0 && m_nfit > 0)
   { // No lines to fit but parameters exist
@@ -652,7 +652,7 @@ bool CalFit::performIteration(const CalFitInput &input, CalFitOutput &output)
       output.par.assign(this->par, this->par + m_npar);
     if (m_npar > 0 && this->erpar)
       output.erpar.assign(this->erpar, this->erpar + m_npar);
-    return true; // Or false if this is an unrecoverable state for fitting
+    return;
   }
   if (m_nfit <= 0)
   {
@@ -665,7 +665,7 @@ bool CalFit::performIteration(const CalFitInput &input, CalFitOutput &output)
       output.par.assign(this->par, this->par + m_npar);
     if (m_npar > 0 && this->erpar)
       output.erpar.assign(this->erpar, this->erpar + m_npar);
-    return true;
+    return;
   }
 
   // Pointers for hamx arguments, derived from this->pmix allocation
@@ -817,7 +817,7 @@ bool CalFit::performIteration(const CalFitInput &input, CalFitOutput &output)
         if (nsize_block > m_maxdm_actual)
         {
           m_logger.error("Size of block %d (%d) exceeds max dimension %d.", iblk, nsize_block, m_maxdm_actual);
-          return false; // Fatal error
+          throw NumericError("Block size exceeds max Hamiltonian dimension.", CalErrorCode::SpinDimensioning);
         }
 
         k_loop = (iblk - 1) / m_nblkpf_actual; // Assuming m_nblkpf_actual is F step
@@ -1486,12 +1486,10 @@ bool CalFit::performIteration(const CalFitInput &input, CalFitOutput &output)
   output.itr = m_itr;
   output.xsqbest = m_xsqbest;
   // Final parameters and errors will be fully populated in finalizeOutputData
-
-  return true;
 } // performIteration
 
 
-bool CalFit::finalizeOutputData(const CalFitInput &input, CalFitOutput &output)
+void CalFit::finalizeOutputData(const CalFitInput &input, CalFitOutput &output)
 {
   if (!lufit && output.itr > 0)
     // This case should ideally not happen if lufit is managed correctly through run
@@ -1525,7 +1523,7 @@ bool CalFit::finalizeOutputData(const CalFitInput &input, CalFitOutput &output)
     else
     {
       m_logger.error("this->par is null in finalizeOutputData.");
-      return false;
+      throw NumericError("par is null.", CalErrorCode::NullInput);
     }
     // this->erpar should contain the final scaled errors for ALL m_npar parameters
     // (fitted ones from lsqfit, dependent ones derived in performIteration)
@@ -1536,7 +1534,7 @@ bool CalFit::finalizeOutputData(const CalFitInput &input, CalFitOutput &output)
     else
     {
       m_logger.error("this->erpar is null in finalizeOutputData.");
-      return false;
+      throw NumericError("erpar is null.", CalErrorCode::NullInput);
     }
   }
   else
@@ -1571,7 +1569,7 @@ bool CalFit::finalizeOutputData(const CalFitInput &input, CalFitOutput &output)
     else
     {
       m_logger.error("this->idpar is null in finalizeOutputData.");
-      return false;
+      throw NumericError("idpar is null.", CalErrorCode::NullInput);
     }
 
     size_t parlbl_actual_size = (LBLEN * (size_t)m_npar + 1);
@@ -1582,7 +1580,7 @@ bool CalFit::finalizeOutputData(const CalFitInput &input, CalFitOutput &output)
     else
     {
       m_logger.error("this->parlbl is null in finalizeOutputData.");
-      return false;
+      throw NumericError("parlbl is null.", CalErrorCode::NullInput);
     }
 
     if (this->erp)
@@ -1592,7 +1590,7 @@ bool CalFit::finalizeOutputData(const CalFitInput &input, CalFitOutput &output)
     else
     {
       m_logger.error("this->erp is null in finalizeOutputData.");
-      return false;
+      throw NumericError("erp is null.", CalErrorCode::NullInput);
     }
   }
   else
@@ -1613,7 +1611,7 @@ bool CalFit::finalizeOutputData(const CalFitInput &input, CalFitOutput &output)
     else
     {
       m_logger.error("this->var is null but nfit > 0.");
-      return false;
+      throw NumericError("var is null.", CalErrorCode::NullInput);
     }
 
     // `dpar` from lsqfit's `enorm` output contained 1/norm(L_col_k) or similar scaling factors.
@@ -1696,8 +1694,6 @@ bool CalFit::finalizeOutputData(const CalFitInput &input, CalFitOutput &output)
     chtime(title_card_buffer_final, 82); // Timestamp it
     fputs(title_card_buffer_final, lufit);
   }
-
-  return true;
 }
 
 /* original static functions / private helper functions are now in CalFit_helpers.cpp. */
