@@ -46,16 +46,16 @@ set(SOURCE_FILES
     DpiEngine.cpp
     cat_main.cpp
     sortsub.c
-    calmrg.c
-    calbak.c
-    termval.c
-    stark.c
-    moiam.c
-    iamcalc.c  # Even if target is commented out, keep for properties if file exists
-    sortn.c
-    reassign.c
-    sortegy.c
-    iambak.c
+    calmrg.cpp
+    calbak.cpp
+    termval.cpp
+    stark.cpp
+    moiam.cpp
+    iamcalc.cpp
+    sortn.cpp
+    reassign.cpp
+    sortegy.cpp
+    iambak.cpp
     ulib.c
     cnjj.c
     lsqfit.c
@@ -198,88 +198,76 @@ endif()
 # Add calmrg
 if (NOT DEFINED EXCLUDE_CALMRG AND "calmrg" IN_LIST EXECUTABLES)
   add_executable_plus(calmrg TRUE # This target uses BLAS
-      calmrg.c
+      calmrg.cpp
       ulib.c
       cnjj.c
-      slibgcc.c
       catutil.c
       lsqfit.c
-      # dblas.c removed
   )
 endif()
 
 # Add calbak
 if (NOT DEFINED EXCLUDE_CALBAK AND "calbak" IN_LIST EXECUTABLES)
   add_executable_plus(calbak TRUE # This target uses BLAS
-      calbak.c
+      calbak.cpp
       ulib.c
       cnjj.c
-      slibgcc.c
       catutil.c
       lsqfit.c
-      # dblas.c removed
   )
 endif()
 
 # Add termval
 if (NOT DEFINED EXCLUDE_TERMVAL AND "termval" IN_LIST EXECUTABLES)
   add_executable_plus(termval TRUE # This target uses BLAS
-      termval.c
+      termval.cpp
       ulib.c
       cnjj.c
-      slibgcc.c
       catutil.c
       lsqfit.c
-      # dblas.c removed
   )
 endif()
 
 # Add stark
 if (NOT DEFINED EXCLUDE_STARK AND "stark" IN_LIST EXECUTABLES)
   add_executable_plus(stark TRUE # This target uses BLAS
-      stark.c
+      stark.cpp
       ulib.c
       cnjj.c
-      slibgcc.c
       catutil.c
       lsqfit.c
-      # dblas.c removed
   )
 endif()
 
 # Add moiam
 if (NOT DEFINED EXCLUDE_MOIAM AND "moiam" IN_LIST EXECUTABLES)
   add_executable_plus(moiam TRUE # This target uses BLAS
-      moiam.c
+      moiam.cpp
       ftran.c
       ulib.c
       cnjj.c
-      slibgcc.c
       catutil.c
       lsqfit.c
-      # dblas.c removed
   )
 endif()
 
 # Add iamcalc (NOT WORKING/OBSOLETE)
 if (NOT DEFINED EXCLUDE_IAMCALC AND "iamcalc" IN_LIST EXECUTABLES)
   add_executable_plus(iamcalc TRUE # This target uses BLAS
-      iamcalc.c
+      iamcalc.cpp
       ftran.c
       readopt.c
       ulib.c
       cnjj.c
-      slibgcc.c
       catutil.c
       lsqfit.c
-      # dblas.c removed
   )
 endif()
 
 # Add sortn
 if (NOT DEFINED EXCLUDE_SORTN AND "sortn" IN_LIST EXECUTABLES)
   add_executable_plus(sortn FALSE # This target does NOT use BLAS
-      sortn.c
+      sortn.cpp
       sortsub.c
   )
 endif()
@@ -287,39 +275,33 @@ endif()
 # Add reassign
 if (NOT DEFINED EXCLUDE_REASSIGN AND "reassign" IN_LIST EXECUTABLES)
   add_executable_plus(reassign TRUE # This target uses BLAS
-      reassign.c
+      reassign.cpp
       ulib.c
       cnjj.c
-      slibgcc.c
       catutil.c
       lsqfit.c
-      # dblas.c removed
   )
 endif()
 
 # Add sortegy
 if (NOT DEFINED EXCLUDE_SORTEGY AND "sortegy" IN_LIST EXECUTABLES)
   add_executable_plus(sortegy TRUE # This target uses BLAS
-      sortegy.c
+      sortegy.cpp
       ulib.c
       cnjj.c
-      slibgcc.c
       catutil.c
       lsqfit.c
-      # dblas.c removed
   )
 endif()
 
 # Add iambak
 if (NOT DEFINED EXCLUDE_IAMBAK AND "iambak" IN_LIST EXECUTABLES)
   add_executable_plus(iambak TRUE # This target uses BLAS
-      iambak.c
+      iambak.cpp
       readopt.c
       ulib.c
       cnjj.c
-      slibgcc.c
       catutil.c
       lsqfit.c
-      # dblas.c removed
   )
 endif()

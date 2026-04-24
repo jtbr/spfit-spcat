@@ -70,17 +70,25 @@ This document outlines the prioritized tasks for modernizing the SPFIT/SPCAT sof
         - **Memory access**: Review cache utilization in the Hamiltonian and intensity matrix computation inner loops.
     - **Constraint**: Quantitative results must remain unchanged unless a new baseline is established.
 
-- [ ] **Task 7: Error Handling and Input Validation**
-    - **Description**: Replace `exit()` calls with error returns for programmatic use.
-    - **Implementation Plan**:
-        - The highest-impact change: replace `exit()` in C functions (`ulib.c`, `spinv_*.c`, `catutil.c`, `CalCat_helpers.cpp:ibufof`) with error return codes. CalFit/CalCat already use `bool` returns, but the underlying C functions can still `exit()` on error.
-        - Add input validation at the CalFit/CalCat API boundary (null checks, size consistency).
-        - Configurable logging: redirect diagnostic output from `stdout`/`lufit` to a user-provided callback or stream.
-    - This subsumes the former **Task 8 (Memory Management Refinement)** — the remaining memory management issues are `exit()` calls that leak on error, which this task addresses directly. The RAII pattern in CalFit/CalCat destructors already handles normal cleanup.
+- [x] **Task 7: Error Handling and Input Validation**
+    - **Description**: Replace legacy slibgcc functions and add exception-based error handling for programmatic use.
+    - **Completed**:
+        - Exception hierarchy: `CalError → IoError / InputError / ValidationError / NumericError` (CalError.hpp).
+        - `calalloc(n)` replaces `mallocq(n)`; throws `std::bad_alloc` on failure.
+        - `file_helpers::open_input/open_output` replace `fopenq`; throw `IoError` on failure.
+        - `file_helpers::parse_file_args` replaces `filget`.
+        - `SigintFlag` RAII class replaces `rqexit(-1)`/`rqexit(0)`.
+        - `CalFit::run()` and `CalCat::run()` changed from `bool` to `void`; all error paths throw.
+        - `validateInput()` added to both `CalFit` and `CalCat`.
+        - All 10 legacy mains (`calmrg`, `calbak`, `stark`, `sortn`, `reassign`, `termval`, `sortegy`, `iambak`, `iamcalc`, `moiam`) converted from `.c` to `.cpp` with top-level try/catch, `slibgcc` functions replaced.
+        - `fit_main.cpp` and `cat_main.cpp` wrap `run()` in try/catch with structured error messages.
+        - `readopt.h` given `extern "C"` guards for C++ inclusion.
+        - 55/55 regression tests pass.
+    - **Remaining**: `exit()` calls inside `ulib.c`, `spinv_*.c`, `catutil.c` are still present — these would need deeper C→exception propagation for full programmatic safety (deferred to a future task).
 
 - [ ] **Task 9.0: legacy cleanup**:
     - Break apart calpgm.h header, into calpgm_types.h, blas_compat.h and headers for cnjj/slib/catutil/slib/ulib/subfit, including only what's needed and keeping them out of C++ headers if possible
-    - Remove slibgcc.c, replacing with simple macros or standard replacements or more modern approaches. `fopenq` may need an to be a static inline helper. `maxmem` logic should be removable.
+    - ~~Remove slibgcc.c, replacing with simple macros or standard replacements or more modern approaches.~~ Done in Task 7: `slibgcc.c` no longer compiled; all callers replaced with `file_helpers`, `calalloc`, `SigintFlag`.
     - move legacy apps aside, probably into a `legacy` subdirectory, keeping only spfit/spcat/dpfit/dpcat as the main targets (they should remain buildable/usable). Consider other code reorganization.
 
 - [ ] **Task 9.1: Python interface and example usage**

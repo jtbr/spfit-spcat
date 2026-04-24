@@ -13,6 +13,10 @@ namespace file_helpers {
    Returns FILE* on success, nullptr if not found (no error thrown). */
 FILE *open_input_optional(const char *fname);
 
+/* Open file for reading; search CWD then SPECNAME env path.
+   Throws IoError if not found. */
+FILE *open_input(const char *fname);
+
 /* Open file for writing (or other non-read mode).
    Throws IoError on failure. */
 FILE *open_output(const char *fname, const char *mode = "w");

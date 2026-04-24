@@ -21,6 +21,14 @@ FILE *open_input_optional(const char *fname)
     return h;
 }
 
+FILE *open_input(const char *fname)
+{
+    FILE *h = open_input_optional(fname);
+    if (h == nullptr)
+        throw IoError(std::string("Trouble opening ") + fname);
+    return h;
+}
+
 FILE *open_output(const char *fname, const char *mode)
 {
     FILE *h = fopen(fname, mode);

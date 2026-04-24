@@ -2,6 +2,9 @@
 #include <stdlib.h>
 #include <math.h>
 #include "calpgm.h"
+#include "CalError.hpp"
+#include "file_helpers.hpp"
+#include "SigintFlag.hpp"
 
 
 /*   Copyright (C) 1989, California Institute of Technology */
@@ -50,10 +53,10 @@ void unlink(PEXPT *head, /*@notnull@*/ EXPT *pexpt,
             /*@out@*/ int *jmin,/*@out@*/ int *jmax);
 BOOL mrglin(char *line2, char *line);
 
-int main(argc, argv)
-int argc;
-char *argv[];
+int main(int argc, char *argv[])
 {
+  try {
+  SigintFlag sigint_guard;
 #define NFILE 6
 #define NDLINE 130
   static PEXPT jhash[NHASH + 1];
@@ -77,14 +80,13 @@ char *argv[];
   FILE *lucat, *lunew, *lulog, *lumrg, *lulin, *luopt;
   EXPT *pexpt, *pexptp, *plast, *pnext;
   nmerge = nmatch = nout = nqn = nqn2 = 0;
-  filget(argc, argv, NFILE, cfil, cext);
-  rqexit(-1);
+  file_helpers::parse_file_args(argc, argv, NFILE, cfil, cext);
   for (k = 0; k <= NHASH; ++k)
     jhash[k] = NULL;
-  lulin = fopenq(cfil[elin], "r");
-  lulog = fopenq(cfil[elog], "w");
-  lunew = fopenq(cfil[enew], "w");
-  lucat = fopenq(cfil[ecat], "r");
+  lulin = file_helpers::open_input(cfil[elin]);
+  lulog = file_helpers::open_output(cfil[elog], "w");
+  lunew = file_helpers::open_output(cfil[enew], "w");
+  lucat = file_helpers::open_input(cfil[ecat]);
   /* read qn format */
   nline2 = fgetstr(line2, NDLINE, lucat);
   iqfmt = 1;
@@ -210,7 +212,7 @@ char *argv[];
   }
   if (nline == 0) ratio = 0.;
   /* open .mrg output file */
-  lumrg = fopenq(cfil[emrg], "w");
+  lumrg = file_helpers::open_output(cfil[emrg], "w");
   printf(" %d  experimental lines read\n", nline);
   fflush(stdout);
   memcpy(qnstr, line2 + PQNU, (size_t) nqn2);
@@ -220,7 +222,7 @@ char *argv[];
   while (noeof) {
     memcpy(line1, line2, (size_t) minb);
     memcpy(iqn1, iqn2, sizeof(iqn2));
-    if (rqexit(0) != 0)
+    if (SigintFlag::isTriggered())
       noeof = FALSE;
     nline2 = fgetstr(line2, NDLINE, lucat);
     if (nline2 >= minb) {
@@ -328,7 +330,7 @@ char *argv[];
     fprintf(lulog, " %d  lines to be matched by frequency\n", nbad);
   }
   nmatch = 0;
-  lumrg = fopenq(cfil[emrg], "r");
+  lumrg = file_helpers::open_input(cfil[emrg]);
   if (ratio < 0.001)
     nbad = 0;
   while (nbad > 0) {
@@ -421,6 +423,13 @@ char *argv[];
   fclose(lunew);
   fclose(lulog);
   return 0;
+  } catch (const CalError &e) {
+    fprintf(stderr, "Error: %s\n", e.what());
+    return EXIT_FAILURE;
+  } catch (const std::exception &e) {
+    fprintf(stderr, "Error: %s\n", e.what());
+    return EXIT_FAILURE;
+  }
 }                               /* main */
 
 void prline(FILE *lu, int nqn, short *pqn, double frq, double err, double st,
@@ -436,11 +445,7 @@ void prline(FILE *lu, int nqn, short *pqn, double frq, double err, double st,
   fprintf(lu, "%15.4f %10.4f %10.3E %s\n", frq, err, st, label);
 }
 
-int lposn(ikey, nkey, k12, head, ppexpt)
-const short *ikey;
-const int nkey, *k12;
-PEXPT *head;
-PDEXPT *ppexpt;
+int lposn(const short *ikey, const int nkey, const int *k12, PEXPT *head, PDEXPT *ppexpt)
 {
   EXPT *now, *last;
   short *iqnx;
@@ -479,16 +484,12 @@ PDEXPT *ppexpt;
   return icmp;
 }                               /* lposn */
 
-void dolink(head, pexpt, xfrq, xerr, iqn)
-PEXPT *head;
-PDEXPT pexpt;
-const double xfrq, xerr;
-const short *iqn;
+void dolink(PEXPT *head, PDEXPT pexpt, const double xfrq, const double xerr, const short *iqn)
 {
   /* insert new link after pexpt */
   EXPT *now;
   int jx;
-  now = (EXPT *) mallocq(sizeof(EXPT));
+  now = (EXPT *) calalloc(sizeof(EXPT));
   now->frqx = xfrq;
   now->errx = (float) xerr;
   memmove(now->iqn, iqn, (size_t) NDQN * sizeof(short));
@@ -505,10 +506,7 @@ const short *iqn;
   }
 }
 
-void unlink(head, pexpt, jmin, jmax)
-PEXPT *head;
-EXPT *pexpt;
-int *jmin, *jmax;
+void unlink(PEXPT *head, EXPT *pexpt, int *jmin, int *jmax)
 {
   EXPT *now, *last;
   int jx, jj;
@@ -547,8 +545,7 @@ int *jmin, *jmax;
   } while (now != NULL);
 }
 
-BOOL mrglin(line2, line)
-char *line2, *line;
+BOOL mrglin(char *line2, char *line)
 {
   static double cnv = 2.3025851; /* 1 / log10(e) */
   static int fmtstr = KSTR;
