@@ -1,8 +1,8 @@
 *.o
 *.a
 # build targets
-spcat
-spfit
+/spcat
+/spfit
 calbak
 calmrg
 # build "all" targets

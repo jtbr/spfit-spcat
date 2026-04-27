@@ -16,7 +16,7 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -O3 -march=native -ffp-contrac
 
 set(CMAKE_CXX_STANDARD 17)
 
-include_directories(.)
+include_directories(src)
 
 # Find BLAS
 option(USE_SYSTEM_BLAS "Use system BLAS library (OpenBLAS, etc.)" OFF)
@@ -35,41 +35,45 @@ endif()
 # Define all potential source files
 # This list is used for set_source_files_properties
 set(SOURCE_FILES
-    fit_main.cpp
-    subfit.cpp
-    spinv_setup.cpp
-    spinv_spin_symmetry.cpp
-    spinv_linalg_sort.c
-    spinv_hamiltonian.cpp
-    spinv_utils.cpp
-    spinit.cpp
-    CalFit.cpp
-    CalFitIO.cpp
-    SpinvEngine.cpp
-    DpiEngine.cpp
-    cat_main.cpp
-    sortsub.c
-    calmrg.cpp
-    calbak.cpp
-    termval.cpp
-    stark.cpp
-    moiam.cpp
-    iamcalc.cpp
-    sortn.cpp
-    reassign.cpp
-    sortegy.cpp
-    iambak.cpp
-    ulib.c
-    cnjj.c
-    lsqfit.c
-    dblas.c    # dblas.c is in this list
-    dpi.cpp
-    ftran.c
-    catutil.c
-    readopt.c
-    Logger.cpp
-    SigintFlag.cpp
-    file_helpers.cpp
+    src/spfit/fit_main.cpp
+    src/spfit/subfit.cpp
+    src/spfit/CalFit.cpp
+    src/spfit/CalFitIO.cpp
+    src/spfit/CalFit_helpers.cpp
+    src/spcat/cat_main.cpp
+    src/spcat/sortsub.c
+    src/spcat/CalCat.cpp
+    src/spcat/CalCatIO.cpp
+    src/spcat/CalCat_helpers.cpp
+    src/engine/spinv_setup.cpp
+    src/engine/spinv_spin_symmetry.cpp
+    src/engine/spinv_linalg_sort.c
+    src/engine/spinv_hamiltonian.cpp
+    src/engine/spinv_utils.cpp
+    src/engine/spinit.cpp
+    src/engine/SpinvEngine.cpp
+    src/engine/DpiEngine.cpp
+    src/engine/dpi.cpp
+    src/splib/ulib.c
+    src/splib/cnjj.c
+    src/splib/lsqfit.c
+    src/splib/dblas.c
+    src/splib/ftran.c
+    src/splib/catutil.c
+    src/common/Logger.cpp
+    src/common/SigintFlag.cpp
+    src/common/file_helpers.cpp
+    src/legacy_apps/calmrg.cpp
+    src/legacy_apps/calbak.cpp
+    src/legacy_apps/termval.cpp
+    src/legacy_apps/stark.cpp
+    src/legacy_apps/moiam.cpp
+    src/legacy_apps/iamcalc.cpp
+    src/legacy_apps/sortn.cpp
+    src/legacy_apps/reassign.cpp
+    src/legacy_apps/sortegy.cpp
+    src/legacy_apps/iambak.cpp
+    src/legacy_apps/readopt.c
 )
 
 set_source_files_properties(${SOURCE_FILES} PROPERTIES COMPILE_FLAGS "-Wno-missing-field-initializers")
@@ -81,7 +85,7 @@ macro(add_executable_plus name uses_blas_fallback)
   set(current_sources ${ARGN})
 
   if(NOT BLAS_FOUND AND ${uses_blas_fallback})
-    list(APPEND current_sources dblas.c) # Add dblas.c if no system BLAS and target needs it
+    list(APPEND current_sources src/splib/dblas.c) # Add dblas.c if no system BLAS and target needs it
     message(STATUS "Target ${name}: System BLAS not found. Compiling dblas.c as fallback.")
   elseif(BLAS_FOUND AND ${uses_blas_fallback})
     message(STATUS "Target ${name}: Using system BLAS.")
@@ -107,92 +111,61 @@ endmacro()
 # Default build: spfit spcat calmrg. Legacy utilities excluded unless -DBUILD_ALL=ON.
 set(OPTIONAL_EXECUTABLES moiam stark termval sortn calbak reassign sortegy iambak iamcalc)
 
+set(ENGINE_SRCS
+    src/engine/spinv_setup.cpp
+    src/engine/spinv_spin_symmetry.cpp
+    src/engine/spinv_linalg_sort.c
+    src/engine/spinv_hamiltonian.cpp
+    src/engine/spinv_utils.cpp
+    src/engine/spinit.cpp
+    src/engine/dpi.cpp
+    src/engine/SpinvEngine.cpp
+    src/engine/DpiEngine.cpp
+)
+set(SPLIB_SRCS
+    src/splib/catutil.c
+    src/splib/ulib.c
+    src/splib/cnjj.c
+    src/splib/lsqfit.c
+)
+set(COMMON_SRCS
+    src/common/Logger.cpp
+    src/common/SigintFlag.cpp
+    src/common/file_helpers.cpp
+)
+
 # Add spfit
-if(TRUE)
-  add_executable_plus(spfit TRUE # This target uses BLAS
-    fit_main.cpp
-    CalFit.cpp
-    CalFit_helpers.cpp
-    CalFitIO.cpp
-    subfit.cpp
-    spinv_setup.cpp
-    spinv_spin_symmetry.cpp
-    spinv_linalg_sort.c
-    spinv_hamiltonian.cpp
-    spinv_utils.cpp
-    spinit.cpp
-    dpi.cpp
-    SpinvEngine.cpp
-    DpiEngine.cpp
-    catutil.c
-    ulib.c
-    cnjj.c
-    lsqfit.c
-    # dblas.c removed - macro handles it
-    ftran.c
-    Logger.cpp
-    SigintFlag.cpp
-    file_helpers.cpp
-  )
-endif()
+add_executable_plus(spfit TRUE
+    src/spfit/fit_main.cpp
+    src/spfit/CalFit.cpp
+    src/spfit/CalFit_helpers.cpp
+    src/spfit/CalFitIO.cpp
+    src/spfit/subfit.cpp
+    src/splib/ftran.c
+    ${ENGINE_SRCS}
+    ${SPLIB_SRCS}
+    ${COMMON_SRCS}
+)
 
 # Add spcat
-if(TRUE)
-  add_executable_plus(spcat TRUE # This target uses BLAS
-    cat_main.cpp
-    CalCat.cpp
-    CalCat_helpers.cpp
-    CalCatIO.cpp
-    sortsub.c
-    spinv_setup.cpp
-    spinv_spin_symmetry.cpp
-    spinv_linalg_sort.c
-    spinv_hamiltonian.cpp
-    spinv_utils.cpp
-    spinit.cpp
-    dpi.cpp
-    SpinvEngine.cpp
-    DpiEngine.cpp
-    catutil.c
-    ulib.c
-    cnjj.c
-    lsqfit.c
-    # dblas.c removed - macro handles it
-    Logger.cpp
-    SigintFlag.cpp
-    file_helpers.cpp
-  )
-endif()
-
-# # Add dpfit
-# if (NOT DEFINED EXCLUDE_CALMRG AND "calmrg" IN_LIST EXECUTABLES)
-#   add_executable_plus(calmrg TRUE # This target uses BLAS
-#       calfit.c
-#       sortfit.c
-#       dpi.c
-#       ulib.c cnjj.c slibgcc.c catutil.c lsqfit.c # splib
-#       # dblas.c removed
-#   )
-# endif()
-
-# # Add dpcat
-# if (NOT DEFINED EXCLUDE_CALMRG AND "calmrg" IN_LIST EXECUTABLES)
-#   add_executable_plus(calmrg TRUE # This target uses BLAS
-#       calcat.c
-#       sortsub.c
-#       dpi.c
-#       ulib.c cnjj.c slibgcc.c catutil.c lsqfit.c # splib
-#       # dblas.c removed
-#   )
-# endif()
+add_executable_plus(spcat TRUE
+    src/spcat/cat_main.cpp
+    src/spcat/CalCat.cpp
+    src/spcat/CalCat_helpers.cpp
+    src/spcat/CalCatIO.cpp
+    src/spcat/sortsub.c
+    ${ENGINE_SRCS}
+    ${SPLIB_SRCS}
+    ${COMMON_SRCS}
+)
 
 # Shared helpers required by all legacy executables
-set(CPP_HELPERS file_helpers.cpp SigintFlag.cpp Logger.cpp)
-set(SPLIB ulib.c cnjj.c catutil.c lsqfit.c)
+set(CPP_HELPERS ${COMMON_SRCS})
+set(SPLIB ${SPLIB_SRCS})
 
 # Default: calmrg (matches Makefile default targets: spfit spcat calmrg)
 add_executable_plus(calmrg TRUE
-    calmrg.cpp
+    src/legacy_apps/calmrg.cpp
     ${CPP_HELPERS}
     ${SPLIB}
 )
@@ -200,51 +173,51 @@ add_executable_plus(calmrg TRUE
 # Optional executables — always defined so `make <target>` works individually;
 # excluded from the default `make all` unless -DBUILD_ALL=ON.
 add_executable_plus(calbak TRUE
-    calbak.cpp
+    src/legacy_apps/calbak.cpp
     ${CPP_HELPERS}
     ${SPLIB}
 )
 add_executable_plus(termval TRUE
-    termval.cpp
+    src/legacy_apps/termval.cpp
     ${CPP_HELPERS}
     ${SPLIB}
 )
 add_executable_plus(stark TRUE
-    stark.cpp
+    src/legacy_apps/stark.cpp
     ${CPP_HELPERS}
     ${SPLIB}
 )
 add_executable_plus(moiam TRUE
-    moiam.cpp
-    ftran.c
+    src/legacy_apps/moiam.cpp
+    src/splib/ftran.c
     ${CPP_HELPERS}
     ${SPLIB}
 )
 add_executable_plus(iamcalc TRUE
-    iamcalc.cpp
-    ftran.c
-    readopt.c
+    src/legacy_apps/iamcalc.cpp
+    src/splib/ftran.c
+    src/legacy_apps/readopt.c
     ${CPP_HELPERS}
     ${SPLIB}
 )
 add_executable_plus(sortn FALSE
-    sortn.cpp
-    sortsub.c
+    src/legacy_apps/sortn.cpp
+    src/spcat/sortsub.c
     ${CPP_HELPERS}
 )
 add_executable_plus(reassign TRUE
-    reassign.cpp
+    src/legacy_apps/reassign.cpp
     ${CPP_HELPERS}
     ${SPLIB}
 )
 add_executable_plus(sortegy TRUE
-    sortegy.cpp
+    src/legacy_apps/sortegy.cpp
     ${CPP_HELPERS}
     ${SPLIB}
 )
 add_executable_plus(iambak TRUE
-    iambak.cpp
-    readopt.c
+    src/legacy_apps/iambak.cpp
+    src/legacy_apps/readopt.c
     ${CPP_HELPERS}
     ${SPLIB}
 )
