@@ -14,7 +14,12 @@
 #include <math.h>
 #include <time.h>
 #include <ctype.h>
-#include "calpgm.h"
+#include "splib/calpgm_types.h"
+#include "splib/blas_compat.h"
+#include "splib/ulib.h"
+#include "splib/slib.h"
+#include "splib/catutil.h"
+#include "splib/cnjj.h"
 
 static double zero = 0.;
 static double tiny = 1.e-36;

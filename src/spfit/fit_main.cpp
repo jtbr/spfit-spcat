@@ -29,6 +29,7 @@
 #include <math.h>
 #include <stdlib.h>
 #include "splib/lsqfit.h"
+#include "spfit/subfit.h"
 #include "engine/SpinvEngine.hpp"
 #include "engine/DpiEngine.hpp"
 #include "CalFit.hpp"

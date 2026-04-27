@@ -7,7 +7,11 @@
 #include <string.h>
 #include <math.h>
 #include <ctype.h>
-#include "splib/calpgm.h"
+#include "splib/calpgm_types.h"
+#include "splib/ulib.h"
+#include "splib/blas_compat.h"
+#include "splib/slib.h"
+#include "splib/catutil.h"
 #include "readopt.h"
 #include "common/CalError.hpp"
 #include "common/file_helpers.hpp"

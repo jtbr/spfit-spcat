@@ -6,10 +6,8 @@
 extern "C" {
 #endif
 
-#include <stdio.h>
-#include <stdbool.h>
 #include <ctype.h>
-#include "splib/calpgm.h"
+#include "splib/calpgm_types.h"
 
 #define ODD(i)  (((int)(i) & 1) != 0) /* Check if integer i is odd */
 #define EVEN(i) (((int)(i) & 1) == 0) /* Check if integer i is even */

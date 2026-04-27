@@ -11,7 +11,11 @@
 #include <vector>    // For std::vector
 #include <math.h>
 #include "CalFitIO.hpp"
-#include "splib/calpgm.h"
+#include "splib/calpgm_types.h"
+#include "splib/ulib.h"
+#include "splib/slib.h"
+#include "splib/catutil.h"
+#include "spfit/subfit.h"
 #include "common/CalError.hpp"
 
 

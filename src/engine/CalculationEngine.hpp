@@ -1,8 +1,7 @@
 #ifndef CALCULATION_ENGINE_HPP
 #define CALCULATION_ENGINE_HPP
 
-#include <stdio.h>
-#include "splib/calpgm.h"
+#include "splib/calpgm_types.h"
 
 class CalculationEngine {
 public:

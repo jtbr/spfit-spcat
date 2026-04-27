@@ -1,7 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "splib/calpgm.h"
+#include "splib/calpgm_types.h"
+#include "spcat/sortsub.h"
 #define NDILINE 130
 
 int sortn(char *inpname, char *outname, BOOL dokey);

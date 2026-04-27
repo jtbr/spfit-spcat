@@ -49,41 +49,41 @@ splib.a: ulib.o cnjj.o catutil.o lsqfit.o $(LBLAS)
 	ar r splib.a $^
 	ranlib splib.a
 
-fit_main.o: fit_main.cpp calpgm.h SpinvEngine.hpp DpiEngine.hpp CalFit.hpp CalFitIO.hpp lsqfit.h
-subfit.o: subfit.cpp calpgm.h
-lsqfit.o: lsqfit.c lsqfit.h
-cat_main.o: cat_main.cpp calpgm.h SpinvEngine.hpp DpiEngine.hpp CalCat.hpp CalCatIO.hpp
-sortsub.o: sortsub.c calpgm.h
-calmrg.o: calmrg.cpp calpgm.h CalError.hpp file_helpers.hpp SigintFlag.hpp
-termval.o: termval.cpp calpgm.h CalError.hpp file_helpers.hpp SigintFlag.hpp
-readopt.o: readopt.c readopt.h
-stark.o: stark.cpp calpgm.h CalError.hpp file_helpers.hpp SigintFlag.hpp
-iamcalc.o: iamcalc.cpp calpgm.h CalError.hpp file_helpers.hpp SigintFlag.hpp
-reassign.o: reassign.cpp calpgm.h CalError.hpp file_helpers.hpp SigintFlag.hpp
-moiam.o: moiam.cpp calpgm.h CalError.hpp file_helpers.hpp SigintFlag.hpp
-ulib.o: ulib.c calpgm.h
+fit_main.o: fit_main.cpp SpinvEngine.hpp DpiEngine.hpp CalFit.hpp CalFitIO.hpp lsqfit.h subfit.h CalError.hpp file_helpers.hpp SigintFlag.hpp
+subfit.o: subfit.cpp calpgm_types.h blas_compat.h ulib.h slib.h subfit.h CalError.hpp file_helpers.hpp
+lsqfit.o: lsqfit.c lsqfit.h cblas.h
+cat_main.o: cat_main.cpp calpgm_types.h SpinvEngine.hpp DpiEngine.hpp CalCat.hpp CalCatIO.hpp ulib.h slib.h catutil.h sortsub.h CalError.hpp file_helpers.hpp SigintFlag.hpp
+sortsub.o: sortsub.c calpgm_types.h sortsub.h
+calmrg.o: calmrg.cpp calpgm_types.h ulib.h slib.h catutil.h CalError.hpp file_helpers.hpp SigintFlag.hpp
+termval.o: termval.cpp calpgm_types.h ulib.h slib.h catutil.h CalError.hpp file_helpers.hpp SigintFlag.hpp
+readopt.o: readopt.c readopt.h catutil.h
+stark.o: stark.cpp calpgm_types.h blas_compat.h ulib.h slib.h CalError.hpp file_helpers.hpp SigintFlag.hpp
+iamcalc.o: iamcalc.cpp calpgm_types.h blas_compat.h ulib.h slib.h catutil.h readopt.h CalError.hpp file_helpers.hpp SigintFlag.hpp
+reassign.o: reassign.cpp calpgm_types.h ulib.h slib.h catutil.h CalError.hpp file_helpers.hpp SigintFlag.hpp
+moiam.o: moiam.cpp calpgm_types.h blas_compat.h ulib.h slib.h catutil.h CalError.hpp file_helpers.hpp SigintFlag.hpp
+ulib.o: ulib.c calpgm_types.h blas_compat.h ulib.h slib.h catutil.h cnjj.h
 cnjj.o: cnjj.c cnjj.h
 file_helpers.o: file_helpers.cpp file_helpers.hpp CalError.hpp
 SigintFlag.o: SigintFlag.cpp SigintFlag.hpp
 Logger.o: Logger.cpp Logger.hpp
-spinv_setup.o: spinv_setup.cpp calpgm.h spinit.h spinv_internal.h SpinvContext.hpp
-spinv_spin_symmetry.o: spinv_spin_symmetry.cpp calpgm.h spinit.h spinv_internal.h SpinvContext.hpp
-spinv_linalg_sort.o: spinv_linalg_sort.c calpgm.h spinit.h spinv_internal.h SpinvContext.hpp
-spinv_hamiltonian.o: spinv_hamiltonian.cpp calpgm.h spinit.h spinv_internal.h SpinvContext.hpp
-spinv_utils.o: spinv_utils.cpp calpgm.h spinit.h spinv_internal.h SpinvContext.hpp
-spinit.o: spinit.cpp calpgm.h spinit.h spinv_internal.h SpinvContext.hpp
+spinv_setup.o: spinv_setup.cpp calpgm_types.h blas_compat.h ulib.h cnjj.h slib.h catutil.h spinit.h spinv_internal.h SpinvContext.hpp CalError.hpp
+spinv_spin_symmetry.o: spinv_spin_symmetry.cpp calpgm_types.h blas_compat.h ulib.h cnjj.h slib.h catutil.h spinit.h spinv_internal.h SpinvContext.hpp CalError.hpp
+spinv_linalg_sort.o: spinv_linalg_sort.c calpgm_types.h blas_compat.h ulib.h cnjj.h slib.h catutil.h spinit.h spinv_internal.h SpinvContext.hpp
+spinv_hamiltonian.o: spinv_hamiltonian.cpp calpgm_types.h blas_compat.h ulib.h cnjj.h slib.h catutil.h spinit.h spinv_internal.h SpinvContext.hpp CalError.hpp
+spinv_utils.o: spinv_utils.cpp calpgm_types.h blas_compat.h ulib.h cnjj.h slib.h catutil.h spinit.h spinv_internal.h SpinvContext.hpp CalError.hpp
+spinit.o: spinit.cpp calpgm_types.h blas_compat.h ulib.h cnjj.h slib.h catutil.h spinit.h spinv_internal.h SpinvContext.hpp CalError.hpp
 SpinvEngine.o: SpinvEngine.cpp SpinvEngine.hpp SpinvContext.hpp spinv_internal.h
 DpiEngine.o: DpiEngine.cpp DpiEngine.hpp DpiContext.hpp dpi.h
-dpi.o: dpi.cpp dpi.h calpgm.h DpiContext.hpp
+dpi.o: dpi.cpp dpi.h calpgm_types.h blas_compat.h ulib.h cnjj.h slib.h catutil.h DpiContext.hpp CalError.hpp
 ftran.o: ftran.c
 sortn.o: sortn.cpp CalError.hpp file_helpers.hpp SigintFlag.hpp
 dblas.o: dblas.c
-calbak.o: calbak.cpp CalError.hpp file_helpers.hpp SigintFlag.hpp
-sortegy.o: sortegy.cpp calpgm.h CalError.hpp file_helpers.hpp SigintFlag.hpp
-iambak.o: iambak.cpp calpgm.h CalError.hpp file_helpers.hpp SigintFlag.hpp
-CalFit.o: CalFit.cpp CalFit.hpp CalculationEngine.hpp
-CalFit_helpers.o: CalFit_helpers.cpp CalFit.hpp
-CalFitIO.o: CalFitIO.cpp CalFitIO.hpp CalFit.hpp CalculationEngine.hpp
-CalCat.o: CalCat.cpp CalCat.hpp CalculationEngine.hpp
-CalCat_helpers.o: CalCat_helpers.cpp CalCat.hpp
-CalCatIO.o: CalCatIO.cpp CalCatIO.hpp CalCat.hpp CalculationEngine.hpp
+calbak.o: calbak.cpp calpgm_types.h ulib.h slib.h catutil.h CalError.hpp file_helpers.hpp SigintFlag.hpp
+sortegy.o: sortegy.cpp calpgm_types.h ulib.h slib.h catutil.h CalError.hpp file_helpers.hpp SigintFlag.hpp
+iambak.o: iambak.cpp calpgm_types.h ulib.h slib.h catutil.h readopt.h CalError.hpp file_helpers.hpp SigintFlag.hpp
+CalFit.o: CalFit.cpp CalFit.hpp CalFitIO.hpp CalculationEngine.hpp calpgm_types.h lsqfit.h ulib.h slib.h catutil.h subfit.h CalError.hpp SigintFlag.hpp SpinvEngine.hpp DpiEngine.hpp
+CalFit_helpers.o: CalFit_helpers.cpp CalFit.hpp CalFitIO.hpp CalculationEngine.hpp calpgm_types.h lsqfit.h ulib.h slib.h catutil.h subfit.h CalError.hpp SpinvEngine.hpp DpiEngine.hpp
+CalFitIO.o: CalFitIO.cpp CalFitIO.hpp CalFit.hpp CalculationEngine.hpp calpgm_types.h ulib.h slib.h catutil.h subfit.h CalError.hpp
+CalCat.o: CalCat.cpp CalCat.hpp CalculationEngine.hpp calpgm_types.h blas_compat.h ulib.h slib.h catutil.h CalError.hpp SigintFlag.hpp
+CalCat_helpers.o: CalCat_helpers.cpp CalCat.hpp CalculationEngine.hpp calpgm_types.h blas_compat.h ulib.h slib.h catutil.h CalError.hpp
+CalCatIO.o: CalCatIO.cpp CalCatIO.hpp CalCat.hpp CalculationEngine.hpp calpgm_types.h ulib.h slib.h catutil.h CalError.hpp file_helpers.hpp

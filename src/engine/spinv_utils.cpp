@@ -22,7 +22,12 @@ getqn(): Gets the full list of quantum numbers for a specific final state index.
 #include <string.h>
 #include <math.h>
 
-#include "splib/calpgm.h"
+#include "splib/calpgm_types.h"
+#include "splib/blas_compat.h"
+#include "splib/ulib.h"
+#include "splib/cnjj.h"
+#include "splib/slib.h"
+#include "splib/catutil.h"
 #include "spinit.h"
 #include "spinv_internal.h"
 #include "SpinvContext.hpp"

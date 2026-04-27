@@ -14,7 +14,12 @@
 #include <stdlib.h>
 #include <math.h>
 #include <string.h>
-#include "splib/calpgm.h"
+#include "splib/calpgm_types.h"
+#include "splib/blas_compat.h"
+#include "splib/ulib.h"
+#include "splib/cnjj.h"
+#include "splib/slib.h"
+#include "splib/catutil.h"
 #include "DpiContext.hpp"
 #include "dpi.h"
 #include "common/CalError.hpp"
