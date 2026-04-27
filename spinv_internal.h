@@ -9,22 +9,7 @@ extern "C" {
 #include <stdio.h>
 #include <stdbool.h>
 #include <ctype.h>
-#ifndef BOOL
-#define BOOL bool
-#endif
-#ifndef TRUE
-#define TRUE (BOOL)1
-#endif
-#ifndef FALSE
-#define FALSE (BOOL)0
-#endif
-#ifndef NULL
-#define NULL (void *)(0)
-#endif
-#ifndef EXIT_FAILURE
-#define EXIT_FAILURE 1
-#endif
-typedef unsigned char bcd_t;
+#include "calpgm.h"
 
 #define ODD(i)  (((int)(i) & 1) != 0) /* Check if integer i is odd */
 #define EVEN(i) (((int)(i) & 1) == 0) /* Check if integer i is even */
