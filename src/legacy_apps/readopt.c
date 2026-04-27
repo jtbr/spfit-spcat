@@ -1,8 +1,6 @@
-#include "splib/catutil.h"
 #include <ctype.h>
-#ifndef NULL
-#define NULL (void *)(0)
-#endif
+#include "splib/calpgm_types.h"
+#include "splib/ulib.h"
 
 int readopt(char *line, double *dval, int nval)
 {

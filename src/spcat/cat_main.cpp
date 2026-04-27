@@ -22,8 +22,6 @@
 #include "CalCatIO.hpp"
 #include "splib/calpgm_types.h"
 #include "splib/ulib.h"
-#include "splib/slib.h"
-#include "splib/catutil.h"
 #include "spcat/sortsub.h"
 #include "common/CalError.hpp"
 #include "common/file_helpers.hpp"

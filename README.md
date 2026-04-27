@@ -67,65 +67,70 @@ These are conversions of the original PDF-format documentation into markdown for
 There is a modern [python wrapper](https://github.com/Ltotheois/Pyckett) available for the original tools that you might find useful and should work the same with this version.
 
 
-## File Contents
+## Source Layout
 
-### Main programs
+Sources are organized under `src/`:
 
-- `fit_main.cpp` — spfit entry point (thin wrapper around `CalFit`)
-- `cat_main.cpp` — spcat entry point (thin wrapper around `CalCat`)
-- `calmrg.c` — catalog merge utility
+```
+src/
+├── spfit/       fit_main.cpp, CalFit.{cpp,hpp}, CalFit_helpers.cpp,
+│                CalFitIO.{cpp,hpp}, subfit.{cpp,h}
+├── spcat/       cat_main.cpp, CalCat.{cpp,hpp}, CalCat_helpers.cpp,
+│                CalCatIO.{cpp,hpp}, sortsub.{c,h}
+├── engine/      CalculationEngine.hpp,
+│                SpinvEngine.{cpp,hpp}, SpinvContext.hpp,
+│                spinv_setup.cpp, spinv_spin_symmetry.cpp,
+│                spinv_linalg_sort.c, spinv_hamiltonian.cpp,
+│                spinv_utils.cpp, spinv_internal.h,
+│                DpiEngine.{cpp,hpp}, DpiContext.hpp, dpi.{cpp,h},
+│                spinit.{cpp,h}
+├── splib/       ulib.{c,h}, cnjj.{c,h}, catutil.{c,h},
+│                lsqfit.{c,h}, cblas.h, blas_compat.h, dblas.c,
+│                ftran.c, calpgm_types.h
+├── common/      CalError.hpp, file_helpers.{cpp,hpp},
+│                Logger.{cpp,hpp}, SigintFlag.{cpp,hpp}
+└── legacy_apps/ calmrg.cpp, calbak.cpp, sortn.cpp, reassign.cpp,
+                 sortegy.cpp, termval.cpp, stark.cpp, moiam.cpp,
+                 iamcalc.cpp, iambak.cpp
+```
 
-### Core classes (C++)
+**Key files:**
 
-- `CalFit.cpp`, `CalFit_helpers.cpp`, `CalFit.hpp` — fitting logic (Marquardt-Levenberg iteration)
-- `CalFitIO.cpp`, `CalFitIO.hpp` — spfit file I/O (`.par`, `.lin`, `.fit`, `.var`)
-- `CalCat.cpp`, `CalCat_helpers.cpp`, `CalCat.hpp` — catalog generation logic
-- `CalCatIO.cpp`, `CalCatIO.hpp` — spcat file I/O (`.int`, `.var`)
-- `CalculationEngine.hpp` — abstract interface for Hamiltonian computation
-
-### Calculation engines
-
-- `SpinvEngine.cpp`, `SpinvEngine.hpp`, `SpinvContext.hpp` — engine for asymmetric/symmetric tops and general molecules
-- `spinv_setup.c`, `spinv_spin_symmetry.c`, `spinv_linalg_sort.c`, `spinv_hamiltonian.c`, `spinv_utils.c`, `spinv_internal.h` — underlying C implementation (parameterized via `SpinvContext`; decomposed from Pickett's original single `spinv.c`)
-- `DpiEngine.cpp`, `DpiEngine.hpp`, `DpiContext.hpp` — engine for diatomic/linear molecules with nuclear spin
-- `dpi.c`, `dpi.h` — underlying C implementation (parameterized via `DpiContext`)
-
-### Libraries
-
-- `calpgm.h` — central configuration header included by nearly all C/C++ source files
-- `ulib.c` — parameter I/O (`getpar`, `getvar`, `putvar`), error analysis (`calerr`, `prcorr`), slib utility functions (`chtime`, `fgetstr`)
-- `lsqfit.c`, `lsqfit.h` — least-squares fitting (QR factorization, Marquardt-Levenberg solver)
-- `dblas.c` — fallback LINPACK double precision BLAS routines (required for exact numerical reproduction of baseline)
-- `cnjj.c`, `cnjj.h` — Clebsch-Gordan coefficients
-- `catutil.c`, `catutil.h` — catalog utility functions
-- `sortsub.c` — frequency sorting routines shared by spcat and the sortn utility
-- `subfit.c` — fitting routines supplementary to CalFit
-- `spinit.c`, `spinit.h` — spin initialization
-
-### Auxiliary programs (legacy, unmodernized)
-
-These are original Pickett utility programs. They compile and link (`make all`) but have not been modernized, tested, or verified against the current codebase. They link against the old `splib.a` static library (where applicable) rather than the new C++ classes.
-
-**Data preparation / workflow:**
-- `sortn.c` — standalone CLI tool for sorting catalog files by frequency (wraps the `sortn()` function from `sortsub.c`, which is also linked directly into spcat)
-- `calmrg.c` — merges experimental lines into a catalog structure
-- `calbak.c` — converts `.cat` format back to `.lin` for re-fitting
-- `sortegy.c` — sorts energy levels by quantum number rules
-- `termval.c` — associates spectral lines with upper/lower energy levels from a term list
-- `reassign.c` — reassigns quantum numbers to lines via a rule file
-
-**Internal rotation (IAM) sub-suite:**
-- `moiam.c` — computes internal rotation structural parameters from molecular coordinates
-- `iamcalc.c` — Hamiltonian diagonalization for internal rotation analysis
-- `iambak.c` — back-transforms fitted IAM parameters between models
-- `ftran.c` — Fourier transform routines used by moiam and iamcalc
-- `readopt.c`, `readopt.h` — option/parameter reading used by iamcalc and iambak
-
-**Specialized:**
-- `stark.c` — computes Stark effect coefficients for molecular energy levels
+- `src/spfit/CalFit.cpp` — Marquardt-Levenberg fitting logic
+- `src/spcat/CalCat.cpp` — catalog generation logic
+- `src/engine/CalculationEngine.hpp` — abstract interface for Hamiltonian computation
+- `src/splib/ulib.c` — parameter I/O (`getpar`, `getvar`, `putvar`), line and BCD parsing, utility functions
+- `src/splib/lsqfit.c` — least-squares solver (QR factorization, Marquardt-Levenberg)
+- `src/splib/cnjj.c` - Clebsch-Gordan coefficients
+- `src/splib/dblas.c` — fallback BLAS (required for exact numerical reproduction of baseline)
 
 **Runtime support files (not included in repo):**
-- `*.nam` — parameter name files used by `getlbl` in `subfit.c` to label `.fit` output (e.g. `sping.nam`, `dpi.nam`). Searched in the current directory, then in the directory specified by the `SPECNAME` environment variable. Not included in this repository; their absence is handled gracefully (output will lack parameter name labels).
+
+- `*.nam` — parameter name files used by `getlbl` in `subfit.cpp` to label `.fit` output (e.g. `sping.nam`, `dpi.nam`). Searched in the current directory, then in the directory specified by the `SPECNAME` environment variable. Not included in this repository; their absence is handled gracefully (output will lack parameter name labels).
+
+### Auxiliary programs
+
+Legacy utility programs live in `src/legacy_apps/`. They compile and link (`make all`) but have not been modernized and the current test suite does not test them.
+**Data preparation / workflow:**
+
+- `sortn` — standalone CLI tool for sorting catalog files by frequency (wraps the `sortn()` function from `sortsub.c`, which is also linked directly into spcat)
+- `calmrg` — merges experimental lines into a catalog structure
+- `calbak` — converts `.cat` format back to `.lin` for re-fitting
+- `sortegy` — sorts energy levels by quantum number rules
+- `termval` — associates spectral lines with upper/lower energy levels from a term list
+- `reassign` — reassigns quantum numbers to lines via a rule file
+
+**Internal rotation (IAM) sub-suite:**
+
+- `moiam` — computes internal rotation structural parameters from molecular coordinates
+- `iamcalc` — Hamiltonian diagonalization for internal rotation analysis
+- `iambak` — back-transforms fitted IAM parameters between models
+- `ftran` — Fourier transform routines used by moiam and iamcalc
+- `readopt`, `readopt.h` — option/parameter reading used by iamcalc and iambak
+
+**Specialized:**
+
+- `stark` — computes Stark effect coefficients for molecular energy levels
 
 ## Contributions
 

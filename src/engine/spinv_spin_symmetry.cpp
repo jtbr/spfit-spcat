@@ -30,8 +30,6 @@ getmask(): Creates a selection mask for dircos based on K, L, and I<sub>tot</sub
 #include "splib/blas_compat.h"
 #include "splib/ulib.h"
 #include "splib/cnjj.h"
-#include "splib/slib.h"
-#include "splib/catutil.h"
 #include "spinit.h"
 #include "spinv_internal.h"
 #include "SpinvContext.hpp"

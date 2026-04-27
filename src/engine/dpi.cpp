@@ -18,8 +18,6 @@
 #include "splib/blas_compat.h"
 #include "splib/ulib.h"
 #include "splib/cnjj.h"
-#include "splib/slib.h"
-#include "splib/catutil.h"
 #include "DpiContext.hpp"
 #include "dpi.h"
 #include "common/CalError.hpp"

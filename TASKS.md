@@ -6,7 +6,7 @@ This document outlines the prioritized tasks for modernizing the SPFIT/SPCAT sof
 
 - [x] **Task 1: Code Readability and Clarity Improvements (Preliminary)**
     - Enhanced readability of core C code: comments, function documentation, targeted variable renames.
-    - `spinv.c` split into `spinv_setup.c`, `spinv_spin_symmetry.c`, `spinv_linalg_sort.c`, `spinv_hamiltonian.c`, `spinv_utils.c` with `spinv_internal.h`.
+    - `spinv.c` split into `spinv_setup.cpp`, `spinv_spin_symmetry.cpp`, `spinv_linalg_sort.c`, `spinv_hamiltonian.cpp`, `spinv_utils.cpp` with `spinv_internal.h`.
 
 - [x] **Task 2: Fix Compiler Warnings and Remove Unused Code**
     - All compiler warnings fixed; compiles cleanly with `-Wall -Wextra`. `cppcheck` clean. Unused functions/files removed.
@@ -43,7 +43,7 @@ This document outlines the prioritized tasks for modernizing the SPFIT/SPCAT sof
     - **Design notes for future work**:
         - CalFit operates fully in-memory (Input/Output structs). CalCat intentionally uses `FILE*` streams for streaming output — for Python bindings (Task 9), this would need to become a callback or accumulate results in `CalCatOutput`.
         - Input structs use `std::vector`; class internals still use C-style `mallocq`/`free`, encapsulated by RAII destructors. Converting internals to `std::vector` members is possible but cosmetic — the ownership model is already correct.
-        - `CalFitIO` and `CalCatIO` are independent static classes. Both call the same low-level C functions (`getpar`, `getvar`, `setopt` in `ulib.c`), but their wrapper logic differs (different file formats, second-line fields, additional data sections). Shared I/O abstraction was considered and rejected — the shared code already lives in `ulib.c`, and a higher-level wrapper would add parameterization complexity for no practical benefit.
+        - `CalFitIO` and `CalCatIO` are independent static classes. Both call the same low-level C functions (`getpar`, `getvar` in `ulib.c`), but their wrapper logic differs (different file formats, second-line fields, additional data sections). Shared I/O abstraction was considered and rejected — the shared code already lives in `ulib.c`, and a higher-level wrapper would add parameterization complexity for no practical benefit.
     - **Key matrix layout facts** (documented as in-situ comments in `CalFit.cpp`):
         - `fit` is column-major, leading dimension `ndfit = nfit+1`; element `(r,c) = fit[r + c*ndfit]`.
         - `fitbgn` and `var` are packed **upper** triangular; column `j` has `j+1` elements.
@@ -67,14 +67,19 @@ This document outlines the prioritized tasks for modernizing the SPFIT/SPCAT sof
     - 55/55 regression tests pass.
     - ~~Remove slibgcc.c, replacing with simple macros or standard replacements or more modern approaches.~~ Done in Task 7: `slibgcc.c` no longer compiled; all callers replaced with `file_helpers`, `calalloc`, `SigintFlag`. (from task 9.0)
 
+- [x] **Task 9.0: legacy cleanup**:
+  - Reorganized all sources into `src/{spfit,spcat,engine,splib,common,legacy_apps}/`. Include path: `-Isrc`, style `"module/file.h"` everywhere.
+  - Replaced `calpgm.h` with focused headers: `calpgm_types.h` (types/macros), `blas_compat.h` (CBLAS aliases), `ulib.h` (ulib + slib + pcard), `subfit.h`, `sortsub.h`, `catutil.h` (readqn/gupfmt only). Public C++ headers (`CalFit.hpp`, `CalCat.hpp`, `CalculationEngine.hpp`) no longer transitively pull in BLAS aliases or C prototypes.
+  - `slib.h` merged into `ulib.h`; `pcard` moved from `catutil.c` to `ulib.c`.
+  - 55/55 regression tests pass.
 
 ## Open Tasks
 
 - [ ] **Task X: Investigate suspected bugs in original C code**
     - These are suspicious patterns in the original Pickett code. None are triggered by existing test cases. Investigate if relevant test cases arise or before making changes to the surrounding code.
     - `calfit-orig.cpp`: "Supplied Variance" (`inpcor > 0`) path has `for (n = 1; i <= nfit; ++n)` — loop condition uses `i` but counter is `n`. Either dead code or a latent bug. The C++ refactoring in `CalFit.cpp` implements this differently. No test molecules use `inpcor > 0`.
-    - `spinv_utils.c:82`: `ibtmp = idval[0]` — comment says this should probably read `idval[1]`. May be relevant for internal rotation cases.
-    - `spinv_spin_symmetry.c:105`: `iis[i] = (short)ii` — possible off-by-one (`ii - 1`?).
+    - `spinv_utils.cpp:82`: `ibtmp = idval[0]` — comment says this should probably read `idval[1]`. May be relevant for internal rotation cases.
+    - `spinv_spin_symmetry.cpp:105`: `iis[i] = (short)ii` — possible off-by-one (`ii - 1`?).
     - `ulib.c:675`: `fabs(*pvar) < 1.01` gate on Cholesky diagonal — prevents reading correlation block if any diagonal exceeds 1.01, which shouldn't happen for a valid correlation matrix.
     - Any bugs quashed here should probably be fixed in the original (C) branch as well
 
@@ -87,10 +92,6 @@ This document outlines the prioritized tasks for modernizing the SPFIT/SPCAT sof
         - **Memory access**: Review cache utilization in the Hamiltonian and intensity matrix computation inner loops.
     - **Constraint**: Quantitative results must remain unchanged unless a new baseline is established.
 
-
-- [ ] **Task 9.0: legacy cleanup**:
-    - Break apart calpgm.h header (probably into calpgm_types.h, blas_compat.h and headers for cnjj/slib/catutil/slib/ulib/subfit), including only what's needed and keeping them out of C++ headers if possible. More generally, consider usage of headers and if they should be changed or re-organized.
-    - move legacy apps aside, probably into a `legacy` subdirectory, keeping only spfit/spcat as the main targets (they should remain buildable/usable). Consider other code reorganization.
 
 - [ ] **Task 9.1: Python interface and example usage**
     - C++ example demonstrating programmatic use of CalFit/CalCat (construct engine, populate Input struct, call `run()`, read Output struct).
@@ -108,7 +109,7 @@ This document outlines the prioritized tasks for modernizing the SPFIT/SPCAT sof
 - [ ] **Task 11: Re-evaluate Quantum Number (QN) Limits**
     - `MAXQN` is currently 10, matching the Pickett catalog format specification. Changing it would break compatibility with existing catalogs and tools.
     - A better approach may be to support extended formats through new code paths (e.g., a wider output format option) rather than changing the constant.
-    - Relevant code: `calpgm.h`, `spinv_utils.c:getqn`, `CalFit_helpers.cpp:getblk`, `CalCat.cpp:computeCatalog`.
+    - Relevant code: `calpgm_types.h` (MAXQN), `spinv_utils.cpp:getqn`, `CalFit_helpers.cpp:getblk`, `CalCat.cpp:computeCatalog`.
 
 - Any reason to consider use of modern linear algebra libraries to replace legacy code?
 

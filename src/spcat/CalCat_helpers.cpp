@@ -13,8 +13,6 @@
 #include "splib/calpgm_types.h"
 #include "splib/blas_compat.h"
 #include "splib/ulib.h"
-#include "splib/slib.h"
-#include "splib/catutil.h"
 #include "common/CalError.hpp"
 
 int CalCat::qnfmt(short *iqu, int nqn, char *sqn)

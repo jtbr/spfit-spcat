@@ -31,6 +31,12 @@ int getbcd(const char *line, bcd_t *ivbcd, int nbcd);
 int putbcd(/*@out@*/ char *line, int nlen, const bcd_t *ivbcd);
 int bcd2i(bcd_t btmp);
 bcd_t i2bcd(int i);
+/* formerly part of slibgcc */
+int  chtime(char str[], const int n);
+int  fgetstr(/*@out@*/char buffer[], const int n, FILE *stream);
+/* formerly part of catutil */
+int  pcard(const char *card, /*@out@*/ double *val, const int nval,
+           /*@null@*/ const int *fmtlen);
 
 #ifdef __cplusplus
 }
