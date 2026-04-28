@@ -21,7 +21,7 @@ bool CalCatIO::readInput(const std::string &intFile,
                          const std::string &varFile,
                          CalCatInput &input,
                          std::unique_ptr<CalculationEngine> &calc_engine,
-                         FILE *luout)
+                         OutputSink *luout)
 {
   char titl[NCARD];
   double *dvec;
@@ -33,7 +33,7 @@ bool CalCatIO::readInput(const std::string &intFile,
     return false;
   }
   if (!luout) {
-    puts("Error: luout stream is NULL.");
+    puts("Error: luout sink is NULL.");
     return false;
   }
 
@@ -53,7 +53,7 @@ bool CalCatIO::readInput(const std::string &intFile,
   if (!first) {
     chtime(titl, 82);
     fputs(titl, stdout);
-    fputs(titl, luout);
+    luout->puts(titl);
     input.title = std::string(titl);
     first = (fgetstr(titl, NCARD, luint) <= 0);
   }
@@ -91,11 +91,11 @@ bool CalCatIO::readInput(const std::string &intFile,
   }
   if (input.qrot < 1)
     input.qrot = 1;
-  fprintf(luout, "ID=%6ld QSPINROT= %14.4f MIN, MAX QN= %3d %3d\n",
-          input.itag, input.qrot, input.inblk, input.lblk);
-  fprintf(luout, "MIN.LOG.STR= %9.3f MIN.LOG.STR(FRQ/300GHZ)**2= %9.3f",
-          input.thrsh, input.thrsh1);
-  fprintf(luout, " MAX FREQ %10.1f GHZ, TEMP= %8.2f\n", input.fqmax, input.tmq);
+  luout->printf("ID=%6ld QSPINROT= %14.4f MIN, MAX QN= %3d %3d\n",
+               input.itag, input.qrot, input.inblk, input.lblk);
+  luout->printf("MIN.LOG.STR= %9.3f MIN.LOG.STR(FRQ/300GHZ)**2= %9.3f",
+               input.thrsh, input.thrsh1);
+  luout->printf(" MAX FREQ %10.1f GHZ, TEMP= %8.2f\n", input.fqmax, input.tmq);
 
   /* read dipole moments */
   int ndip = input.ndip;
@@ -130,7 +130,7 @@ bool CalCatIO::readInput(const std::string &intFile,
       input.nvdip[k] += 1;
     }
     ibcd += NDECDIP;
-    fprintf(luout, "%6d %s\n", k + 1, titl);
+    luout->printf("%6d %s\n", k + 1, titl);
   }
   input.ndip = j;
   ndip = j;
@@ -165,9 +165,9 @@ bool CalCatIO::readInput(const std::string &intFile,
   input.npar = 0;
   input.catqn = MAXCAT;
   if (fgetstr(titl, NCARD, luvar) > 0) {
-    fputs(".VAR FILE TITLE :", luout);
-    fputs(titl, luout);
-    fputc('\n', luout);
+    luout->puts(".VAR FILE TITLE :");
+    luout->puts(titl);
+    luout->puts("\n");
     if (fgetstr(titl, NCARD, luvar) > 0) {
       dvec[0] = 0;
       dvec[1] = 1;
@@ -201,7 +201,7 @@ bool CalCatIO::readInput(const std::string &intFile,
   input.idpar.resize(nl);
   input.idpar[0] = (bcd_t)input.ndbcd;
   strcpy(titl, "0123456789");
-  int itmp = getpar(luvar, luout, &input.nfit, &npar, input.idpar.data(),
+  int itmp = getpar(luvar, luout->file(), &input.nfit, &npar, input.idpar.data(),
                     input.par.data(), input.derv.data(), titl, 0);
   input.npar = npar;
 

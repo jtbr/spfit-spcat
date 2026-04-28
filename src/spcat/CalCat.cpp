@@ -22,7 +22,7 @@
 #define NCARD 130
 
 CalCat::CalCat(std::unique_ptr<CalculationEngine> &calc_engine,
-               FILE *luout, FILE *lucat, FILE *luegy, FILE *lustr,
+               OutputSink *luout, OutputSink *lucat, OutputSink *luegy, OutputSink *lustr,
                Logger &logger)
     : calc(std::move(calc_engine)),
       m_logger(logger),
@@ -226,8 +226,8 @@ void CalCat::setupBlocks(const CalCatInput &input)
 
   m_nbkpj = m_lblk;
   int i_maxdm = nsize_p;
-  fprintf(m_luout, "IQNFMT = %d\n", m_iqnfmt);
-  calc->setblk(m_luout, m_npar, m_idpar, m_par, &m_nbkpj, &i_maxdm);
+  m_luout->printf("IQNFMT = %d\n", m_iqnfmt);
+  calc->setblk(m_luout->file(), m_npar, m_idpar, m_par, &m_nbkpj, &i_maxdm);
   m_maxdm = (unsigned)i_maxdm;
 
   m_inblk = m_nbkpj * m_inblk + 1;
@@ -245,7 +245,7 @@ void CalCat::setupBlocks(const CalCatInput &input)
   }
 
   /* set up DIAG, NSAV */
-  calc->setint(m_luout, &m_diag, &m_nsav, m_ndip, m_idip, m_isimag);
+  calc->setint(m_luout->file(), &m_diag, &m_nsav, m_ndip, m_idip, m_isimag);
 
   if (m_prstr) {
     int k = 0, ij = 0;
@@ -263,7 +263,7 @@ void CalCat::setupBlocks(const CalCatInput &input)
       }
     }
     if (ij > 0)
-      fputs(" mixed magnetic and electric dipoles in str file\n", m_luout);
+      m_luout->puts(" mixed magnetic and electric dipoles in str file\n");
   }
 
   m_nsav = (m_nsav + 1) * m_nbkpj;
@@ -393,9 +393,9 @@ void CalCat::computeCatalog(const CalCatInput &/*input*/, CalCatOutput &output)
 
     /* print out energies and compute partition function */
     if (m_prfrq) {
-      fprintf(m_luout, " ENERGIES FOR BLOCK NUMBER %3d, INDEX-DEGEN-ENERGY-",
-              iblk);
-      fputs("-EST.ERROR-MIXING-   QUANTUM NUMBERS\n", m_luout);
+      m_luout->printf(" ENERGIES FOR BLOCK NUMBER %3d, INDEX-DEGEN-ENERGY-",
+                      iblk);
+      m_luout->puts("-EST.ERROR-MIXING-   QUANTUM NUMBERS\n");
       first = TRUE;
     }
     kbgn = 0;
@@ -452,52 +452,52 @@ void CalCat::computeCatalog(const CalCatInput &/*input*/, CalCatOutput &output)
         output.qsum[k] += dgn * exp(tmp);
       }
       if (m_prfrq) {
-        fprintf(m_luout, "%6d %4d %17.6f %17.6f %10.6f",
-                iblk, i + 1, egx, err, m_pmix[i]);
+        m_luout->printf("%6d %4d %17.6f %17.6f %10.6f",
+                        iblk, i + 1, egx, err, m_pmix[i]);
         if (m_globfmt != 0)
-          fprintf(m_luout, " (%3d)", ktsp);
+          m_luout->printf(" (%3d)", ktsp);
         for (int k = 0; k < m_maxqn; ++k) {
-          fprintf(m_luout, "%3d", (int)iqni[k]);
+          m_luout->printf("%3d", (int)iqni[k]);
         }
-        fputc('\n', m_luout);
+        m_luout->puts("\n");
       }
       if (m_pregy) {
-        fprintf(m_luegy, "%6d %4d %17.6f %17.6f %10.6f %4d:",
-                iblk, i + 1, egx, err, m_pmix[i], idgn);
+        m_luegy->printf("%6d %4d %17.6f %17.6f %10.6f %4d:",
+                        iblk, i + 1, egx, err, m_pmix[i], idgn);
         if (m_globfmt != 0)
-          fprintf(m_luegy, "(%3d)", ktsp);
+          m_luegy->printf("(%3d)", ktsp);
         for (int k = 0; k < m_maxqn; ++k) {
-          fprintf(m_luegy, "%3d", (int)iqni[k]);
+          m_luegy->printf("%3d", (int)iqni[k]);
         }
-        fputc('\n', m_luegy);
+        m_luegy->puts("\n");
       }
       if (m_prder) {
         j = 0;
         for (int k = 0; k < m_nfit; ++k) {
           if (j == 0)
-            fputs("        ", m_luegy);
-          fprintf(m_luegy, " %5d %13.5E", k + 1, m_derv[k]);
+            m_luegy->puts("        ");
+          m_luegy->printf(" %5d %13.5E", k + 1, m_derv[k]);
           if ((++j) == 6) {
-            fputc('\n', m_luegy);
+            m_luegy->puts("\n");
             j = 0;
           }
         }
         if (j > 0)
-          fputc('\n', m_luegy);
+          m_luegy->puts("\n");
       }
       if (m_preig) {
         j = 0;
         for (int k = kbgn; k < isiz; ++k) {
           if (j == 0)
-            fputs("        ", m_luegy);
-          fprintf(m_luegy, " %5d %13.5E", k + 1, teigp[k]);
+            m_luegy->puts("        ");
+          m_luegy->printf(" %5d %13.5E", k + 1, teigp[k]);
           if ((++j) == 6) {
-            fputc('\n', m_luegy);
+            m_luegy->puts("\n");
             j = 0;
           }
         }
         if (j > 0)
-          fputc('\n', m_luegy);
+          m_luegy->puts("\n");
       }
     }
 
@@ -602,8 +602,8 @@ void CalCat::computeCatalog(const CalCatInput &/*input*/, CalCatOutput &output)
               str = dvec_str[ij];
               if (isneg != 0 && m_isimag[ij] > 0)
                 str = -str;
-              fprintf(m_lustr, "%15.4f%15.6E %4d %s %4d\n", frq, str,
-                      m_iqnfmt, sqn, ij + 1);
+              m_lustr->printf("%15.4f%15.6E %4d %s %4d\n", frq, str,
+                              m_iqnfmt, sqn, ij + 1);
             }
           }
           strr *= strr;
@@ -631,32 +631,31 @@ void CalCat::computeCatalog(const CalCatInput &/*input*/, CalCatOutput &output)
             err = m_bigerr;
           elow /= m_cmc;
           if (first) {
-            fputs(" FREQUENCY-EST.ERROR.-LINE.STR. DIP**2-LGSTR.-ITD,",
-                  m_luout);
-            fputs("-GUP-I.D.-QNFORM-QUANTUM NUMBERS\n", m_luout);
+            m_luout->puts(" FREQUENCY-EST.ERROR.-LINE.STR. DIP**2-LGSTR.-ITD,");
+            m_luout->puts("-GUP-I.D.-QNFORM-QUANTUM NUMBERS\n");
             first = FALSE;
           }
           if (m_prfrq) {
-            fprintf(m_luout, "%13.4f %8.4f %12.5E %8.4f %2d",
-                    frq, err, strr, strlg, m_itd);
-            fprintf(m_luout, "%10.4f %3d %7ld %4d %s\n",
-                    elow, igup, m_itag, m_iqnfmt, sqn);
+            m_luout->printf("%13.4f %8.4f %12.5E %8.4f %2d",
+                            frq, err, strr, strlg, m_itd);
+            m_luout->printf("%10.4f %3d %7ld %4d %s\n",
+                            elow, igup, m_itag, m_iqnfmt, sqn);
           }
           ++nline;
           gupfmt(igup, sgup);
           sgup[3] = '\0';
           if (m_prir) {
-            fprintf(m_lucat, "%13.6f%8.6f%8.4f%2d%10.4f%s%7ld%4d",
-                    frq, err, strlg, m_itd, elow, sgup, m_itag, m_iqnfmt);
+            m_lucat->printf("%13.6f%8.6f%8.4f%2d%10.4f%s%7ld%4d",
+                            frq, err, strlg, m_itd, elow, sgup, m_itag, m_iqnfmt);
           } else if (frq < 99999999.) {
-            fprintf(m_lucat, "%13.4f%8.4f%8.4f%2d%10.4f%s%7ld%4d",
-                    frq, err, strlg, m_itd, elow, sgup, m_itag, m_iqnfmt);
+            m_lucat->printf("%13.4f%8.4f%8.4f%2d%10.4f%s%7ld%4d",
+                            frq, err, strlg, m_itd, elow, sgup, m_itag, m_iqnfmt);
           } else {
-            fprintf(m_lucat, "%13.3f%8.3f%8.3f%2d%10.4f%s%7ld%4d",
-                    frq, err, strlg, m_itd, elow, sgup, m_itag, m_iqnfmt);
+            m_lucat->printf("%13.3f%8.3f%8.3f%2d%10.4f%s%7ld%4d",
+                            frq, err, strlg, m_itd, elow, sgup, m_itag, m_iqnfmt);
           }
-          fputs(sqn, m_lucat);
-          fputc('\n', m_lucat);
+          m_lucat->puts(sqn);
+          m_lucat->puts("\n");
         }
       }
       if (dvec_alloc)
@@ -676,28 +675,28 @@ void CalCat::finalizeOutput(const CalCatInput &/*input*/, CalCatOutput &output)
 
   if (m_ifdump) {
     m_logger.warn(" WARNING: THERE WAS NO DIAGONALIZATION");
-    fputs(warn, m_luout);
+    m_luout->puts(warn);
   }
   m_logger.info("INITIAL Q = %14.4f, NEW Q IS RELATIVE TO MIN.EGY.= %14.4f",
                 m_qrot, output.egymin);
-  fprintf(m_luout, "INITIAL Q = %14.4f, NEW Q IS RELATIVE TO MIN.EGY.= %14.4f\n",
-          m_qrot, output.egymin);
+  m_luout->printf("INITIAL Q = %14.4f, NEW Q IS RELATIVE TO MIN.EGY.= %14.4f\n",
+                  m_qrot, output.egymin);
   m_logger.info(" NUMBER OF LINES = %6ld", output.nline);
-  fprintf(m_luout, " NUMBER OF LINES = %6ld\n", output.nline);
+  m_luout->printf(" NUMBER OF LINES = %6ld\n", output.nline);
   m_logger.info("TEMPERATURE - Q(SPIN-ROT.) - log Q(SPIN-ROT.)");
-  fputs(headq, m_luout);
+  m_luout->puts(headq);
   for (int i = 0; i < output.ntemp; ++i) {
     double qlog = -100;
     if (output.qsum[i] > m_zero)
       qlog = log10(output.qsum[i]);
     m_logger.info(" %10.3f %14.4f %9.4f", output.temp[i], output.qsum[i], qlog);
-    fprintf(m_luout, " %10.3f %14.4f %9.4f\n", output.temp[i], output.qsum[i], qlog);
+    m_luout->printf(" %10.3f %14.4f %9.4f\n", output.temp[i], output.qsum[i], qlog);
   }
 
   /* release engine storage */
   int nbkpj_tmp = m_nbkpj;
   int i_tmp = 0;
-  calc->setblk(m_luout, 0, m_idpar, m_par, &nbkpj_tmp, &i_tmp);
+  calc->setblk(m_luout->file(), 0, m_idpar, m_par, &nbkpj_tmp, &i_tmp);
 
   /* free block structure memory */
   SBLK *pblk = m_blk;

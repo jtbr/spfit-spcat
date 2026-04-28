@@ -30,7 +30,7 @@ public:
                         const std::string &varFile,
                         CalCatInput &input,
                         std::unique_ptr<CalculationEngine> &calc_engine,
-                        FILE *luout);
+                        OutputSink *luout);
 };
 
 #endif // CALCAT_IO_HPP

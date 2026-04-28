@@ -15,6 +15,7 @@
 #include "engine/CalculationEngine.hpp"
 #include "splib/lsqfit.h" // For bcd_t, MAXQN, BOOL, etc.
 #include "common/Logger.hpp"
+#include "spcat/OutputSink.hpp"
 
 #define NTEMP 1001
 #define TMAX 1000
@@ -78,6 +79,8 @@ struct CalCatInput
  * @brief Output data structure for CalCat class
  *
  * Holds summary results from catalog generation.
+ * cat_lines/egy_lines/str_lines are populated when MemorySinks are drained
+ * after run() (library/Python use); empty for FileSink (CLI) use.
  */
 struct CalCatOutput
 {
@@ -89,6 +92,10 @@ struct CalCatOutput
   int ntemp;
   double temp[NTEMP];
   double qsum[NTEMP];
+
+  std::vector<std::string> cat_lines;
+  std::vector<std::string> egy_lines;
+  std::vector<std::string> str_lines;
 };
 
 /**
@@ -118,7 +125,7 @@ class CalCat
 {
 public:
   CalCat(std::unique_ptr<CalculationEngine> &calc_engine,
-         FILE *luout, FILE *lucat, FILE *luegy, FILE *lustr,
+         OutputSink *luout, OutputSink *lucat, OutputSink *luegy, OutputSink *lustr,
          Logger &logger = Logger::defaultLogger());
   ~CalCat();
 
@@ -127,10 +134,10 @@ public:
 private:
   std::unique_ptr<CalculationEngine> calc;
   Logger &m_logger;
-  FILE *m_luout;
-  FILE *m_lucat;
-  FILE *m_luegy;
-  FILE *m_lustr;
+  OutputSink *m_luout;
+  OutputSink *m_lucat;
+  OutputSink *m_luegy;
+  OutputSink *m_lustr;
 
   // Phase methods (throw CalError on failure)
   void validateInput(const CalCatInput &input);

@@ -23,6 +23,7 @@
 #include "splib/calpgm_types.h"
 #include "splib/ulib.h"
 #include "spcat/sortsub.h"
+#include "spcat/OutputSink.hpp"
 #include "common/CalError.hpp"
 #include "common/file_helpers.hpp"
 #include "common/SigintFlag.hpp"
@@ -55,38 +56,43 @@ int main(int argc, char *argv[])
   file_helpers::parse_file_args(argc, argv, NFILE, fname, ext);
 
   /* Open output stream */
-  FILE *luout = file_helpers::open_output(fname[eout], "w");
+  FILE *luout_f = file_helpers::open_output(fname[eout], "w");
+  FileSink luout_sink(luout_f);
 
   /* Read input data from .int and .var files */
   CalCatInput input;
-  if (!CalCatIO::readInput(fname[eint], fname[evar], input, calc_engine, luout)) {
-    fclose(luout);
+  if (!CalCatIO::readInput(fname[eint], fname[evar], input, calc_engine, &luout_sink)) {
+    fclose(luout_f);
     return EXIT_FAILURE;
   }
 
   /* Open output streams based on iflg */
-  FILE *luegy = luout;
-  FILE *lustr = luout;
+  FILE *luegy_f = luout_f;
+  FILE *lustr_f = luout_f;
   int iflg = input.iflg;
   if (iflg >= 1000)
     iflg %= 1000;
   iflg %= 100;
   if (iflg >= 10) {
-    lustr = file_helpers::open_output(fname[estr], "w");
+    lustr_f = file_helpers::open_output(fname[estr], "w");
     iflg %= 10;
   }
   if (iflg != 0) {
-    luegy = file_helpers::open_output(fname[eegy], "w");
+    luegy_f = file_helpers::open_output(fname[eegy], "w");
   }
 
   /* Open catalog output stream */
-  FILE *lucat = file_helpers::open_output(fname[ecat], "w");
+  FILE *lucat_f = file_helpers::open_output(fname[ecat], "w");
+
+  FileSink luegy_sink(luegy_f);
+  FileSink lustr_sink(lustr_f);
+  FileSink lucat_sink(lucat_f);
 
   /* Create CalCat instance and run */
   CalCatOutput output;
   {
     SigintFlag sigint_guard; // (guard active for duration of run)
-    CalCat calCat(calc_engine, luout, lucat, luegy, lustr);
+    CalCat calCat(calc_engine, &luout_sink, &lucat_sink, &luegy_sink, &lustr_sink);
     try
     {
       calCat.run(input, output);
@@ -94,21 +100,21 @@ int main(int argc, char *argv[])
     catch (const CalError &e)
     {
       fprintf(stderr, "Catalog generation failed: %s\n", e.what());
-      if (luegy != luout) fclose(luegy);
-      if (lustr != luout) fclose(lustr);
-      fclose(luout);
-      fclose(lucat);
+      if (luegy_f != luout_f) fclose(luegy_f);
+      if (lustr_f != luout_f) fclose(lustr_f);
+      fclose(luout_f);
+      fclose(lucat_f);
       return EXIT_FAILURE;
     }
   }
 
   /* Close output streams */
-  if (luegy != luout)
-    fclose(luegy);
-  if (lustr != luout)
-    fclose(lustr);
-  fclose(luout);
-  fclose(lucat);
+  if (luegy_f != luout_f)
+    fclose(luegy_f);
+  if (lustr_f != luout_f)
+    fclose(lustr_f);
+  fclose(luout_f);
+  fclose(lucat_f);
 
   /* Sort catalog file by frequency */
   sortn(fname[ecat], fname[ecat], FALSE);

@@ -52,7 +52,7 @@ splib.a: ulib.o cnjj.o catutil.o lsqfit.o $(LBLAS)
 fit_main.o: fit_main.cpp SpinvEngine.hpp DpiEngine.hpp CalFit.hpp CalFitIO.hpp lsqfit.h subfit.h CalError.hpp file_helpers.hpp SigintFlag.hpp
 subfit.o: subfit.cpp calpgm_types.h blas_compat.h ulib.h subfit.h CalError.hpp file_helpers.hpp
 lsqfit.o: lsqfit.c lsqfit.h cblas.h
-cat_main.o: cat_main.cpp calpgm_types.h SpinvEngine.hpp DpiEngine.hpp CalCat.hpp CalCatIO.hpp ulib.h sortsub.h CalError.hpp file_helpers.hpp SigintFlag.hpp
+cat_main.o: cat_main.cpp calpgm_types.h SpinvEngine.hpp DpiEngine.hpp CalCat.hpp CalCatIO.hpp OutputSink.hpp ulib.h sortsub.h CalError.hpp file_helpers.hpp SigintFlag.hpp
 sortsub.o: sortsub.c calpgm_types.h sortsub.h
 calmrg.o: calmrg.cpp calpgm_types.h ulib.h catutil.h CalError.hpp file_helpers.hpp SigintFlag.hpp
 termval.o: termval.cpp calpgm_types.h ulib.h CalError.hpp file_helpers.hpp SigintFlag.hpp
@@ -84,6 +84,6 @@ iambak.o: iambak.cpp calpgm_types.h ulib.h readopt.h CalError.hpp file_helpers.h
 CalFit.o: CalFit.cpp CalFit.hpp CalFitIO.hpp CalculationEngine.hpp calpgm_types.h lsqfit.h ulib.h subfit.h CalError.hpp SigintFlag.hpp SpinvEngine.hpp DpiEngine.hpp
 CalFit_helpers.o: CalFit_helpers.cpp CalFit.hpp CalFitIO.hpp CalculationEngine.hpp calpgm_types.h lsqfit.h ulib.h subfit.h CalError.hpp SpinvEngine.hpp DpiEngine.hpp
 CalFitIO.o: CalFitIO.cpp CalFitIO.hpp CalFit.hpp CalculationEngine.hpp calpgm_types.h ulib.h subfit.h CalError.hpp
-CalCat.o: CalCat.cpp CalCat.hpp CalculationEngine.hpp calpgm_types.h blas_compat.h ulib.h catutil.h CalError.hpp SigintFlag.hpp
-CalCat_helpers.o: CalCat_helpers.cpp CalCat.hpp CalculationEngine.hpp calpgm_types.h blas_compat.h ulib.h CalError.hpp
-CalCatIO.o: CalCatIO.cpp CalCatIO.hpp CalCat.hpp CalculationEngine.hpp calpgm_types.h ulib.h CalError.hpp file_helpers.hpp
+CalCat.o: CalCat.cpp CalCat.hpp OutputSink.hpp CalculationEngine.hpp calpgm_types.h blas_compat.h ulib.h catutil.h CalError.hpp SigintFlag.hpp
+CalCat_helpers.o: CalCat_helpers.cpp CalCat.hpp OutputSink.hpp CalculationEngine.hpp calpgm_types.h blas_compat.h ulib.h CalError.hpp
+CalCatIO.o: CalCatIO.cpp CalCatIO.hpp CalCat.hpp OutputSink.hpp CalculationEngine.hpp calpgm_types.h ulib.h CalError.hpp file_helpers.hpp
