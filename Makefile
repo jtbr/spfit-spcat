@@ -34,7 +34,7 @@ SPINV_OBJFILES=spinv_setup.o spinv_spin_symmetry.o spinv_linalg_sort.o spinv_ham
 CPP_HELPERS=file_helpers.o SigintFlag.o Logger.o
 OBJFILES=dpi.o spinit.o $(SPLIB_OBJFILES) $(SPINV_OBJFILES) SpinvEngine.o DpiEngine.o $(CPP_HELPERS)
 spfit: fit_main.o CalFit.o CalFit_helpers.o CalFitIO.o subfit.o $(OBJFILES) $(LBLAS); g++ -o $@ $^ $(BLASLIB) -lm
-spcat: cat_main.o CalCat.o CalCat_helpers.o CalCatIO.o sortsub.o $(OBJFILES) $(LBLAS); g++ -o $@ $^ $(BLASLIB) -lm
+spcat: cat_main.o CalCat.o CalCat_helpers.o CalCatIO.o $(OBJFILES) $(LBLAS); g++ -o $@ $^ $(BLASLIB) -lm
 calmrg: calmrg.o $(CPP_HELPERS) splib.a; g++ -o $@ $^ $(BLASLIB) -lm
 calbak: calbak.o $(CPP_HELPERS) splib.a; g++ -o $@ $^ $(BLASLIB) -lm
 termval: termval.o $(CPP_HELPERS) splib.a; g++ -o $@ $^ $(BLASLIB) -lm
@@ -47,7 +47,7 @@ reassign: reassign.o $(CPP_HELPERS) splib.a; g++ -o $@ $^ $(BLASLIB) -lm
 sortegy: sortegy.o $(CPP_HELPERS) splib.a; g++ -o $@ $^ $(BLASLIB) -lm
 iambak: iambak.o $(CPP_HELPERS) splib.a readopt.o; g++ -o $@ $^ $(BLASLIB) -lm
 fit_example: fit_example.o CalFit.o CalFit_helpers.o CalFitIO.o subfit.o ftran.o $(OBJFILES) $(LBLAS); g++ -o $@ $^ $(BLASLIB) -lm
-cat_example: cat_example.o CalCat.o CalCat_helpers.o CalCatIO.o sortsub.o $(OBJFILES) $(LBLAS); g++ -o $@ $^ $(BLASLIB) -lm
+cat_example: cat_example.o CalCat.o CalCat_helpers.o CalCatIO.o $(OBJFILES) $(LBLAS); g++ -o $@ $^ $(BLASLIB) -lm
 
 splib.a: ulib.o cnjj.o catutil.o lsqfit.o $(LBLAS)
 	ar r splib.a $^
@@ -56,7 +56,7 @@ splib.a: ulib.o cnjj.o catutil.o lsqfit.o $(LBLAS)
 fit_main.o: fit_main.cpp SpinvEngine.hpp DpiEngine.hpp CalFit.hpp CalFitIO.hpp lsqfit.h subfit.h CalError.hpp file_helpers.hpp SigintFlag.hpp
 subfit.o: subfit.cpp calpgm_types.h blas_compat.h ulib.h subfit.h CalError.hpp file_helpers.hpp
 lsqfit.o: lsqfit.c lsqfit.h cblas.h
-cat_main.o: cat_main.cpp calpgm_types.h SpinvEngine.hpp DpiEngine.hpp CalCat.hpp CalCatIO.hpp OutputSink.hpp ulib.h sortsub.h CalError.hpp file_helpers.hpp SigintFlag.hpp
+cat_main.o: cat_main.cpp calpgm_types.h SpinvEngine.hpp DpiEngine.hpp CalCat.hpp CalCatIO.hpp OutputSink.hpp ulib.h CalError.hpp file_helpers.hpp SigintFlag.hpp
 sortsub.o: sortsub.c calpgm_types.h sortsub.h
 calmrg.o: calmrg.cpp calpgm_types.h ulib.h catutil.h CalError.hpp file_helpers.hpp SigintFlag.hpp
 termval.o: termval.cpp calpgm_types.h ulib.h CalError.hpp file_helpers.hpp SigintFlag.hpp
@@ -80,7 +80,7 @@ SpinvEngine.o: SpinvEngine.cpp SpinvEngine.hpp SpinvContext.hpp spinv_internal.h
 DpiEngine.o: DpiEngine.cpp DpiEngine.hpp DpiContext.hpp dpi.h
 dpi.o: dpi.cpp dpi.h calpgm_types.h blas_compat.h ulib.h cnjj.h DpiContext.hpp CalError.hpp
 ftran.o: ftran.c
-sortn.o: sortn.cpp CalError.hpp file_helpers.hpp SigintFlag.hpp
+sortn.o: sortn.cpp sortsub.h CalError.hpp file_helpers.hpp SigintFlag.hpp
 dblas.o: dblas.c
 calbak.o: calbak.cpp calpgm_types.h ulib.h catutil.h CalError.hpp file_helpers.hpp SigintFlag.hpp
 sortegy.o: sortegy.cpp calpgm_types.h ulib.h CalError.hpp file_helpers.hpp SigintFlag.hpp

@@ -22,7 +22,6 @@
 #include "CalCatIO.hpp"
 #include "splib/calpgm_types.h"
 #include "splib/ulib.h"
-#include "spcat/sortsub.h"
 #include "spcat/OutputSink.hpp"
 #include "common/CalError.hpp"
 #include "common/file_helpers.hpp"
@@ -81,12 +80,9 @@ int main(int argc, char *argv[])
     luegy_f = file_helpers::open_output(fname[eegy], "w");
   }
 
-  /* Open catalog output stream */
-  FILE *lucat_f = file_helpers::open_output(fname[ecat], "w");
-
   FileSink luegy_sink(luegy_f);
   FileSink lustr_sink(lustr_f);
-  FileSink lucat_sink(lucat_f);
+  MemorySink lucat_sink; // buffered so we can sort before writing
 
   /* Create CalCat instance and run */
   CalCatOutput output;
@@ -103,21 +99,28 @@ int main(int argc, char *argv[])
       if (luegy_f != luout_f) fclose(luegy_f);
       if (lustr_f != luout_f) fclose(lustr_f);
       fclose(luout_f);
-      fclose(lucat_f);
       return EXIT_FAILURE;
     }
   }
 
-  /* Close output streams */
+  /* Sort catalog lines then write to file */
+  output.cat_lines = lucat_sink.drain_lines();
+  output.sort_cat_lines();
+  {
+    FILE *fcat = file_helpers::open_output(fname[ecat], "w");
+    for (const auto &line : output.cat_lines) {
+      fputs(line.c_str(), fcat);
+      fputc('\n', fcat);
+    }
+    fclose(fcat);
+  }
+
+  /* Close remaining output streams */
   if (luegy_f != luout_f)
     fclose(luegy_f);
   if (lustr_f != luout_f)
     fclose(lustr_f);
   fclose(luout_f);
-  fclose(lucat_f);
-
-  /* Sort catalog file by frequency */
-  sortn(fname[ecat], fname[ecat], FALSE);
 
   return 0;
 }

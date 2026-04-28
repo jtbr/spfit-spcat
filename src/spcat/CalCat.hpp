@@ -97,8 +97,10 @@ struct CalCatOutput
   std::vector<std::string> egy_lines;
   std::vector<std::string> str_lines;
 
-  // Sort cat_lines by frequency (first 13 columns), matching the file-based
-  // sortn step performed by the CLI after writing the .cat file.
+  // Sort cat_lines to match the CLI's sortn behavior:
+  // primary key cols 0–12 (frequency),
+  // secondary key cols 55–94 (quantum numbers),
+  // stable (original order preserved for identical lines)
   void sort_cat_lines();
 };
 

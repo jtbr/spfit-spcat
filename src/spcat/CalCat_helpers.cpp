@@ -197,13 +197,25 @@ SBLK *CalCat::ibufof(const int ipos, const unsigned int ndel, SBLK *blk)
 
 void CalCatOutput::sort_cat_lines()
 {
-    std::sort(cat_lines.begin(), cat_lines.end(),
-              [](const std::string &a, const std::string &b) {
-                  // Frequency is right-justified in the first 13 columns.
-                  double fa = (a.size() >= 13) ? std::stod(a.substr(0, 13)) : 0.0;
-                  double fb = (b.size() >= 13) ? std::stod(b.substr(0, 13)) : 0.0;
-                  return fa < fb;
-              });
+    // Mirrors sortn's dokey=FALSE comparison (bufcmp):
+    //   primary key  — cols  0–12  (frequency, right-justified fixed-width)
+    //   secondary key — cols 55–94 (quantum numbers)
+    // Both compared lexicographically; for positive fixed-width fields this
+    // equals numeric order.  stable_sort matches sortn's address-difference
+    // tie-breaker (original order preserved for equal lines).
+    std::stable_sort(cat_lines.begin(), cat_lines.end(),
+                     [](const std::string &a, const std::string &b) {
+                         int cmp = a.compare(0, 13, b, 0, 13);
+                         if (cmp != 0) return cmp < 0;
+                         // secondary key: cols 55 onwards
+                         const size_t sec = 55;
+                         bool a_has = a.size() > sec, b_has = b.size() > sec;
+                         if (!a_has && !b_has) return false;
+                         if (!a_has) return true;
+                         if (!b_has) return false;
+                         return a.compare(sec, std::string::npos,
+                                          b, sec, std::string::npos) < 0;
+                     });
 }
 
 SBLK *CalCat::sblk_alloc(const int nstruct, const unsigned mxdem)

@@ -42,7 +42,7 @@ set(SOURCE_FILES
     src/spfit/CalFitIO.cpp
     src/spfit/CalFit_helpers.cpp
     src/spcat/cat_main.cpp
-    src/spcat/sortsub.c
+    src/legacy_apps/sortsub.c
     src/spcat/CalCat.cpp
     src/spcat/CalCatIO.cpp
     src/spcat/CalCat_helpers.cpp
@@ -154,7 +154,6 @@ add_executable_plus(spcat TRUE
     src/spcat/CalCat.cpp
     src/spcat/CalCat_helpers.cpp
     src/spcat/CalCatIO.cpp
-    src/spcat/sortsub.c
     ${ENGINE_SRCS}
     ${SPLIB_SRCS}
     ${COMMON_SRCS}
@@ -203,7 +202,7 @@ add_executable_plus(iamcalc TRUE
 )
 add_executable_plus(sortn FALSE
     src/legacy_apps/sortn.cpp
-    src/spcat/sortsub.c
+    src/legacy_apps/sortsub.c
     ${CPP_HELPERS}
 )
 add_executable_plus(reassign TRUE
@@ -244,7 +243,7 @@ if(BUILD_EXAMPLES)
       src/spcat/CalCat.cpp
       src/spcat/CalCat_helpers.cpp
       src/spcat/CalCatIO.cpp
-      src/spcat/sortsub.c
+      src/legacy_apps/sortsub.c
   )
   add_executable_plus(fit_example TRUE
       examples/fit_example.cpp

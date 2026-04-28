@@ -3,8 +3,11 @@
 #include "common/CalError.hpp"
 #include "common/file_helpers.hpp"
 #include "common/SigintFlag.hpp"
-extern "C" int sortn(char *impname, char *outname, int dokey);
+#include "legacy_apps/sortsub.h"
 
+// sorts (cat) file lines interactively by column
+// given any fixed-width text file, it shows you the first line and lets you point at which columns form the sort key
+// you type the column positions (characters 1-9) directly over the printed line to indicate the most to least significant column in sorting
 int main(int argc, char *argv[])
 {
   try {
