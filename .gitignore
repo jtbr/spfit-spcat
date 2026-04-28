@@ -24,5 +24,8 @@ CMakeCache.txt
 # test outputs:
 spfit_spcat_test_suite/*/*/*/*
 spfit_spcat_test_suite/temp*
+# python artefacts
+python//*.pyc
+__pycache__
 
 *~
