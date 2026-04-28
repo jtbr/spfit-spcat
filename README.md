@@ -54,6 +54,24 @@ To match the v2008 reference outputs exactly, the build must use the bundled `db
 
 This is necessary because FMA instructions and optimized BLAS libraries change floating-point accumulation order at the ULP level, which can flip the sign of near-zero Householder reflectors in the least-squares solver. The resulting `.var` output is physically equivalent but not bit-identical to the reference. See `TASKS.md` Task 6 for full details.
 
+## Python Package
+
+A `pickett` Python package is included under `python/`.  It provides a direct
+interface to the fitting and catalog generation routines without spawning
+subprocesses or writing intermediate files:
+
+```sh
+pip install ./python      # builds the nanobind extension and installs pickett
+```
+
+```python
+import pickett
+fit_out = pickett.fit_files("path/to/molecule")   # reads .par + .lin
+cat_out = pickett.cat_files("path/to/molecule")   # reads .var + .int
+```
+
+See [API.md](API.md) for full C++ and Python API documentation.
+
 ## Documentation and Getting Started
 
 There is a very useful set of notes and usage information available [here](http://info.ifpan.edu.pl/~kisiel/asym/pickett/crib.htm).
@@ -64,7 +82,7 @@ To get started, you'll need to reference the full documentation explaining input
 
 These are conversions of the original PDF-format documentation into markdown format; this was not trivial so in case of doubt, refer to the originals and please report any mistakes.
 
-There is a modern [python wrapper](https://github.com/Ltotheois/Pyckett) available for the original tools that you might find useful and should work the same with this version.
+There is also a separate [python wrapper](https://github.com/Ltotheois/Pyckett) available for the original tools.
 
 
 ## Source Layout

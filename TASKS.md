@@ -95,11 +95,15 @@ This document outlines the prioritized tasks for modernizing the SPFIT/SPCAT sof
 
 
 
-- [ ] **Task 9.1: Python interface and example usage**
-    - C++ example demonstrating programmatic use of CalFit/CalCat (construct engine, populate Input struct, call `run()`, read Output struct).
-    - Python bindings via `pybind11` wrapping CalFit/CalCat.
-    - **Design consideration**: CalCat currently streams output via `FILE*`. Python bindings will need either (a) in-memory accumulation in `CalCatOutput`, or (b) a Python callback for each catalog line. Option (a) is simpler; option (b) is more memory-efficient for large catalogs.
-    - Shared I/O abstraction between CalFitIO/CalCatIO is not needed — the low-level parsing (`getpar`/`getvar` in `ulib.c`) is already shared; the wrapper differences reflect genuinely different file formats.
+- [x] **Task 9.1: Python interface and example usage**
+    - C++ examples in `examples/fit_example.cpp` and `examples/cat_example.cpp` demonstrate programmatic use of CalFit/CalCat.
+    - Python bindings via **nanobind** (not pybind11): smaller, faster, stable-ABI wheels. Packaged under `python/` with scikit-build-core + pyproject.toml; install with `pip install ./python`.
+    - `OutputSink` abstraction (`FileSink` + `MemorySink`) replaces `FILE*` in CalCat's public API, enabling in-memory catalog capture without POSIX-only `open_memstream`/`fmemopen`.
+    - High-level Python API: `pickett.fit_files(base_path)` and `pickett.cat_files(base_path)`.
+    - Low-level Python API: `FitSession` / `CatSession` objects with `.run()`.
+    - Exception hierarchy mapped to Python: `CalError`, `IoError`, `InputError`, `ValidationError`, `NumericError`.
+    - 18/18 smoke tests pass (`uv run --directory python pytest tests/`).
+    - See `API.md` for full documentation.
 
 - [ ] **Task 10: Documentation Improvement**
     - Enhance code documentation. Existing: `spinv.md` (SPFIT/SPCAT algorithms), `dpi.md` (DPFIT/DPCAT).
