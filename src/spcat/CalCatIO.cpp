@@ -161,6 +161,11 @@ bool CalCatIO::readInput(const std::string &intFile,
 
   /* ---- Read .var file ---- */
   FILE *luvar = file_helpers::open_input_optional(varFile.c_str());
+  if (!luvar) {
+    printf("Error: cannot open .VAR file '%s'\n", varFile.c_str());
+    free(dvec);
+    return false;
+  }
 
   input.npar = 0;
   input.catqn = MAXCAT;
@@ -184,7 +189,7 @@ bool CalCatIO::readInput(const std::string &intFile,
     input.npar = 0;
   if (input.npar <= 0) {
     puts("Error reading .VAR file");
-    fclose(luvar);
+    if (luvar) fclose(luvar);
     free(dvec);
     return false;
   }

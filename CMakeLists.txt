@@ -6,6 +6,7 @@ cmake_policy(SET CMP0057 NEW)
 # To build legacy utilities via cmake, either use `cmake -DBUILD_ALL=ON` or `make <target>` individually.
 # Use the root Makefile directly if you need `make all` semantics (builds all executables by default).
 option(BUILD_ALL "Build all executables including legacy utilities (cmake -DBUILD_ALL=ON)" OFF)
+option(BUILD_EXAMPLES "Build C++ programmatic examples (cmake -DBUILD_EXAMPLES=ON)" OFF)
 
 # TODO re-add debug options
 # NOTE: -ffp-contract=off disables fused multiply-add (FMA), which change the accumulation order of BLAS dot
@@ -228,4 +229,35 @@ if(NOT BUILD_ALL)
   foreach(target ${OPTIONAL_EXECUTABLES})
     set_target_properties(${target} PROPERTIES EXCLUDE_FROM_ALL TRUE)
   endforeach()
+endif()
+
+# Programmatic C++ examples (cmake -DBUILD_EXAMPLES=ON)
+if(BUILD_EXAMPLES)
+  set(FIT_SRCS
+      src/spfit/CalFit.cpp
+      src/spfit/CalFit_helpers.cpp
+      src/spfit/CalFitIO.cpp
+      src/spfit/subfit.cpp
+      src/splib/ftran.c
+  )
+  set(CAT_SRCS
+      src/spcat/CalCat.cpp
+      src/spcat/CalCat_helpers.cpp
+      src/spcat/CalCatIO.cpp
+      src/spcat/sortsub.c
+  )
+  add_executable_plus(fit_example TRUE
+      examples/fit_example.cpp
+      ${FIT_SRCS}
+      ${ENGINE_SRCS}
+      ${SPLIB_SRCS}
+      ${COMMON_SRCS}
+  )
+  add_executable_plus(cat_example TRUE
+      examples/cat_example.cpp
+      ${CAT_SRCS}
+      ${ENGINE_SRCS}
+      ${SPLIB_SRCS}
+      ${COMMON_SRCS}
+  )
 endif()

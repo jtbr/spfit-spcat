@@ -6,6 +6,7 @@ CFLAGS=-O3 -Wall -Wextra -march=native -ffp-contract=off -Isrc  # optimized for 
 CXXFLAGS=$(CFLAGS)
 EXEQ=spfit spcat calmrg  # dpcat and dpfit are optional variations to spcat and spfit respectively
 EXEA=${EXEQ} moiam stark termval sortn calbak reassign sortegy iambak iamcalc
+EXAMPLES=fit_example cat_example
 #next line for atlas blas
 #BLASLIB=-lcblas -latlas
 #OpenBLAS from libopenblas-dev apt package
@@ -16,7 +17,7 @@ ifndef BLASLIB
 endif
 
 vpath %.c   src/spfit src/spcat src/engine src/splib src/common src/legacy_apps
-vpath %.cpp src/spfit src/spcat src/engine src/splib src/common src/legacy_apps
+vpath %.cpp src/spfit src/spcat src/engine src/splib src/common src/legacy_apps examples
 vpath %.h   src/spfit src/spcat src/engine src/splib src/common src/legacy_apps
 vpath %.hpp src/spfit src/spcat src/engine src/splib src/common src/legacy_apps
 
@@ -24,8 +25,9 @@ default: ${EXEQ}
 all: ${EXEA}
 install:
 	-mv ${EXEQ} /usr/local/bin
+examples: ${EXAMPLES}
 clean:
-	rm -f ${EXEA} *.o *.a
+	rm -f ${EXEA} ${EXAMPLES} *.o *.a
 
 SPLIB_OBJFILES=ulib.o cnjj.o catutil.o lsqfit.o
 SPINV_OBJFILES=spinv_setup.o spinv_spin_symmetry.o spinv_linalg_sort.o spinv_hamiltonian.o spinv_utils.o
@@ -44,6 +46,8 @@ sortn: sortn.o $(CPP_HELPERS) sortsub.o; g++ -o $@ $^ -lm
 reassign: reassign.o $(CPP_HELPERS) splib.a; g++ -o $@ $^ $(BLASLIB) -lm
 sortegy: sortegy.o $(CPP_HELPERS) splib.a; g++ -o $@ $^ $(BLASLIB) -lm
 iambak: iambak.o $(CPP_HELPERS) splib.a readopt.o; g++ -o $@ $^ $(BLASLIB) -lm
+fit_example: fit_example.o CalFit.o CalFit_helpers.o CalFitIO.o subfit.o ftran.o $(OBJFILES) $(LBLAS); g++ -o $@ $^ $(BLASLIB) -lm
+cat_example: cat_example.o CalCat.o CalCat_helpers.o CalCatIO.o sortsub.o $(OBJFILES) $(LBLAS); g++ -o $@ $^ $(BLASLIB) -lm
 
 splib.a: ulib.o cnjj.o catutil.o lsqfit.o $(LBLAS)
 	ar r splib.a $^
@@ -87,3 +91,5 @@ CalFitIO.o: CalFitIO.cpp CalFitIO.hpp CalFit.hpp CalculationEngine.hpp calpgm_ty
 CalCat.o: CalCat.cpp CalCat.hpp OutputSink.hpp CalculationEngine.hpp calpgm_types.h blas_compat.h ulib.h catutil.h CalError.hpp SigintFlag.hpp
 CalCat_helpers.o: CalCat_helpers.cpp CalCat.hpp OutputSink.hpp CalculationEngine.hpp calpgm_types.h blas_compat.h ulib.h CalError.hpp
 CalCatIO.o: CalCatIO.cpp CalCatIO.hpp CalCat.hpp OutputSink.hpp CalculationEngine.hpp calpgm_types.h ulib.h CalError.hpp file_helpers.hpp
+fit_example.o: fit_example.cpp SpinvEngine.hpp CalFit.hpp CalFitIO.hpp CalError.hpp Logger.hpp
+cat_example.o: cat_example.cpp SpinvEngine.hpp CalCat.hpp CalCatIO.hpp OutputSink.hpp CalError.hpp Logger.hpp

@@ -96,6 +96,10 @@ struct CalCatOutput
   std::vector<std::string> cat_lines;
   std::vector<std::string> egy_lines;
   std::vector<std::string> str_lines;
+
+  // Sort cat_lines by frequency (first 13 columns), matching the file-based
+  // sortn step performed by the CLI after writing the .cat file.
+  void sort_cat_lines();
 };
 
 /**

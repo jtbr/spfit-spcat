@@ -5,6 +5,8 @@
 /*   Herbert M. Pickett, 20 March 1989 */
 /*   Revised version in C++, 2025 for modernization */
 
+#include <algorithm>
+#include <cstdlib>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -191,6 +193,17 @@ SBLK *CalCat::ibufof(const int ipos, const unsigned int ndel, SBLK *blk)
     pdblk->ixblk = 0;
   }
   return pmblk;
+}
+
+void CalCatOutput::sort_cat_lines()
+{
+    std::sort(cat_lines.begin(), cat_lines.end(),
+              [](const std::string &a, const std::string &b) {
+                  // Frequency is right-justified in the first 13 columns.
+                  double fa = (a.size() >= 13) ? std::stod(a.substr(0, 13)) : 0.0;
+                  double fb = (b.size() >= 13) ? std::stod(b.substr(0, 13)) : 0.0;
+                  return fa < fb;
+              });
 }
 
 SBLK *CalCat::sblk_alloc(const int nstruct, const unsigned mxdem)
