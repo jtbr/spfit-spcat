@@ -91,6 +91,8 @@ This document outlines the prioritized tasks for modernizing the SPFIT/SPCAT sof
         - **BLAS considerations**: `dblas.c` is required for exact v2008 reproduction (see Task 6). If profiling shows BLAS is a bottleneck, options are: (a) recompile OpenBLAS with `-ffp-contract=off -fno-associative-math`, (b) create a new baseline from v2008 code compiled with modern optimizations, or (c) accept numerically-equivalent-but-not-identical output. Profile before deciding.
         - **Memory access**: Review cache utilization in the Hamiltonian and intensity matrix computation inner loops.
     - **Constraint**: Quantitative results must remain unchanged unless a new baseline is established.
+    - Any reason to consider use of modern linear algebra libraries to replace legacy code?
+
 
 
 - [ ] **Task 9.1: Python interface and example usage**
@@ -110,9 +112,6 @@ This document outlines the prioritized tasks for modernizing the SPFIT/SPCAT sof
     - `MAXQN` is currently 10, matching the Pickett catalog format specification. Changing it would break compatibility with existing catalogs and tools.
     - A better approach may be to support extended formats through new code paths (e.g., a wider output format option) rather than changing the constant.
     - Relevant code: `calpgm_types.h` (MAXQN), `spinv_utils.cpp:getqn`, `CalFit_helpers.cpp:getblk`, `CalCat.cpp:computeCatalog`.
-
-- Any reason to consider use of modern linear algebra libraries to replace legacy code?
-
 ## Build & Test
 
 ```bash

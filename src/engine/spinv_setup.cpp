@@ -1645,7 +1645,10 @@ int pasort(struct SpinvContext *ctx, FILE *lu, const int npar, bcd_t *idpar, con
   ifac = ctx->glob.vibfac + 1;
   ndecv = ctx->glob.vibdec;
   ilim = ifac * ifac - 1;
-  if (initl > 0)
+  // Guard against freeing &ctx->zipder (the non-allocated fallback member).
+  // initl is a static that outlives individual engine instances, so we check
+  // the pointer directly instead.
+  if (ctx->ipder != &ctx->zipder)
   {
     free(ctx->ipder);
     ctx->ipder = NULL;
