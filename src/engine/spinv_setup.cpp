@@ -1583,7 +1583,7 @@ int pasort(struct SpinvContext *ctx, FILE *lu, const int npar, bcd_t *idpar, con
                           "(8) problem with Itot symmetry\n",
                           "(9) matrix element couples states with differernt weights\n"};
 
-  static int idmy[NDXCOM], initl;
+  static int idmy[NDXCOM];
   static bcd_t idunit[NDECPAR];
   SVIB *pvib1, *pvib2;
   SPAR *spar_now, *spar_last, *spar_match, *spar_free;
@@ -1621,7 +1621,6 @@ int pasort(struct SpinvContext *ctx, FILE *lu, const int npar, bcd_t *idpar, con
   {
     free(ctx->ipder);
     ctx->ipder = &ctx->zipder;
-    initl = 0;
     return 0;
   }
   /*  find reduced spin matrix elements */
@@ -1646,7 +1645,7 @@ int pasort(struct SpinvContext *ctx, FILE *lu, const int npar, bcd_t *idpar, con
   ndecv = ctx->glob.vibdec;
   ilim = ifac * ifac - 1;
   // Guard against freeing &ctx->zipder (the non-allocated fallback member).
-  // initl is a static that outlives individual engine instances, so we check
+  // initl was a static that outlived individual engine instances, so we check
   // the pointer directly instead.
   if (ctx->ipder != &ctx->zipder)
   {
@@ -1655,7 +1654,6 @@ int pasort(struct SpinvContext *ctx, FILE *lu, const int npar, bcd_t *idpar, con
   }
   nl = (size_t)npar * sizeof(int);
   ctx->ipder = (int *)calalloc(nl);
-  initl = npar;
   kk = 1;
   ityi = 1;
   ctx->ipder[0] = 0;
