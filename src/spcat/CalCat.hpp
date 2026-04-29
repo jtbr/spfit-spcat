@@ -21,12 +21,11 @@
 #define TMAX 1000
 #define MAXQNX 13
 
-typedef struct {
-  double *eigblk;
-  double *egyblk;
-  unsigned int nsizblk;
-  int ixblk;
-} SBLK;
+struct SBLK {
+  std::vector<double> eigblk; // nsizblk * nsizblk (empty when !m_diag)
+  std::vector<double> egyblk; // m_ndel * nsizblk: energies + derivatives
+  int nsizblk = 0;
+};
 
 /**
  * @brief Input data structure for CalCat class
@@ -105,23 +104,6 @@ struct CalCatOutput
 };
 
 /**
- * @brief Block cache state (replaces ibufof static variables)
- */
-struct BlockCacheState
-{
-  FILE *scratch;
-  long maxrec;
-  long lsizb;
-  int mempos;
-  int orgpos;
-  int nbsav;
-  unsigned int maxdm;
-
-  BlockCacheState() : scratch(nullptr), maxrec(0), lsizb(0),
-                      mempos(0), orgpos(0), nbsav(0), maxdm(0) {}
-};
-
-/**
  * @brief Main class for spectroscopic catalog generation (SPCAT)
  *
  * Encapsulates the logic for computing spectroscopic line frequencies,
@@ -155,11 +137,6 @@ private:
   // Helper methods (in CalCat_helpers.cpp)
   static int qnfmt(short *iqu, int nqn, char *sqn);
   static int simt(int isiz, int jsiz, double *s, double *t, double *u, double *wk);
-  SBLK *ibufof(int iblk, unsigned int ndel, SBLK *blk);
-  static SBLK *sblk_alloc(int nstruct, unsigned mxdm);
-
-  // Block cache state (replaces ibufof statics)
-  BlockCacheState m_cache;
 
   // Control flags (derived from iflg)
   BOOL m_prir, m_prder, m_prfrq, m_preig, m_pregy, m_prstr;
@@ -173,9 +150,8 @@ private:
   double m_bigerr, m_zero, m_telim;
   double m_qrot;
 
-  // Block structure
-  SBLK *m_blk;
-  int m_nsav, m_nbsav;
+  // Block storage — one entry per outer-loop iteration, allocated lazily
+  std::vector<SBLK> m_blocks;
   int m_nbkpj;
   unsigned int m_maxdm;
   unsigned int m_ndel;

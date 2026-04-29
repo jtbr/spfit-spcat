@@ -27,7 +27,7 @@ CalCat::CalCat(std::unique_ptr<CalculationEngine> &calc_engine,
     : calc(std::move(calc_engine)),
       m_logger(logger),
       m_luout(luout), m_lucat(lucat), m_luegy(luegy), m_lustr(lustr),
-      m_blk(nullptr), m_s(nullptr), m_pmix(nullptr),
+      m_s(nullptr), m_pmix(nullptr),
       m_par(nullptr), m_derv(nullptr), m_var(nullptr),
       m_idpar(nullptr), m_dip(nullptr), m_idip(nullptr),
       m_nvdip(nullptr), m_isimag(nullptr), m_iqnfmtv(nullptr)
@@ -36,11 +36,7 @@ CalCat::CalCat(std::unique_ptr<CalculationEngine> &calc_engine,
     throw IoError("CalCat constructor received NULL luout stream.", CalErrorCode::FileOpenFailed);
 }
 
-CalCat::~CalCat()
-{
-  if (m_cache.scratch)
-    fclose(m_cache.scratch);
-}
+CalCat::~CalCat() = default;
 
 void CalCat::run(const CalCatInput &input, CalCatOutput &output)
 {
@@ -244,8 +240,9 @@ void CalCat::setupBlocks(const CalCatInput &input)
     m_s[k] = (double *)calalloc(nlsq);
   }
 
-  /* set up DIAG, NSAV */
-  calc->setint(m_luout->file(), &m_diag, &m_nsav, m_ndip, m_idip, m_isimag);
+  /* set up DIAG (m_nsav from setint is no longer used for pool sizing) */
+  int nsav_unused = 0;
+  calc->setint(m_luout->file(), &m_diag, &nsav_unused, m_ndip, m_idip, m_isimag);
 
   if (m_prstr) {
     int k = 0, ij = 0;
@@ -266,47 +263,13 @@ void CalCat::setupBlocks(const CalCatInput &input)
       m_luout->puts(" mixed magnetic and electric dipoles in str file\n");
   }
 
-  m_nsav = (m_nsav + 1) * m_nbkpj;
   if (m_diag && (m_ifdump || m_maxdm == 1))
     m_diag = 0;
   if (!m_ifdump && m_preig)
     m_preig = m_diag;
 
-  /* allocate block structure */
-  m_blk = sblk_alloc(m_nsav + 1, m_maxdm);
-  nl = (size_t)m_maxdm;
-  nl = ((size_t)m_ndel + nl) * nl;
-  {
-    /* Assume plenty of address space; cap only against NDHEAPC if defined. */
-    m_nbsav = m_nsav;
-  }
-  nlsq = nl * sizeof(double);
-#ifdef NDHEAPC
-#if    NDHEAPC
-  {
-    size_t ndh = (size_t)NDHEAPC;
-    ndh = ndh / nlsq;
-    if (ndh < (size_t)m_nbsav)
-      m_nbsav = (int)ndh;
-  }
-#endif
-#endif
-  if (m_nbsav < 2)
-    m_nbsav = 2;
-
-  nl = (size_t)m_maxdm * sizeof(double);
-  nlsq = nl * (size_t)m_maxdm;
-  nl *= (size_t)m_ndel;
-
-  SBLK *pblk = m_blk;
-  for (int i = 0; i <= m_nbsav; ++i) {
-    pblk->egyblk = (double *)calalloc(nl);
-    if (m_diag) {
-      pblk->eigblk = (double *)calalloc(nlsq);
-    }
-    ++pblk;
-  }
-  pblk = NULL;
+  /* pre-size block vector (buffers allocated lazily per iteration) */
+  m_blocks.reserve((size_t)(m_lblk - m_inblk + 1));
   /* set up intensity constants */
   m_tmc = -m_tmc;
   m_tmq = m_tmc / (input.tmq * m_cmc);
@@ -358,36 +321,26 @@ void CalCat::computeCatalog(const CalCatInput &/*input*/, CalCatOutput &output)
     if ((iblk - j * m_nbkpj) == 1) {
       if (SigintFlag::isTriggered())
         break;
-      SBLK *pblk = m_blk;
-      int jblk = iblk + m_nbkpj - m_nsav;
-      for (int i = 0; i <= m_nsav; ++i) {
-        if (pblk->ixblk < jblk)
-          pblk->ixblk = 0;
-        ++pblk;
-      }
       if (caldelay(PR_DELAY)) {
         m_logger.info(" STARTING QUANTUM %3d", j);
         fflush(stdout);
       }
     }
-    /* move first block to unused position */
-    SBLK *pblk = ibufof(-1, m_ndel, m_blk);
+    /* allocate block entry; fill buffers after size is known */
+    m_blocks.emplace_back();
+    SBLK &curblk = m_blocks.back();
     /* get energy and derivatives for new block */
     calc->getqn(iblk, 0, 0, iqni, &isiz);
     if (isiz <= 0)
       continue;
     if ((unsigned)isiz > m_maxdm)
       break;
-    pblk->ixblk = iblk;
-    pblk->nsizblk = (unsigned)isiz;
-    teig = NULL;
+    curblk.nsizblk = isiz;
+    curblk.egyblk.resize((size_t)m_ndel * (size_t)isiz);
     if (m_diag)
-      teig = pblk->eigblk;
-    if (teig == NULL)
-      teig = m_s[0];
-    egy = pblk->egyblk;
-    if (egy == NULL)
-      break;
+      curblk.eigblk.resize((size_t)isiz * (size_t)isiz);
+    teig = m_diag ? curblk.eigblk.data() : m_s[0];
+    egy = curblk.egyblk.data();
     dedp = egy + isiz;
     calc->hamx(iblk, isiz, m_npar, m_idpar, m_par, egy, teig, dedp, m_pmix, m_ifdump);
 
@@ -501,26 +454,12 @@ void CalCat::computeCatalog(const CalCatInput &/*input*/, CalCatOutput &output)
       }
     }
 
-    /* loop over previous blocks for intensity */
-    int jblk = 0;
-    do {
-      int jnxt = iblk + 1;
-      pblk = m_blk;
-      int jj = 0;
-      for (j = 0; j <= m_nsav; ++j) {
-        int jx = pblk->ixblk;
-        if (jx > jblk && jx < jnxt) {
-          jnxt = jx;
-          jj = j;
-        }
-        ++pblk;
-      }
-      jblk = jnxt;
-      pblk = ibufof(jj, m_ndel, m_blk);
-      jsiz = (int)pblk->nsizblk;
-      teigp = pblk->eigblk;
-      if (teigp == NULL)
-        teigp = m_s[0];
+    /* loop over all preceding blocks (including current) for intensity */
+    for (int jblk = m_inblk; jblk <= iblk; ++jblk) {
+      SBLK &pblkj = m_blocks[(size_t)(jblk - m_inblk)];
+      jsiz = pblkj.nsizblk;
+      if (jsiz == 0) continue;
+      teigp = pblkj.eigblk.empty() ? m_s[0] : pblkj.eigblk.data();
       idgn = 0;
       int ij = 0;
       for (int i = 0; i < m_npdip; ++i) {
@@ -538,9 +477,7 @@ void CalCat::computeCatalog(const CalCatInput &/*input*/, CalCatOutput &output)
       if (idgn <= 0)
         continue;
       dgnf = (double)idgn;
-      egyp = pblk->egyblk;
-      if (egyp == NULL)
-        continue;
+      egyp = pblkj.egyblk.data();
       int idf = (int)m_maxdm;
       int jmax = jsiz;
       /* Need a dvec for str output */
@@ -660,7 +597,7 @@ void CalCat::computeCatalog(const CalCatInput &/*input*/, CalCatOutput &output)
       }
       if (dvec_alloc)
         free(dvec_alloc);
-    } while (jblk != iblk);
+    }
   }
   teig = teigp = NULL;
 
@@ -698,17 +635,9 @@ void CalCat::finalizeOutput(const CalCatInput &/*input*/, CalCatOutput &output)
   int i_tmp = 0;
   calc->setblk(m_luout->file(), 0, m_idpar, m_par, &nbkpj_tmp, &i_tmp);
 
-  /* free block structure memory */
-  SBLK *pblk = m_blk;
-  for (int i = 0; i <= m_nsav; ++i) {
-    if (pblk->eigblk != NULL)
-      free(pblk->eigblk);
-    if (pblk->egyblk != NULL)
-      free(pblk->egyblk);
-    ++pblk;
-  }
-  free(m_blk);
-  m_blk = NULL;
+  /* release block storage (RAII — vectors free their own buffers) */
+  m_blocks.clear();
+  m_blocks.shrink_to_fit();
 
   /* free intensity matrices */
   for (int i = 0; i < m_npdip; ++i) {
