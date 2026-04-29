@@ -6,6 +6,7 @@
 /*   Revised version in C++, 2025 for modernization */
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <algorithm> // For std::copy
 #include <vector>    // For std::vector
@@ -90,6 +91,30 @@ bool CalFitIO::readInput(const std::string &parFile, const std::string &linFile,
     dvec[1] = -dvec[1];
   }
   input.limlin = (size_t)dvec[1];
+
+  // Sanity check: reject inputs that would require an unreasonably large line buffer.
+  // Default 32 GB; override via PICKETT_MAX_FIT_BYTES (decimal bytes).
+  {
+    size_t max_fit_bytes = 32ULL << 30;
+    if (const char *env = getenv("PICKETT_MAX_FIT_BYTES")) {
+      char *end = nullptr;
+      unsigned long long v = strtoull(env, &end, 10);
+      if (end != env && *end == '\0' && v > 0) max_fit_bytes = (size_t)v;
+    }
+    const size_t per_line_bytes = sizeof(SXLINE) + (size_t)input.npar * sizeof(double);
+    if (per_line_bytes > 0 && input.limlin > max_fit_bytes / per_line_bytes) {
+      fprintf(lufit_for_logging,
+              "ERROR: line buffer request (limlin=%zu, npar=%d) exceeds sanity limit"
+              " (%zu bytes). Set PICKETT_MAX_FIT_BYTES to override or check .par file.\n",
+              input.limlin, input.npar, max_fit_bytes);
+      printf("ERROR: line buffer request (limlin=%zu, npar=%d) exceeds sanity limit"
+             " (%zu bytes). Set PICKETT_MAX_FIT_BYTES to override or check .par file.\n",
+             input.limlin, input.npar, max_fit_bytes);
+      fclose(lubak_stream_for_par_content);
+      return false;
+    }
+  }
+
   input.nitr = (int)dvec[2];
   input.nxpar_from_file = (int)dvec[3];
   input.marqp0 = dvec[4];

@@ -270,6 +270,29 @@ void CalCat::setupBlocks(const CalCatInput &input)
 
   /* pre-size block vector (buffers allocated lazily per iteration) */
   m_blocks.reserve((size_t)(m_lblk - m_inblk + 1));
+
+  /* Warn if worst-case block storage exceeds the configured threshold.
+     The bound is conservative: actual allocations use nsizblk <= m_maxdm per block. */
+  {
+    size_t warn_bytes = 32ULL << 30;
+    if (const char *env = getenv("PICKETT_MAX_CAT_BYTES")) {
+      char *end = nullptr;
+      unsigned long long v = strtoull(env, &end, 10);
+      if (end != env && *end == '\0' && v > 0) warn_bytes = (size_t)v;
+    }
+    size_t n_blocks = (size_t)(m_lblk - m_inblk + 1);
+    size_t per_block = (size_t)m_ndel * m_maxdm + (m_diag ? (size_t)m_maxdm * m_maxdm : 0);
+    size_t worst_bytes = n_blocks * per_block * sizeof(double);
+    if (per_block > 0 && worst_bytes / per_block / sizeof(double) == n_blocks
+        && worst_bytes > warn_bytes) {
+      m_luout->printf(
+          "WARNING: worst-case block storage (%zu GB) exceeds threshold (%zu GB)."
+          " Actual RSS will be lower if most blocks are smaller than maxdm=%u."
+          " Set PICKETT_MAX_CAT_BYTES to suppress.\n",
+          worst_bytes >> 30, warn_bytes >> 30, m_maxdm);
+    }
+  }
+
   /* set up intensity constants */
   m_tmc = -m_tmc;
   m_tmq = m_tmc / (input.tmq * m_cmc);
