@@ -26,7 +26,6 @@
 #endif
 
 /**********common structures*********************************************/
-#define NDHEAPF 1200000L /* suggested length of store for heap (calfit)*/
 #define MAXCAT 6  /* number of quanta in catalog file */
 #define MAXQN 10  /* maximum number of quanta */
 #define NDECDIP 6 /* number of digit pairs + 1 for idip */

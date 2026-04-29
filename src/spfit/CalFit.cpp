@@ -485,8 +485,8 @@ void CalFit::initializeParameters(const CalFitInput &input)
     fprintf(lufit, " IR Frequencies Scaled by %12.10f\n", m_fqfacq);
   }
 
-  // --- 6. Call lbufof ---
-  lbufof(-m_nfit, m_limlin);
+  // --- 6. Initialize line buffer ---
+  init_line_buffer(m_limlin, m_nfit);
 } // initializeParameters
 
 
@@ -1667,8 +1667,7 @@ void CalFit::finalizeOutputData(const CalFitInput &input, CalFitOutput &output)
   // === End Option ===
 
   // Final cleanup before CalFitIO::writeOutput takes over
-  // lbufof(-1,0) was called in original main at this stage.
-  lbufof(-1, 0); // Release line buffer storage
+  release_line_buffer();
 
   // calc->setblk(lufit, 0, ...) was called for cleanup.
   int dummy_nblkpf = 0, dummy_maxdm = 0; // For cleanup call

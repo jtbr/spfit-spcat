@@ -12,6 +12,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <vector>
 #include "splib/calpgm_types.h"
 #include "splib/blas_compat.h"
 #include "splib/ulib.h"
@@ -264,185 +265,29 @@ int prcorr(FILE *lufit, int nfit, double *cor, int ndcor, double *err, int norma
   return 0;
 } /* prcorr */
 
-  SXLINE *lbufof(int iflg, int ipos)
-  { /*  FUNCTION TO ACCESS LINE DATA, WITH POSSIBLE STORE */
-    /*  iflg = 0, then read line at abs(ipos)             */
-    /*  iflg = 1, then read/write line at abs(ipos)       */
-    /*  iflg = 2, then write line at abs(ipos)            */
-    /*  iflg < 0, then -iflg is number of derivatives     */
-    /*            and ipos is the number of lines         */
-    static SXLINE head;
-    /*@owned@*/ static double **dheapv = NULL;
-    /*@owned@*/ static double *dheap = NULL;
-    /*@dependent@*/ static double *tail;
-    static FILE *scratch = NULL;
-    static size_t nbyte;
-    static int nbuf, bpos, tpos, next, maxrec, ndbl, dnuoff, rewrit;
-    SXLINE *sret;
-    double *pheap;
-    size_t lpos, nline;
-    int n, relpos, k, state;
+namespace {
+  std::vector<SXLINE> g_lines;     // g_lines[0] = sentinel; g_lines[i] = line i (1-indexed)
+  std::vector<double> g_dnudp_buf; // flat derivatives storage, size nlines * ndbl
+}
 
-    sret = &head;
-    if (iflg >= 0)
-    {
-      if (ipos == 0)
-      {
-        return sret;
-      }
-      if (dheapv == NULL)
-        throw NumericError("scratch used before initialization", CalErrorCode::ScratchFileIo);
-      /* find offset from buffer origin */
-      if (ipos < 0)
-        ipos = -ipos;
-      --ipos;
-      state = 2; /* defaults for write/read new buffer */
-      relpos = ipos - bpos;
-      k = relpos - next;
-      if (k >= 0)
-      {
-        if (k == 0)
-        {
-          if (relpos < nbuf)
-          {            /* record next in buffer */
-            state = 1; /* read only */
-            if (tpos == ipos)
-            { /* copy from tail to body */
-              dcopy(ndbl, tail, 1, dheapv[relpos], 1);
-              ++next;
-              tpos = -1;
-              state = 0;
-              if ((rewrit & 2) != 0)
-                rewrit = 1;
-            }
-          } else if (relpos == nbuf && tpos < 0) {
-          state = 1;
-        }
-      }
-    } else if (relpos >= 0) {   /* record within active buffer */
-      state = 0;
-    }
-    if (ipos == tpos) {
-      relpos = nbuf;
-      state = 0;
-    }
-    if (state == 2) {           /*  save old data */
-      if (iflg == 2)
-        relpos = nbuf;
-      if (relpos == nbuf) {
-        lpos = (size_t) tpos;
-        pheap = tail;
-        n = 1;
-        k = rewrit & 2;
-        rewrit &= 1;
-      } else {
-        if (next == nbuf && bpos == maxrec) {   /* first write */
-          ++next;
-          rewrit = 1;
-          tpos = -1;
-        }
-        lpos = (size_t) bpos;
-        pheap = dheapv[0];
-        n = next;
-        bpos = ipos;
-        relpos = next = 0;
-        k = rewrit & 1;
-        rewrit &= 2;
-      }
-      if (k != 0) {
-        if ((size_t) maxrec <= lpos) {
-          maxrec = (int) (lpos + n);
-          if (scratch == NULL)
-            scratch = tmpfile();
-        }
-        if (lpos != 0)
-          lpos *= nbyte;
-        if (scratch == NULL || fseek(scratch, (long) lpos, SEEK_SET) != 0
-            || (int) fwrite(pheap, nbyte, (size_t) n, scratch) != n)
-          throw NumericError("scratch file write error", CalErrorCode::ScratchFileIo);
-      }
-    }
-    if (relpos == nbuf) {
-      pheap = tail;
-      tpos = ipos;
-      if (iflg != 0)
-        rewrit |= 2;
-    } else {
-      pheap = dheapv[relpos];
-      if (iflg != 0)
-        rewrit |= 1;
-    }
-    if (state != 0) {
-      if (relpos < nbuf)
-        ++next;
-      if (ipos < maxrec) {
-        n = 1;
-        lpos = (size_t) ipos;
-        if (lpos != 0)
-          lpos *= nbyte;
-        if (scratch == NULL || fseek(scratch, (long) lpos, SEEK_SET) != 0
-            || (int) fread(pheap, nbyte, (size_t) n, scratch) != n)
-          throw NumericError("scratch file read error", CalErrorCode::ScratchFileIo);
-      }
-    }
-    if (pheap != NULL)
-      sret = (SXLINE *) pheap;
-    sret->dnudp = pheap + dnuoff;
-    pheap = NULL;
-  } else { /***** initialization *****/
-    if (scratch != NULL) {
-      fclose(scratch);
-      scratch = NULL;
-    }
-    if (dheapv != NULL) {
-      free(dheapv);
-      dheapv = NULL;
-    }
-    if (dheap != NULL) {
-      free(dheap);
-      dheap = NULL;
-    }
-    if (ipos > 0) {
-      dnuoff = (int) ((sizeof(SXLINE) - 1) / sizeof(double) + 1);
-      /* dnuoff is number of doubles in SXLINE */
-      ndbl = dnuoff - iflg;
-      if (ndbl < 1)
-        ndbl = 1;
-      nbyte = (size_t) ndbl * sizeof(double);
-      /* On 64-bit, address space is effectively unlimited for this purpose. */
-      lpos = (size_t)((long long)8 * 1024 * 1024 * 1024) / sizeof(double); /* 8 GB cap */
-      lpos = lpos / (size_t) ndbl;
-      nline = (size_t) ipos;
-      if (lpos < nline)
-        nline = lpos;
-#ifdef NDHEAPF
-#if NDHEAPF
-      lpos = (size_t) NDHEAPF;
-      lpos = lpos / nbyte;
-      if (lpos < nline)
-        nline = lpos;
-#endif
-#endif
-      nbuf = (int) nline - 1;
-      lpos = nline * nbyte;
-      dheap = (double *) calalloc(lpos);
-      lpos = (size_t) nbuf *sizeof(double *);
-      dheapv = (double **) calalloc(lpos);
-      k = 0;
-      pheap = dheap;
-      do {
-        dheapv[k] = pheap;
-        pheap += ndbl;
-      } while (++k < nbuf);
-      tail = pheap;
-      pheap = NULL;
-      tpos = -1;
-      head.linku = head.linkl = 0;
-      head.dnudp = dheap + dnuoff;
-    }
-  }
-  return sret;
-} /* lbufof */
+SXLINE *line_at(int ipos) {
+  return &g_lines[(size_t)abs(ipos)];
+}
+
+void init_line_buffer(size_t nlines, int nfit) {
+  int ndbl = nfit > 0 ? nfit : 1;
+  g_lines.assign(nlines + 1, SXLINE{});
+  g_dnudp_buf.assign(nlines * (size_t)ndbl, 0.0);
+  for (size_t i = 1; i <= nlines; ++i)
+    g_lines[i].dnudp = &g_dnudp_buf[(i - 1) * (size_t)ndbl];
+  g_lines[0].linku = g_lines[0].linkl = 0;
+  g_lines[0].dnudp = nullptr;
+}
+
+void release_line_buffer() {
+  g_lines.clear(); g_lines.shrink_to_fit();
+  g_dnudp_buf.clear(); g_dnudp_buf.shrink_to_fit();
+}
 
 void dnuadd(int npar, int nparx, int initl, int indx, int ifac,
             double *egy, double *egyder, int nsize, int line,
@@ -465,7 +310,7 @@ void dnuadd(int npar, int nparx, int initl, int indx, int ifac,
   long itmp;
   int noff, nparn;
 
-  xline = lbufof(1, line);
+  xline = line_at(line);
   deriv = xline->dnudp;
   if (initl < 0)
     xline->cfrq = 0.;
@@ -514,7 +359,7 @@ double dnuget(int iflg, int npar, double f, int line, double *dvec)
   /*     calculated frequency                                */
   /*     DVEC = modified vector of derivatives and frequency */
 
-  xline = lbufof(0, line);
+  xline = line_at(line);
   frq = xline->cfrq;
   if (iflg == 0) {
     /* copy scaled derivatives into DVEC */
@@ -542,7 +387,7 @@ int getdbk(int *link, int *iblk, int *indx, int *initl, int *ifac)
   /*           IFAC= code for energy conversion */
   /*                 0 for 1., 1 for -1., 2 for c, 3 for -c */
   iret = *link;
-  xline = lbufof(0, iret);
+  xline = line_at(iret);
   iup = xline->ibu;
   ilow = xline->ibl;
   init = iup - ilow;
@@ -572,7 +417,7 @@ int frqdat(int line, int *ibln, double *txfrq, double *txwt, double *txerr, shor
 {  /*  gets blend code, frequency, weight, error , and quantum numbers */
   static size_t ndqn = 2 * MAXQN * sizeof(short);
   SXLINE *xline;
-  xline = lbufof(0, line);
+  xline = line_at(line);
   *txfrq = xline->xfrq;
   *txerr = xline->xerr;
   *ibln = xline->bln;
@@ -601,7 +446,7 @@ int lnlink(int *prvblk, int nblk, int iblk, int line)
       break;
   }
   prvblk[iblk] = line;
-  xline = lbufof(2, last);
+  xline = line_at(last);
   if (last >= 0) {
     last = xline->linku;
     xline->linku = line;
@@ -610,7 +455,7 @@ int lnlink(int *prvblk, int nblk, int iblk, int line)
     xline->linkl = line;
   }
   if (line != 0) {
-    xline = lbufof(1, line);
+    xline = line_at(line);
     if (line >= 0) {
       xline->linku = last;
     } else {

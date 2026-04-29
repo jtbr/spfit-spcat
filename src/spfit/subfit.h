@@ -10,7 +10,9 @@ int getlbl(int npar, bcd_t *idpar, /*@out@*/ char *parlbl, const char *fil, int 
 int filbak(char *flu, char *fbak);
 int prcorr(FILE *lufit, int npar, double *cor, int ndcor, double *err,
            int normalize_to_correlation);
-SXLINE * lbufof(int iflg, int ipos);
+SXLINE *line_at(int ipos);
+void init_line_buffer(size_t nlines, int nfit);
+void release_line_buffer();
 void dnuadd(int npar, int nparx, int initl, int indx,
             int ifac, double *egy, double *egyder, int nsize,
             int line, const double *par, const double *fac);

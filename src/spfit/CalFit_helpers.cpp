@@ -244,7 +244,7 @@ int CalFit::linein(const std::vector<std::string> &lines, int *nline, int iqnfmt
   size_t line_idx = 0;
   for (i = 1; i <= mxline; ++i)
   { /*  loop for reading lines */
-    xline = lbufof(1, i);
+    xline = line_at(i);
     iqnum = xline->qn;
     if (line_idx >= lines.size() ||
         getlin_str(lines[line_idx].c_str(), (int)lines[line_idx].size(),
@@ -309,7 +309,7 @@ int CalFit::linein(const std::vector<std::string> &lines, int *nline, int iqnfmt
     if (isblnd != 0)
     {
       xline->bln = nbln;
-      xline = lbufof(1, i - 1); // Get previous line
+      xline = line_at(i - 1);
       xline->bln = -2;
       nbln += 2;
     }
@@ -399,7 +399,7 @@ int CalFit::lineix(FILE *lu, int flg, int nline, int nblkpf, int iqnfmt)
   /*       loop for converting lines */
   for (nread = 1; nread <= nline; ++nread)
   {
-    xline = lbufof(1, nread);
+    xline = line_at(nread);
     xfrqn = xline->xfrq;
     xerrn = xline->xerr;
     xwtn = xline->xwt;
@@ -482,7 +482,7 @@ int CalFit::lineix(FILE *lu, int flg, int nline, int nblkpf, int iqnfmt)
         xnorm = 1. / xnorm;
         for (j = nread - (j >> 1); j <= nread; ++j)
         {
-          xline = lbufof(1, j);
+          xline = line_at(j);
           xline->xwt = (float)(xline->xwt * xnorm);
         }
         xnorm = 0.;
