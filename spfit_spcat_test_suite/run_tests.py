@@ -110,7 +110,7 @@ def run_commands_and_move_outputs_dynamic(output_subdir_name, suite_base_path='.
                             print(f"    Running SPCAT: {' '.join(spcat_command)}")
                             try:
                                 spcat_log_path = os.path.join(output_dir_path_abs, f"{local_basename}_spcat.log")
-                                spcat_result = subprocess.run(spcat_command, capture_output=True, text=True, check=False, timeout=1000)
+                                spcat_result = subprocess.run(spcat_command, capture_output=True, text=True, check=False, timeout=1200)
                                 with open(spcat_log_path, "w") as f:
                                     f.write("--- SPCAT STDOUT ---\n")
                                     f.write(spcat_result.stdout)

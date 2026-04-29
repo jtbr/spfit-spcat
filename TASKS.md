@@ -73,6 +73,17 @@ This document outlines the prioritized tasks for modernizing the SPFIT/SPCAT sof
   - `slib.h` merged into `ulib.h`; `pcard` moved from `catutil.c` to `ulib.c`.
   - 55/55 regression tests pass.
 
+- [x] **Task 9.1: Python interface and example usage**
+  - C++ examples in `examples/fit_example.cpp` and `examples/cat_example.cpp` demonstrate programmatic use of CalFit/CalCat.
+  - Python bindings via **nanobind** (not pybind11): smaller, faster, stable-ABI wheels. Packaged under `python/` with scikit-build-core + pyproject.toml; install with `pip install ./python`.
+  - `OutputSink` abstraction (`FileSink` + `MemorySink`) replaces `FILE*` in CalCat's public API, enabling in-memory catalog capture without POSIX-only `open_memstream`/`fmemopen`.
+  - High-level Python API: `pickett.fit_files(base_path)` and `pickett.cat_files(base_path)`.
+  - Low-level Python API: `FitSession` / `CatSession` objects with `.run()`.
+  - Exception hierarchy mapped to Python: `CalError`, `IoError`, `InputError`, `ValidationError`, `NumericError`.
+  - 18/18 smoke tests pass (`uv run --directory python pytest tests/`).
+  - See `API.md` for full documentation.
+
+
 ## Open Tasks
 
 - [ ] **Task X: Investigate suspected bugs in original C code**
@@ -94,21 +105,37 @@ This document outlines the prioritized tasks for modernizing the SPFIT/SPCAT sof
     - Any reason to consider use of modern linear algebra libraries to replace legacy code?
 
 
-
-- [x] **Task 9.1: Python interface and example usage**
-    - C++ examples in `examples/fit_example.cpp` and `examples/cat_example.cpp` demonstrate programmatic use of CalFit/CalCat.
-    - Python bindings via **nanobind** (not pybind11): smaller, faster, stable-ABI wheels. Packaged under `python/` with scikit-build-core + pyproject.toml; install with `pip install ./python`.
-    - `OutputSink` abstraction (`FileSink` + `MemorySink`) replaces `FILE*` in CalCat's public API, enabling in-memory catalog capture without POSIX-only `open_memstream`/`fmemopen`.
-    - High-level Python API: `pickett.fit_files(base_path)` and `pickett.cat_files(base_path)`.
-    - Low-level Python API: `FitSession` / `CatSession` objects with `.run()`.
-    - Exception hierarchy mapped to Python: `CalError`, `IoError`, `InputError`, `ValidationError`, `NumericError`.
-    - 18/18 smoke tests pass (`uv run --directory python pytest tests/`).
-    - See `API.md` for full documentation.
-
 - [ ] **Task 10: Documentation Improvement**
     - Enhance code documentation. Existing: `spinv.md` (SPFIT/SPCAT algorithms), `dpi.md` (DPFIT/DPCAT).
     - Create user-facing documentation for the C++ API and build system.
     - Document the scientific principles and algorithms for contributors.
+
+- [ ] **Task 12: Typed-struct input API (file-free programmatic use)**
+    - **Goal**: Define typed C++ input records as the canonical public API so that `CalFit::run` and `CalCat::run` can be driven entirely from in-memory structs — no `.par`/`.lin`/`.int`/`.var` files required. The legacy file-reading path becomes a backward-compat parser layer on top of the same core.
+    - **Motivation**: Task 9.1 left `CalFitIO::readInput` and `CalCatIO::readInput` opening files with `fopen()`, calling `setopt(FILE*, …)` directly, and using `getpar`/`getvar(FILE*, …)` (`src/splib/ulib.c:576,658`). The internal structs (`CalFitInput::idpar_data`) are BCD-packed bytes, not values a Python user would naturally construct. Task 12 fixes this, and also enables a future clean file format (TOML/JSON as a serialization of the same structs).
+    - **Schema** (new header `src/api/InputSchema.hpp`):
+        - `Parameter { int64_t id; double value, a_priori_error; bool fixed; string label; }`
+        - `LineRecord { array<int,MAXQN*2> qn; int nqn; double freq, err, weight; string blend_tag; }`
+        - `DipoleMoment { int64_t id; double value; bool starts_new_component; }`
+        - `VibState { int index; bool oblate; int knmin,knmax,iax,iwtpl,iwtmn,ewt0; double vsym; vector<int> nuclear_spins; }` (SPINV only)
+        - `SpinvOptions { int ixz,idiag,phase_flags; vector<VibState>; string nam_file; }`
+        - `DpiOptions { int isdgn, nvib; }` — only two integers
+        - `EngineOptions { Kind kind; SpinvOptions spinv; DpiOptions dpi; }` (discriminated union)
+        - `FitInput { title, n_iterations, marquardt_param, max_obs_calc_err, param_err_scale, freq_scale, max_lines, EngineOptions, vector<Parameter>, vector<double> variance, vector<LineRecord> }`
+        - `CatInput { title, CatControl, vector<DipoleMoment>, EngineOptions, vector<Parameter>, vector<double> variance }`
+        Validate against file formats in spinv.md and dpi.md.
+    - **Phase 1 — Schema + builders** (`src/api/builders.{hpp,cpp}`):
+        - `build_fit_input(FitInput, CalculationEngine&) → CalFitInput`; `build_cat_input(CatInput, …) → CalCatInput`.
+        - New pure-virtual `CalculationEngine::apply_options(const EngineOptions&)` implemented by lifting the post-parse mutation block of `setopt` / `setopt_dpi` (`spinv_setup.cpp:612-720`, `dpi.cpp:655-679`) into helpers called from both the new method and the legacy `setopt(FILE*, …)`.
+    - **Phase 2 — Parsers** (`src/api/legacy_parser.{hpp,cpp}`):
+        - `parse_spinv_option_lines`, `parse_dpi_option_line`, `parse_parameter_lines`, `parse_variance_lines`, `parse_dipole_lines`, `parse_line_records` — each a pure function on `vector<string>`.
+        - `CalFitIO::readInput` / `CalCatIO::readInput` rewritten as: slurp file → split lines → parsers → `FitInput`/`CatInput` → `build_*input`.
+    - **Phase 3 — Python bindings**: bind `FitInput`, `CatInput`, `EngineOptions`, `Parameter`, `LineRecord`, `DipoleMoment`, `VibState`, `SpinvOptions`, `DpiOptions`; add `FitSession.from_input(FitInput)` / `CatSession.from_input(CatInput)`; keep file-path constructors (now go through parser internally).
+    - **Phase 4 — Tests**: 55-molecule regression remains the gate; add `python/tests/test_typed_input.py` with round-trip (parse→build→run) and typed-only (hand-constructed structs) tests.
+    - **Phase 5 — API Docs**: Update `API.md` with new input structures and constructors and `README.md` with synopsis.
+    - **Phase 6 — (Optional) clean file format**: Make new version of executables that accept TOML/JSON/similar format inputs and produce same-format outputs
+    - **Key files**: new `src/api/InputSchema.hpp`, `src/api/builders.{hpp,cpp}`, `src/api/legacy_parser.{hpp,cpp}`; modify `src/engine/CalculationEngine.hpp`, `SpinvEngine.{hpp,cpp}`, `DpiEngine.{hpp,cpp}`, `spinv_setup.cpp`, `dpi.cpp`, `CalFitIO.{hpp,cpp}`, `CalCatIO.{hpp,cpp}`, `CalFit_helpers.cpp`, `python/src/bindings.cpp`, `python/pickett/__init__.py`, `API.md`.
+    - **Constraint**: 55-file regression baseline must remain bit-identical.
 
 ## Future Considerations
 
