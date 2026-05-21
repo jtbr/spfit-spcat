@@ -17,9 +17,9 @@ ifndef BLASLIB
 endif
 
 vpath %.c   src/spfit src/spcat src/engine src/splib src/common src/legacy_apps
-vpath %.cpp src/spfit src/spcat src/engine src/splib src/common src/legacy_apps examples
+vpath %.cpp src/spfit src/spcat src/engine src/splib src/common src/legacy_apps src/api examples
 vpath %.h   src/spfit src/spcat src/engine src/splib src/common src/legacy_apps
-vpath %.hpp src/spfit src/spcat src/engine src/splib src/common src/legacy_apps
+vpath %.hpp src/spfit src/spcat src/engine src/splib src/common src/legacy_apps src/api
 
 default: ${EXEQ}
 all: ${EXEA}
@@ -32,7 +32,7 @@ clean:
 SPLIB_OBJFILES=ulib.o cnjj.o catutil.o lsqfit.o
 SPINV_OBJFILES=spinv_setup.o spinv_spin_symmetry.o spinv_linalg_sort.o spinv_hamiltonian.o spinv_utils.o
 CPP_HELPERS=file_helpers.o SigintFlag.o Logger.o
-OBJFILES=dpi.o spinit.o $(SPLIB_OBJFILES) $(SPINV_OBJFILES) SpinvEngine.o DpiEngine.o $(CPP_HELPERS)
+OBJFILES=dpi.o spinit.o $(SPLIB_OBJFILES) $(SPINV_OBJFILES) SpinvEngine.o DpiEngine.o $(CPP_HELPERS) builders.o legacy_parser.o
 spfit: fit_main.o CalFit.o CalFit_helpers.o CalFitIO.o subfit.o $(OBJFILES) $(LBLAS); g++ -o $@ $^ $(BLASLIB) -lm
 spcat: cat_main.o CalCat.o CalCat_helpers.o CalCatIO.o $(OBJFILES) $(LBLAS); g++ -o $@ $^ $(BLASLIB) -lm
 calmrg: calmrg.o $(CPP_HELPERS) splib.a; g++ -o $@ $^ $(BLASLIB) -lm
@@ -91,5 +91,7 @@ CalFitIO.o: CalFitIO.cpp CalFitIO.hpp CalFit.hpp CalculationEngine.hpp calpgm_ty
 CalCat.o: CalCat.cpp CalCat.hpp OutputSink.hpp CalculationEngine.hpp calpgm_types.h blas_compat.h ulib.h catutil.h CalError.hpp SigintFlag.hpp
 CalCat_helpers.o: CalCat_helpers.cpp CalCat.hpp OutputSink.hpp CalculationEngine.hpp calpgm_types.h blas_compat.h ulib.h CalError.hpp
 CalCatIO.o: CalCatIO.cpp CalCatIO.hpp CalCat.hpp OutputSink.hpp CalculationEngine.hpp calpgm_types.h ulib.h CalError.hpp file_helpers.hpp
+builders.o: builders.cpp builders.hpp InputSchema.hpp CalFit.hpp CalCat.hpp CalculationEngine.hpp ulib.h calpgm_types.h lsqfit.h CalError.hpp Logger.hpp
+legacy_parser.o: legacy_parser.cpp legacy_parser.hpp InputSchema.hpp builders.hpp ulib.h calpgm_types.h CalError.hpp
 fit_example.o: fit_example.cpp SpinvEngine.hpp CalFit.hpp CalFitIO.hpp CalError.hpp Logger.hpp
 cat_example.o: cat_example.cpp SpinvEngine.hpp CalCat.hpp CalCatIO.hpp OutputSink.hpp CalError.hpp Logger.hpp

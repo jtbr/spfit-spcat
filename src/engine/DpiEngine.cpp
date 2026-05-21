@@ -1,6 +1,10 @@
 #include "DpiEngine.hpp"
 #include <cstdlib>
+#include <cstdio>
+#include <sstream>
 #include "dpi.h"
+#include "api/InputSchema.hpp"
+#include "common/CalError.hpp"
 
 DpiEngine::DpiEngine() {
     // Initialize the context with default values
@@ -43,6 +47,26 @@ int DpiEngine::getqn(const int iblk, const int indx, const int maxqn,
 int DpiEngine::setopt(FILE *lu, int *nfmt, int *itd, int *ndbcd, char *namfil)
 {
   return ::setopt_dpi(&m_context, lu, nfmt, itd, ndbcd, namfil);
+}
+
+int DpiEngine::apply_options(const EngineOptions &opts, int *nfmt, int *itd, int *ndbcd,
+                             std::string &namfil)
+{
+    // DPI option card: "isdgn nvib" (exactly two integers)
+    std::ostringstream oss;
+    oss << opts.dpi.isdgn << " " << opts.dpi.nvib << "\n";
+    std::string card = oss.str();
+
+    FILE *f = fmemopen((void *)card.data(), card.size(), "r");
+    if (!f)
+        throw IoError("fmemopen failed in DpiEngine::apply_options");
+
+    char namfil_buf[256] = {};
+    int n = ::setopt_dpi(&m_context, f, nfmt, itd, ndbcd, namfil_buf);
+    fclose(f);
+
+    namfil = namfil_buf;
+    return n;
 }
 
 int DpiEngine::setfmt(int *iqnfmt, int nfmt)

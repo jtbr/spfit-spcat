@@ -75,6 +75,8 @@ set(SOURCE_FILES
     src/legacy_apps/sortegy.cpp
     src/legacy_apps/iambak.cpp
     src/legacy_apps/readopt.c
+    src/api/builders.cpp
+    src/api/legacy_parser.cpp
 )
 
 set_source_files_properties(${SOURCE_FILES} PROPERTIES COMPILE_FLAGS "-Wno-missing-field-initializers")
@@ -134,6 +136,10 @@ set(COMMON_SRCS
     src/common/SigintFlag.cpp
     src/common/file_helpers.cpp
 )
+set(API_SRCS
+    src/api/builders.cpp
+    src/api/legacy_parser.cpp
+)
 
 # Add spfit
 add_executable_plus(spfit TRUE
@@ -146,6 +152,7 @@ add_executable_plus(spfit TRUE
     ${ENGINE_SRCS}
     ${SPLIB_SRCS}
     ${COMMON_SRCS}
+    ${API_SRCS}
 )
 
 # Add spcat
@@ -157,6 +164,7 @@ add_executable_plus(spcat TRUE
     ${ENGINE_SRCS}
     ${SPLIB_SRCS}
     ${COMMON_SRCS}
+    ${API_SRCS}
 )
 
 # Shared helpers required by all legacy executables

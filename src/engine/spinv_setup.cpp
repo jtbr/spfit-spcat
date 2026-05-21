@@ -1067,11 +1067,9 @@ int setfmt(struct SpinvContext *ctx, int *iqnfmt, int nfmt)
     else
     {
       iqnfmt[iv] = iqfmtq;
-      printf("DEBUG setfmt: iqnfmt[%d] set to %d\n", iv, iqnfmt[iv]);
     }
     ++pvinfo;
   }
-  printf("DEBUG setfmt: Before return, iqnfmt[0]=%d, ctx->glob.maxqn=%d\n", iqnfmt[0], ctx->glob.maxqn);
   if (nfmt <= 0)
     return 1;
   return ctx->glob.maxqn;

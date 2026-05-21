@@ -1,7 +1,10 @@
 #ifndef CALCULATION_ENGINE_HPP
 #define CALCULATION_ENGINE_HPP
 
+#include <string>
 #include "splib/calpgm_types.h"
+
+struct EngineOptions; // forward declaration — defined in api/InputSchema.hpp
 
 class CalculationEngine {
 public:
@@ -20,6 +23,10 @@ public:
     virtual int getqn(const int iblk, const int indx, const int maxqn,
                       short *iqn, int *idgn) = 0;
     virtual int setopt(FILE *lu, int *nfmt, int *itd, int *ndbcd, char *namfil) = 0;
+    // Configure engine from typed options (file-free path).
+    // Same out-params as setopt; returns number of option cards consumed (0 for typed path).
+    virtual int apply_options(const EngineOptions &opts, int *nfmt, int *itd, int *ndbcd,
+                              std::string &namfil) = 0;
     virtual int setfmt(int *iqnfmt, int nfmt) = 0;
     // Set up block structure and updates nblkpf (blocks per F) and negy (max Hamiltonian dim)
     virtual int setblk(FILE *lu, int npar, bcd_t *idpar, double *par,

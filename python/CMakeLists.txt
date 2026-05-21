@@ -58,6 +58,11 @@ set(SPCAT_SRCS
     ${PARENT_SRC}/spcat/CalCatIO.cpp
 )
 
+set(API_SRCS
+    ${PARENT_SRC}/api/builders.cpp
+    ${PARENT_SRC}/api/legacy_parser.cpp
+)
+
 nanobind_add_module(_pickett NB_STATIC
     src/bindings.cpp
     ${ENGINE_SRCS}
@@ -65,6 +70,7 @@ nanobind_add_module(_pickett NB_STATIC
     ${COMMON_SRCS}
     ${SPFIT_SRCS}
     ${SPCAT_SRCS}
+    ${API_SRCS}
 )
 
 target_link_libraries(_pickett PRIVATE m)

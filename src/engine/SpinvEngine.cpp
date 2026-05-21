@@ -1,7 +1,12 @@
 #include <cstring>
 #include <cstdlib>
+#include <cstdio>
+#include <sstream>
+#include <stdexcept>
 #include "spinv_internal.h"
 #include "SpinvEngine.hpp"
+#include "api/InputSchema.hpp"
+#include "common/CalError.hpp"
 
 SpinvEngine::SpinvEngine()
 {
@@ -136,10 +141,110 @@ int SpinvEngine::getqn(const int iblk, const int indx, const int maxqn,
 
 int SpinvEngine::setopt(FILE *lu, int *nfmt, int *itd, int *ndbcd, char *namfil)
 {
-    printf("DEBUG setopt at entry: m_context.glob.nqn0 = %d\n", m_context.glob.nqn0);
-    int retval = ::setopt(&m_context, lu, nfmt, itd, ndbcd, namfil);
-    printf("DEBUG setopt at exit: m_context.glob.nqn0 = %d\n", m_context.glob.nqn0);
-    return retval;
+    return ::setopt(&m_context, lu, nfmt, itd, ndbcd, namfil);
+}
+
+// Encode nuclear spins as a decimal string that getbcd will parse into bcdspin.
+// getbcd packs digits right-to-left into BCD nibbles, so spins are concatenated
+// in reverse order: for spins {s0, s1, ..., sn-1} write "s_{n-1}...s1 s0".
+// Each spin value 2*I must be in [1, 9] (the isbig=0 single-nibble format).
+// Zero spins outputs "0" which triggers isbig=1 with jj=0, terminating immediately.
+static std::string encode_spinv_spin(const VibState &vib)
+{
+    for (int s : vib.nuclear_spins) {
+        if (s < 1 || s > 9)
+            throw ValidationError("nuclear_spin 2*I value must be in [1,9]; "
+                                  "use isbig BCD format for larger spins (not yet supported)",
+                                  CalErrorCode::InvalidParameter);
+    }
+    std::string result;
+    if (vib.negbcd_spin)
+        result += '-';
+    if (vib.nuclear_spins.empty()) {
+        result += '0';
+    } else {
+        for (int i = (int)vib.nuclear_spins.size() - 1; i >= 0; --i)
+            result += (char)('0' + vib.nuclear_spins[i]);
+    }
+    return result;
+}
+
+// Build the text cards that SpinvEngine::setopt can parse from a fmemopen buffer.
+// Card format (getbcd reads the leading integer, pcard reads rvec[0..10] after it):
+//   <spin_int> <lopt> <knnmin> <knnmax> <ixz> <iax> <iwtpl> <iwtmn> <vsym> <ewt0> <idiag> <phase>
+// - Card 1: lopt = ±nvib (sign = oblate flag), ixz/idiag/phase from SpinvOptions globals
+// - Card i>1: lopt = vibs[i].index (0-based vib state index to configure)
+// - Intermediate cards (not last) use vsym = -1.0 to signal "keep reading"
+// - Last card uses vibs.back().vsym (must be >= -0.5; clamped if negative)
+static std::string make_spinv_cards(const SpinvOptions &so)
+{
+    if (so.vibs.empty())
+        throw ValidationError("SpinvOptions.vibs must have at least one entry",
+                              CalErrorCode::InvalidParameter);
+
+    std::ostringstream oss;
+    int nvib = (int)so.vibs.size();
+
+    for (int i = 0; i < nvib; ++i) {
+        const VibState &vib = so.vibs[i];
+        bool is_last = (i == nvib - 1);
+
+        std::string spin = encode_spinv_spin(vib);
+
+        // lopt: card 1 → ±nvib; subsequent cards → vib state index
+        int lopt;
+        if (i == 0)
+            lopt = so.oblate ? -nvib : nvib;
+        else
+            lopt = vib.index;
+
+        // vsym: intermediate cards must be < -0.5 (loop-continue signal).
+        // Last card: user value clamped to >= -0.4 so it doesn't continue the loop.
+        double vsym;
+        if (!is_last) {
+            vsym = -1.0;
+        } else {
+            vsym = (vib.vsym < -0.5) ? -0.4 : vib.vsym;
+        }
+
+        // card 1 carries global options; later cards carry zeros for those fields
+        int ixz   = (i == 0) ? so.ixz   : 0;
+        int idiag  = (i == 0) ? so.idiag  : 0;
+        int phase  = (i == 0) ? so.phase_flags : 0;
+
+        oss << spin << " " << lopt
+            << " " << vib.knmin << " " << vib.knmax
+            << " " << ixz << " " << vib.iax
+            << " " << vib.iwtpl << " " << vib.iwtmn
+            << " " << vsym << " " << vib.ewt0
+            << " " << idiag << " " << phase << "\n";
+    }
+    return oss.str();
+}
+
+int SpinvEngine::apply_options(const EngineOptions &opts, int *nfmt, int *itd, int *ndbcd,
+                               std::string &namfil)
+{
+    std::string cards = make_spinv_cards(opts.spinv);
+    FILE *f = fmemopen((void *)cards.data(), cards.size(), "r");
+    if (!f)
+        throw IoError("fmemopen failed in SpinvEngine::apply_options");
+
+    char namfil_buf[256] = {};
+    if (!namfil.empty()) {
+        strncpy(namfil_buf, namfil.c_str(), sizeof(namfil_buf) - 1);
+    }
+
+    int n = ::setopt(&m_context, f, nfmt, itd, ndbcd, namfil_buf);
+    fclose(f);
+
+    // nam_file overrides the engine default derived from the card's leading letter
+    if (!opts.spinv.nam_file.empty())
+        namfil = opts.spinv.nam_file;
+    else
+        namfil = namfil_buf;
+
+    return n;
 }
 
 int SpinvEngine::setfmt(int *iqnfmt, int nfmt)
