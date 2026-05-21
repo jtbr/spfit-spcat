@@ -151,20 +151,20 @@ int SpinvEngine::setopt(FILE *lu, int *nfmt, int *itd, int *ndbcd, char *namfil)
 // Zero spins outputs "0" which triggers isbig=1 with jj=0, terminating immediately.
 static std::string encode_spinv_spin(const VibState &vib)
 {
-    for (int s : vib.nuclear_spins) {
+    for (int s : vib.spin_degeneracies) {
         if (s < 1 || s > 9)
-            throw ValidationError("nuclear_spin 2*I value must be in [1,9]; "
+            throw ValidationError("spin_degeneracy value must be in [1,9]; "
                                   "use isbig BCD format for larger spins (not yet supported)",
                                   CalErrorCode::InvalidParameter);
     }
     std::string result;
-    if (vib.negbcd_spin)
+    if (vib.symmetric_rotor_quanta)
         result += '-';
-    if (vib.nuclear_spins.empty()) {
+    if (vib.spin_degeneracies.empty()) {
         result += '0';
     } else {
-        for (int i = (int)vib.nuclear_spins.size() - 1; i >= 0; --i)
-            result += (char)('0' + vib.nuclear_spins[i]);
+        for (int i = (int)vib.spin_degeneracies.size() - 1; i >= 0; --i)
+            result += (char)('0' + vib.spin_degeneracies[i]);
     }
     return result;
 }
@@ -208,15 +208,15 @@ static std::string make_spinv_cards(const SpinvOptions &so)
         }
 
         // card 1 carries global options; later cards carry zeros for those fields
-        int ixz   = (i == 0) ? so.ixz   : 0;
-        int idiag  = (i == 0) ? so.idiag  : 0;
-        int phase  = (i == 0) ? so.phase_flags : 0;
+        int ixx   = (i == 0) ? so.inclusion_flags : 0;
+        int idiag = (i == 0) ? so.diag_order     : 0;
+        int phase = (i == 0) ? so.phase_flags     : 0;
 
         oss << spin << " " << lopt
             << " " << vib.knmin << " " << vib.knmax
-            << " " << ixz << " " << vib.iax
+            << " " << ixx << " " << vib.stat_weight_axis
             << " " << vib.iwtpl << " " << vib.iwtmn
-            << " " << vsym << " " << vib.ewt0
+            << " " << vsym << " " << vib.esym_weight
             << " " << idiag << " " << phase << "\n";
     }
     return oss.str();

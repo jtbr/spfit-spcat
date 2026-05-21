@@ -439,6 +439,191 @@ for line in cat_out.cat_lines[:5]:
     print(line)
 ```
 
+### File-free (typed-struct) API
+
+The file-free path lets you construct, modify, or generate input programmatically —
+no `.par`, `.lin`, or `.int` files needed.
+
+#### Entry points
+
+| Function / method | What it does |
+|---|---|
+| `parse_fit_files(par_path, lin_path)` | Parse existing files → `FitInput` struct |
+| `parse_cat_files(var_path, int_path)` | Parse existing files → `CatInput` struct |
+| `FitSession.from_input(fi)` | Build a fit session from a `FitInput` struct |
+| `CatSession.from_input(ci)` | Build a cat session from a `CatInput` struct |
+
+`parse_fit_files` / `parse_cat_files` are useful as a **starting point**: parse
+existing files, inspect or modify the resulting struct, then hand it to
+`from_input`.  The fit-line content is transferred internally without
+reformatting, so the numerical results are bit-identical to the file-based path.
+
+#### Struct overview
+
+```
+FitInput
+├── title: str
+├── n_iterations: int          (default 1)
+├── marquardt_param: float     (default 0)
+├── max_obs_calc_err: float    (default 1e6)
+├── parameters: list[Parameter]
+│     Parameter.id              — decimal parameter ID (e.g. 100 = B, 200 = D)
+│     Parameter.value           — value in MHz (or cm⁻¹ in cm-wave mode)
+│     Parameter.a_priori_error  — 1σ prior; very large → float freely; ≤0 → fix
+│     Parameter.fixed           — True → excluded from fit
+│     Parameter.label           — display label (≤ 10 chars)
+├── lines: list[LineRecord]
+│     LineRecord.qn             — list of ints: [Jupper, ...], [Jlower, ...] interleaved
+│     LineRecord.nqn            — number of QN pairs actually used
+│     LineRecord.freq           — observed frequency (MHz)
+│     LineRecord.err            — measurement uncertainty (MHz)
+│     LineRecord.weight         — line weight (default 1.0)
+└── engine_options: EngineOptions
+      EngineOptions.kind        — EngineKind.Spinv (default) or EngineKind.Dpi
+      EngineOptions.spinv       — SpinvOptions (see below)
+```
+
+`CatInput` is analogous, with `dipoles: list[DipoleMoment]` instead of lines and a
+`CatControl` block for catalog settings.
+
+#### SpinvOptions and VibState
+
+Engine options describe the molecular symmetry, quantum numbers, and statistical
+weights.  Every fit/cat run needs at least one `VibState` entry.
+
+```python
+from pickett import SpinvOptions, VibState
+
+# Linear molecule (e.g. CO, HCN) — single vibrational state
+so = SpinvOptions()
+so.vibs = [VibState()]
+vib = so.vibs[0]
+vib.knmin = 0                      # K range → 0,0 signals linear geometry
+vib.knmax = 0
+vib.symmetric_rotor_quanta = True  # J is the only quantum number; use K-basis
+vib.spin_degeneracies = []         # 12C16O: both nuclei have spin 0 → no hyperfine
+vib.iwtpl = 1                      # statistical weight for even-parity states
+vib.iwtmn = 1                      # statistical weight for odd-parity states
+
+# Closed-shell asymmetric top (e.g. H2O, SO2) — no nuclear spins of interest
+so = SpinvOptions()
+so.vibs = [VibState()]
+vib = so.vibs[0]
+# knmin/knmax: defaults (0, 359) include all Ka values → fine for most tops
+vib.spin_degeneracies = [1]        # placeholder spin-0 species; gives correct weights
+vib.iwtpl = 1
+vib.iwtmn = 1
+
+# Symmetric top with C3v symmetry (e.g. CH3CN) — A/E nuclear spin statistics
+so = SpinvOptions()
+so.vibs = [VibState()]
+vib = so.vibs[0]
+vib.stat_weight_axis = 6           # 3-fold symmetric top
+vib.iwtpl = 2                      # A species weight
+vib.iwtmn = 1                      # E species weight
+vib.spin_degeneracies = [4]        # three equivalent H with I=1/2: 2*(3/2)+1 = 4
+```
+
+Key `VibState` fields:
+
+| Field | Default | Meaning |
+|---|---|---|
+| `knmin`, `knmax` | `0, 359` | K-quantum-number range. Set both to 0 for linear molecules. |
+| `stat_weight_axis` | `1` | Rotation axis for statistical weights: 1=a, 2=b, 3=c; 4=A/B C₂; 6=3-fold; 7=C₄; 10=C₆. Negative → I_tot spin basis. |
+| `iwtpl`, `iwtmn` | `1, 1` | Statistical weights for +/− parity states. |
+| `vsym` | `0.0` | Vibrational symmetry. Only meaningful on the last (or only) VibState. |
+| `esym_weight` | `99` | E-symmetry weight. Default 99 = ignored. Negative → EWTFAC=1000 mode. |
+| `spin_degeneracies` | `[]` | Spin degeneracy (2I+1 or 2S+1) for each spin species. `[]` = no spin species. |
+| `symmetric_rotor_quanta` | `False` | True for linear molecules and open-shell systems using K quantum numbers. |
+
+Key `SpinvOptions` fields:
+
+| Field | Default | Meaning |
+|---|---|---|
+| `inclusion_flags` | `0` | Which off-diagonal blocks to include (0 = all). Rarely changed. |
+| `diag_order` | `0` | Eigenvalue ordering within Wang sub-blocks (0 = energy order). |
+| `phase_flags` | `0` | Packed: PHASE + 10·NEWLZ + 20·NOFC + 40·G12. |
+| `oblate` | `False` | True for oblate tops (z=c). Default prolate (z=a). |
+| `nam_file` | `""` | Parameter-label file (empty = engine default `sping.nam`). |
+
+#### Example: fit CO (file-free)
+
+CO is a closed-shell linear molecule. Parameters use the standard Pickett ID
+scheme: B=100, D=200, H=300, L=400 (centrifugal distortion corrections).
+
+```python
+import pickett
+from pickett import (
+    FitInput, Parameter, LineRecord,
+    EngineOptions, EngineKind, SpinvOptions, VibState,
+    FitSession,
+)
+
+# Spectroscopic parameters (starting values in MHz)
+params = [
+    Parameter(id=100, value=57635.968,   a_priori_error=1e37),  # B
+    Parameter(id=200, value=-0.184,      a_priori_error=1e37),  # -D (sign convention)
+    Parameter(id=300, value=1.7e-9,      a_priori_error=1e37),  # H
+    Parameter(id=400, value=0.0,         a_priori_error=1e37),  # L (fix at zero)
+]
+params[3].fixed = True   # L → excluded from fit
+
+# Observed transitions: LineRecord.qn = [J_upper, J_lower, ...] (just J for linear)
+# frequencies in MHz (illustrative values from CDMS/JPL)
+lines = [
+    LineRecord(qn=[1, 0], nqn=1, freq=115271.202, err=0.05),
+    LineRecord(qn=[2, 1], nqn=1, freq=230538.000, err=0.05),
+    LineRecord(qn=[3, 2], nqn=1, freq=345795.990, err=0.05),
+    LineRecord(qn=[4, 3], nqn=1, freq=461040.768, err=0.05),
+]
+
+# Engine options: linear molecule → K=0, symmetric-rotor quanta, no nuclear spins
+vib = VibState()
+vib.knmin = 0
+vib.knmax = 0
+vib.symmetric_rotor_quanta = True
+vib.spin_degeneracies = []
+
+so = SpinvOptions()
+so.vibs = [vib]
+
+fi = FitInput()
+fi.title = "CO v=0 (file-free example)"
+fi.n_iterations = 5
+fi.parameters = params
+fi.lines = lines
+fi.engine_options = EngineOptions()
+fi.engine_options.kind = EngineKind.Spinv
+fi.engine_options.spinv = so
+
+out = FitSession.from_input(fi).run()
+print(f"RMS = {out.xsqbest:.4f}  itr = {out.itr}")
+for p, e in zip(out.par, out.erpar):
+    print(f"  {p:21.13E}  +/-  {e:12.5E}")
+```
+
+#### Parse-and-modify pattern
+
+The most common use of the file-free API is to parse existing files, inspect or
+modify the result, and then re-run:
+
+```python
+import pickett
+from pickett import parse_fit_files, FitSession
+
+# Round-trip: files → struct → run (numerically identical to fit_files())
+fi = parse_fit_files("co_4.par", "co_4.lin")
+out = FitSession.from_input(fi).run()
+
+# Modify: fix a parameter and re-run
+for p in fi.parameters:
+    if p.id == 200:          # D constant
+        p.a_priori_error = 1e-37  # ≤ 1e-37 effectively fixes it
+        break
+out2 = FitSession.from_input(fi).run()
+print(f"3-param fit RMS = {out2.xsqbest:.4f}")
+```
+
 ### Exception handling
 
 The C++ exception hierarchy is mapped to Python exceptions of the same names,

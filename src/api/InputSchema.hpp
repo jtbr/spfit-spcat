@@ -50,33 +50,45 @@ struct DipoleMoment {
 // ── Engine options (SPINV) ─────────────────────────────────────────────────
 
 struct VibState {
-    // Vibrational state configuration — one entry per option card after the first.
-    // The first entry (vibs[0]) also carries global setup for card 1.
-    int    index = 0;   // 0-based vibrational state index; card 1 always configures index 0
+    // Vibrational/electronic state configuration — one entry per option card.
+    // vibs[0] sets defaults for all states; additional entries override per-state.
+    int    index = 0;   // 0-based vibrational state index (card 1 always configures state 0)
     int    knmin = 0;   // minimum K quantum number
-    int    knmax = 359; // maximum K (clamped to MAXN_DIRCOS = 359); 0 → linear molecule
-    int    iax = 1;     // axis / symmetry selector (0–11; negative enables special knmin treatment)
-    int    iwtpl = 1;   // statistical weight (plus parity)
-    int    iwtmn = 1;   // statistical weight (minus parity)
-    double vsym = 0.0;  // vibrational symmetry parameter (builder auto-sets intermediate cards)
-    int    ewt0 = 99;   // energy/weight flag; negative value on vibs[0] sets esymdec = 1000
-    // Nuclear spin encoding: 2*I values (e.g. 0 = none, 1 = spin-1/2, 2 = spin-1)
-    // Maximum 9 spins; each 2*I must be in [1, 9] (isbig=0 BCD format).
-    // For "isbig" spins (2*I > 9) a ValidationError is thrown.
-    std::vector<int> nuclear_spins;
-    // NEGBCD flag on the spin BCD field: required for linear molecules (sets nqnn=1).
-    // Parser sets this automatically; users of linear molecules must set it explicitly.
-    bool negbcd_spin = false;
+    int    knmax = 359; // maximum K; set both knmin=knmax=0 for a linear molecule
+    // Axis for statistical weight: 1=a, 2=b, 3=c, 4=A(C2), 5=B(C2), 6=3-fold,
+    // 7=A/E(C4), 8=B(C4), 9=5-fold, 10=A/E2(C6), 11=B/E1(C6). Negative → I_tot spin basis.
+    int    stat_weight_axis = 1;
+    int    iwtpl = 1;   // statistical weight for even (plus) parity states
+    int    iwtmn = 1;   // statistical weight for odd (minus) parity states
+    // vibrational symmetry (only meaningful on last VibState; builder injects -1.0 sentinel
+    // for earlier states automatically — do not set to -1.0 here).
+    double vsym = 0.0;
+    // E-symmetry weight (EWT field). Default 99 = "ignored". Negative sign on vibs[0]
+    // triggers EWTFAC=1000 mode (default EWTFAC=100). Relevant only for IAX >= 6.
+    int    esym_weight = 99;
+    // Spin degeneracy (2I+1) for each spin species, in units/tens/hundreds digit order.
+    // Examples: [2] = one spin-1/2 nucleus; [3] = one spin-1 or one triplet electron spin;
+    // [1] = spin-0 placeholder (e.g. C2v molecule with no nuclear spins).
+    // For a molecule with no spin species at all, leave empty.
+    std::vector<int> spin_degeneracies;
+    // True if SPIND is negative: selects symmetric-top quantum numbers (K quantum number).
+    // Set True for linear molecules and open-shell (electron-spin) systems.
+    // False (default) for standard asymmetric-top molecules with nuclear spins only.
+    bool symmetric_rotor_quanta = false;
 };
 
 struct SpinvOptions {
-    int    ixz = 0;           // x-z plane selection (card 1 field rvec[3])
-    int    idiag = 0;         // diagonalisation option (card 1 field rvec[9])
-    int    phase_flags = 0;   // packed phase: stdphase = phase_flags%10,
-                              //   newlz = (phase_flags/10)%2, nofc = (phase_flags/10/2)%2,
-                              //   g12 = (phase_flags/10/4)%2 (see spinv_setup.cpp:620–632)
-    bool   oblate = false;    // global oblate flag: negates lopt on card 1
-    std::string nam_file;     // parameter-name file path; empty = engine default ("sping.nam")
+    // Binary flags for which inter-state couplings to include (IXX field):
+    //   bit 0 set → no ΔN≠0; bit 1 → no ΔJ; bit 2 → no ΔF1; etc. Default 0 = include all.
+    int    inclusion_flags = 0;
+    // Eigenvalue ordering within Wang sub-blocks (DIAG field, card 1 only):
+    //   0=energy, 1=full projection, 2=energy within Wang, 3=τ=Ka-Kc, 4=<Kz²>, 5=diag order.
+    int    diag_order = 0;
+    // Phase/operator flags (XOPT field): phase_flags = PHASE + 10*NEWLZ + 20*NOFC + 40*G12.
+    //   PHASE 0-8 forces phase convention (0=none, 8=standard).
+    int    phase_flags = 0;
+    bool   oblate = false;    // oblate rotor: z=c, y=b, x=a (default false = prolate: z=a)
+    std::string nam_file;     // parameter-label file; empty = engine default ("sping.nam")
     std::vector<VibState> vibs; // at least one entry required
 };
 

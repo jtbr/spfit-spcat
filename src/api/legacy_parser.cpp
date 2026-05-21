@@ -81,24 +81,23 @@ static SpinvOptions parse_spinv_option_lines(const std::vector<std::string> &lin
         if (iend <= 0)
             break;  // no valid integer → end of option cards
 
-        bool negbcd_spin = (NEGBCD(bcdspin[0]) != 0);
+        bool sym_rotor_quanta = (NEGBCD(bcdspin[0]) != 0);
 
-        // Decode nuclear_spins from bcdspin using putbcd → decimal string
+        // Decode spin_degeneracies from bcdspin using putbcd → decimal string
         char spin_str[24] = {};
         putbcd(spin_str, sizeof(spin_str) - 1, bcdspin);
 
-        std::vector<int> nuclear_spins;
+        std::vector<int> spin_degs;
         std::string spin_digits;
         for (char c : std::string(spin_str)) {
             if (c >= '0' && c <= '9') spin_digits += c;
         }
         if (spin_digits.empty() || spin_digits == "0") {
-            // no spins
+            // no spin species
         } else {
-            // encode_spinv_spin wrote digits in reversed order (spins[n-1]...spins[0])
-            // so digits[last] = spins[0], digits[0] = spins[n-1]
+            // digits are in reversed order (highest species first): reverse back
             for (int i = (int)spin_digits.size() - 1; i >= 0; --i)
-                nuclear_spins.push_back(spin_digits[i] - '0');
+                spin_degs.push_back(spin_digits[i] - '0');
         }
 
         // Parse 11 floats via pcard (rvec defaults from rvec0, with vsym override to 0)
@@ -110,36 +109,40 @@ static SpinvOptions parse_spinv_option_lines(const std::vector<std::string> &lin
         int lopt   = (int)rvec[0];
         int knmin  = (int)rvec[1];
         int knmax  = (int)rvec[2];
-        // rvec[3] = ixz (card 1 only)
-        int iax    = (int)rvec[4];
+        // rvec[3] = inclusion_flags (card 1 only)
+        int stat_wt_axis = (int)rvec[4];
         int iwtpl  = (int)rvec[5];
         int iwtmn  = (int)rvec[6];
-        double vsym = rvec[7];
-        int ewt0   = (int)rvec[8];
-        // rvec[9]  = idiag (card 1 only)
+        double vsym_raw = rvec[7];  // raw value; -1.0 on non-last cards is a sentinel
+        int esym_wt = (int)rvec[8];
+        // rvec[9]  = diag_order (card 1 only)
         // rvec[10] = phase_flags (card 1 only)
 
         ++lines_consumed;
 
+        bool is_last = (vsym_raw >= -0.5);
+
         VibState vib;
-        vib.knmin        = knmin;
-        vib.knmax        = knmax;
-        vib.iax          = iax;
-        vib.iwtpl        = iwtpl;
-        vib.iwtmn        = iwtmn;
-        vib.vsym         = vsym;
-        vib.ewt0         = ewt0;
-        vib.nuclear_spins = nuclear_spins;
-        vib.negbcd_spin  = negbcd_spin;
+        vib.knmin                = knmin;
+        vib.knmax                = knmax;
+        vib.stat_weight_axis     = stat_wt_axis;
+        vib.iwtpl                = iwtpl;
+        vib.iwtmn                = iwtmn;
+        // Don't propagate the -1.0 sentinel: store 0.0 for non-last states
+        // (the builder injects -1.0 automatically for intermediate states).
+        vib.vsym                 = is_last ? vsym_raw : 0.0;
+        vib.esym_weight          = esym_wt;
+        vib.spin_degeneracies    = spin_degs;
+        vib.symmetric_rotor_quanta = sym_rotor_quanta;
 
         if (first_card) {
             first_card = false;
             int nvib = (lopt < 0) ? -lopt : lopt;
             if (nvib <= 0) nvib = 1;
-            so.oblate       = (lopt < 0);
-            so.ixz          = (int)rvec[3];
-            so.idiag        = (int)rvec[9];
-            so.phase_flags  = (int)rvec[10];
+            so.oblate            = (lopt < 0);
+            so.inclusion_flags   = (int)rvec[3];
+            so.diag_order        = (int)rvec[9];
+            so.phase_flags       = (int)rvec[10];
 
             // Compute namfil override from ctyp (setopt: "sping.nam"[4] = ctyp)
             if (ctyp != '\0') {
@@ -162,8 +165,8 @@ static SpinvOptions parse_spinv_option_lines(const std::vector<std::string> &lin
 
         so.vibs[vib.index] = vib;
 
-        // Terminator: vsym >= -0.5 (last card)
-        if (vsym >= -0.5)
+        // Terminator: vsym_raw >= -0.5 (last card)
+        if (vsym_raw >= -0.5)
             break;
     }
     return so;

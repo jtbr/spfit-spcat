@@ -22,3 +22,6 @@ dev = [
     "pytest>=8.3.5",
     "scikit-build-core>=0.12.2",
 ]
+
+[tool.pytest.ini_options]
+# conftest.py sets CWD to repo root so tests can use spfit_spcat_test_suite/ paths.
