@@ -39,26 +39,37 @@ C++ surface* that exposes them.
 
 ## Overview
 
-Two equivalent entry-point styles are available; **new code should use the
-typed-struct API** (left column below), which avoids any temporary files and
-makes inputs straightforward to construct, validate, modify, and serialize:
+The library is organized around the typed-struct (file-free) route, with
+helpers that read or write legacy files at the edges.  All three workflows
+below produce numerically identical results — the difference is only in how
+inputs arrive and whether disk I/O is involved.
 
-| Typed-struct API (recommended)                | Legacy file-based API                         |
-| --------------------------------------------- | --------------------------------------------- |
-| `FitSession.from_input(fi).run()`             | `FitSession(par_file, lin_file).run()`        |
-| `CatSession.from_input(ci).run()`             | `CatSession(int_file, var_file).run()`        |
-| `parse_fit_files(par, lin) → FitInput`        | `fit_files(base) → CalFitOutput`              |
-| `parse_cat_files(var, int) → CatInput`        | `cat_files(base, int_path=…) → CalCatOutput`  |
+| Workflow                  | Entry points                                            | Input        | Returns        |
+|---------------------------|---------------------------------------------------------|--------------|----------------|
+| **File-free (recommended)** | `FitSession.from_input(fi).run()`                     | `FitInput`   | `CalFitOutput` |
+|                           | `CatSession.from_input(ci).run()`                       | `CatInput`   | `CalCatOutput` |
+| **Bridge — legacy files → structs** | `parse_fit_files(par, lin)`                   | file paths   | `FitInput`     |
+|                           | `parse_cat_files(var, int)`                             | file paths   | `CatInput`     |
+| **Pure legacy (one-shot)**  | `fit_files(base)`  /  `FitSession(par, lin).run()`    | file paths   | `CalFitOutput` |
+|                           | `cat_files(base, ...)`  /  `CatSession(int, var).run()` | file paths   | `CalCatOutput` |
 
-The legacy file-based path is exposed for compatibility with existing `.par`/
-`.lin`/`.int`/`.var` files, but it ultimately funnels through the same typed
-structs as the file-free path.  `parse_fit_files` / `parse_cat_files` are the
-bridges: they read legacy files and return a `FitInput` / `CatInput` that you
-can inspect, modify, and pass straight to `from_input`.  Numerical results are
-bit-identical between the two routes.
+The file-free workflow is preferred for new code — inputs are easier to
+construct, validate, modify, and serialize, and nothing touches the disk.
 
-The CLI executables `spfit` and `spcat` remain available for shell-driven use;
-they read and write the same legacy files.
+For molecules that already have legacy `.par`/`.lin`/`.int`/`.var` files, the
+typical pattern is **parse → modify → run**:
+
+```python
+fi = parse_fit_files("co_4.par", "co_4.lin")   # legacy files in
+fi.parameters[2].fixed = True                  # …modify any field…
+out = FitSession.from_input(fi).run()          # …run via the file-free path
+```
+
+The "pure legacy" one-shot entry points exist mainly for parity with the
+`spfit` / `spcat` command-line tools and for terse interactive use; under the
+hood they parse to the same structs.  The CLI executables `spfit` and
+`spcat` remain available for shell-driven use; they read and write the same
+legacy file formats.
 
 ---
 
@@ -72,64 +83,35 @@ observed transitions without touching the filesystem.
 import pickett
 from pickett import (
     FitInput, Parameter, LineRecord,
-    EngineOptions, EngineKind, SpinvOptions, VibState,
+    EngineOptions, SpinvOptions, VibState,
     FitSession,
 )
 
-# --- 1. Parameters (decimal IDs from spinv.md; builder packs to BCD internally) ---
-params = []
-for pid, val, label in [
-    (100, 57635.968,    "B"),
-    (200, -0.184,       "-D"),
-    (300,  1.7e-9,      "H"),
-    (400,  0.0,         "L"),
-]:
-    p = Parameter()
-    p.id = pid
-    p.value = val
-    p.a_priori_error = 1e37   # very large → free to fit
-    p.label = label
-    params.append(p)
-params[3].fixed = True        # hold L at zero (equivalent to a_priori_error <= 1e-37)
-
-# --- 2. Observed lines (J upper, J lower) ---
-def line(ju, jl, freq_mhz, err=0.05):
-    lr = LineRecord()
-    lr.qn = [ju, jl] + [0] * 18        # qn is a fixed-width 2*MAXQN=20 int array
-    lr.nqn = 1                          # one QN per state (J only)
-    lr.freq = freq_mhz
-    lr.err = err
-    lr.weight = 1.0
-    return lr
-
-lines = [
-    line(1, 0, 115271.2018),
-    line(2, 1, 230538.0000),
-    line(3, 2, 345795.9899),
-    line(4, 3, 461040.7681),
-]
-
-# --- 3. Engine options: one VibState, K=0 (linear), symmetric-rotor quanta ---
-vib = VibState()
-vib.knmin = 0
-vib.knmax = 0
-vib.symmetric_rotor_quanta = True      # linear molecule → J-only QN scheme
-vib.spin_degeneracies = []             # no resolved nuclear hyperfine for ¹²C¹⁶O
-
-so = SpinvOptions()
-so.vibs = [vib]
-
-eo = EngineOptions()
-eo.kind = EngineKind.Spinv
-eo.spinv = so
-
-# --- 4. Assemble FitInput and run ---
-fi = FitInput()
-fi.title = "CO v=0 — file-free fit"
-fi.n_iterations = 5
-fi.parameters = params
-fi.lines = lines
-fi.engine_options = eo
+fi = FitInput(
+    title="CO v=0 — file-free fit",
+    n_iterations=5,
+    # --- 1. Parameters (decimal IDs from spinv.md) ---
+    parameters=[
+        # decimal IDs from spinv.md; the builder packs to BCD internally
+        Parameter(id=100, value=57635.968, a_priori_error=1e37, label="B"),
+        Parameter(id=200, value=-0.184,    a_priori_error=1e37, label="-D"),
+        Parameter(id=300, value=1.7e-9,    a_priori_error=1e37, label="H"),
+        Parameter(id=400, value=0.0,       fixed=True,           label="L"),
+    ],
+    # --- 2. Observed lines (J upper, J lower) ---
+    lines=[
+        # qn = upper QNs then lower QNs; short lists are zero-padded
+        LineRecord(qn=[1, 0], nqn=1, freq=115271.2018, err=0.05),
+        LineRecord(qn=[2, 1], nqn=1, freq=230538.0000, err=0.05),
+        LineRecord(qn=[3, 2], nqn=1, freq=345795.9899, err=0.05),
+        LineRecord(qn=[4, 3], nqn=1, freq=461040.7681, err=0.05),
+    ],
+    # --- 3. Engine options: one VibState, K=0 (linear), symmetric-rotor quanta ---
+    engine_options=EngineOptions(spinv=SpinvOptions(vibs=[
+        # K=0 + symmetric_rotor_quanta → linear-molecule (J-only) QN scheme
+        VibState(knmin=0, knmax=0, symmetric_rotor_quanta=True),
+    ])),
+)
 
 out = FitSession.from_input(fi).run()
 print(f"RMS (obs-calc)/err = {out.xsqbest:.4f}   iterations = {out.itr}")
@@ -151,9 +133,25 @@ out = FitSession.from_input(fi).run()         # numerically identical
 ## Input structs
 
 All input structs are exposed by `pickett._pickett` and re-exported from
-`pickett`.  They all support default construction followed by attribute
-assignment; **keyword-argument constructors are not bound** (`Parameter(id=100)`
-will raise `TypeError`).
+`pickett`.  Every struct supports three equivalent construction styles —
+pick whichever reads best for the context:
+
+```python
+# 1. Keyword-argument constructor (every field has a sensible default)
+p = Parameter(id=100, value=57635.968, label="B")
+
+# 2. Default construct + attribute assignment
+p = Parameter()
+p.id = 100
+p.value = 57635.968
+p.label = "B"
+
+# 3. Hybrid — kwargs for the common fields, attributes for the rest
+p = Parameter(id=100, value=57635.968)
+p.label = "B"
+```
+
+Each struct also has a `__repr__` that prints all fields, so `repr(obj)` or `print(obj)` is a useful one-liner during interactive exploration.
 
 ### `FitInput`
 
@@ -205,33 +203,31 @@ One observed transition.
 
 | Field      | Type        | Default | Notes |
 |------------|-------------|---------|-------|
-| `qn`       | `list[int]` | 20 × 0  | Quantum numbers, **flat array of exactly 2·MAXQN = 20 ints**: upper-state quanta first, then lower-state.  Assigning a shorter list raises `TypeError`. |
-| `nqn`      | `int`       | `0`     | Number of quanta *per state* that are actually meaningful in `qn` (so 1 ≤ nqn ≤ MAXQN; total slots used = 2·nqn) |
+| `qn`       | `list[int]` | `[]`    | Quantum numbers, upper-state first then lower-state.  Assignment accepts any `Sequence[int]` of length ≤ 2·MAXQN = 20; shorter lists are zero-padded.  Reading returns the full 20-element padded list. |
+| `nqn`      | `int`       | `0`     | Number of quanta *per state* that are meaningful in `qn` (so 1 ≤ nqn ≤ MAXQN; total slots used = 2·nqn) |
 | `freq`     | `float`     | `0.0`   | Observed frequency in MHz (or cm⁻¹ if `err < 0`, matching the legacy `.lin` sign convention) |
 | `err`      | `float`     | `1e-7`  | Measurement uncertainty (MHz) |
 | `weight`   | `float`     | `1.0`   | Line weight within a blend (`WT`; auto-normalised) |
 | `blend_tag`| `str`       | `""`    | Non-empty triggers blend grouping for adjacent lines sharing the tag |
 
-The `qn` layout follows the .lin convention: `qn[0..nqn-1]` are the upper-state
-quanta in the order dictated by the quantum-number format (see spinv.md
-"Format of Quantum Numbers"), and `qn[MAXQN..MAXQN+nqn-1]` are the lower-state
-quanta.  In practice you build the full 20-element list each time, e.g.:
+The `qn` layout follows the .lin convention: the upper-state quanta come
+first (`qn[0..nqn-1]`), then the lower-state quanta packed immediately after
+(`qn[nqn..2·nqn-1]`).  The order within each half is dictated by the
+quantum-number format described in spinv.md "Format of Quantum Numbers".
+Slots past `2·nqn` are unused and remain zero — short lists you supply are
+zero-padded out to the full 20.
 
 ```python
-lr.qn = [J_upper, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-         J_lower, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-lr.nqn = 1
+# Linear molecule, J=1 → J=0  (nqn=1):
+LineRecord(qn=[1, 0], nqn=1, freq=115271.2018, err=5e-5)
+
+# Asymmetric top, (J', Ka', Kc') → (J", Ka", Kc")  (nqn=3):
+LineRecord(qn=[10, 2, 9, 9, 3, 6], nqn=3, freq=341245.32)
+# qn[0..2] = (10, 2, 9) upper, qn[3..5] = (9, 3, 6) lower
+
+# Asymmetric top with v as well, (J', Ka', Kc', v') → … (nqn=4):
+LineRecord(qn=[10, 2, 9, 0,  9, 3, 6, 0], nqn=4, freq=341245.32)
 ```
-
-Or more compactly for the linear/J-only case:
-
-```python
-lr.qn = [J_upper, J_lower] + [0] * 18  # nqn=1 → only slot 0 is read for each state
-lr.nqn = 1
-```
-
-The latter form works because the formatter ignores positions past `nqn` (and
-past `MAXQN` for the lower-state half), but is order-dependent for `nqn ≥ 2`.
 
 ### Engine options
 
@@ -365,10 +361,23 @@ Maps to .int line 2 (`FLAGS, TAG, QROT, FBGN, FEND, STR0, STR1, FQLIM, TEMP, MAX
 | `tmq`    | `float`| `300.0`   | `TEMP`        | Temperature for intensities (K) |
 | `maxv`   | `int`  | `-1`      | `MAXV`        | Maximum v; -1 = unlimited |
 
-To enable `.str` output (populates `CalCatOutput.str_lines`), add `10` to
-`iflg` (i.e. `STRFLG=1`).  To enable `.egy` output, add the `EGYFLG` digit
-(1 = energies, 2 = + derivatives, 3 = + eigenvectors, etc.).  To work in
-wavenumbers throughout, add `1000` (`IRFLG=1`).
+Convenience properties expose the most-used `iflg` sub-fields directly so
+you rarely need to compute the packed value yourself:
+
+| Property            | Type   | Maps to | Meaning |
+|---------------------|--------|---------|---------|
+| `wavenumbers`       | `bool` | `IRFLG` | True → parameters & frequencies are in wavenumbers |
+| `output_strengths`  | `int`  | `STRFLG`| 0 = off; 1 = enable `.str` output; 2 = also label separate dipole contributions |
+| `output_energies`   | `int`  | `EGYFLG`| 0 = off; 1 = energies; 2 = + derivatives; 3 = + eigenvectors; 5 = dump Hamiltonian |
+
+```python
+cc = CatControl(itag=28503, fqmax=500.0)
+cc.output_strengths = 1   # populates CalCatOutput.str_lines
+cc.output_energies = 1    # populates CalCatOutput.egy_lines
+```
+
+These properties set / get the relevant decimal digits of `iflg`; you can
+still write `iflg` directly when you need the full `IRFLG·1000 + OUTFLG·100 + STRFLG·10 + EGYFLG` encoding (e.g. to set `OUTFLG` ≠ 0, which has no shorthand).
 
 ---
 
@@ -461,8 +470,8 @@ print(f"Q(300 K) = {q_at[300.0]:.4f}")
 | `IXX`, `IAX`, `EWT`, `DIAG`, `XOPT` short field names          | Renamed to `inclusion_flags`, `stat_weight_axis`, `esym_weight`, `diag_order`, `phase_flags` |
 | Negative IDPAR flag means "dependent on previous parameter"    | `Parameter.fixed = True` on a parameter immediately after its parent |
 | `a_priori_error ≤ 1e-37` fixes a parameter                     | Either `a_priori_error ≤ 1e-37` *or* `Parameter.fixed = True` |
-| `.lin` 12-int QN field; sign of err encodes MHz vs cm⁻¹        | `LineRecord.qn` is 2·MAXQN=20 ints; `err < 0` still encodes wavenumber units |
-| `FLAGS = IRFLG·1000 + OUTFLG·100 + STRFLG·10 + EGYFLG`         | `CatControl.iflg` — same packed encoding |
+| `.lin` 12-int QN field; sign of err encodes MHz vs cm⁻¹        | `LineRecord.qn` is up-to-2·MAXQN=20 ints (auto-padded); `err < 0` still encodes wavenumber units |
+| `FLAGS = IRFLG·1000 + OUTFLG·100 + STRFLG·10 + EGYFLG`         | `CatControl.iflg` — same packed encoding, plus `wavenumbers`/`output_strengths`/`output_energies` shortcut properties |
 | `.cat` text uses Pickett's letter encoding for \|QN\| > 99     | Same encoding; `cat_lines` are returned as raw strings |
 | Lines reformatted on parse / round-trip                        | `parse_fit_files` passes the original `.lin` text through unmodified for bit-identical round-trip |
 | Engine selection via `--spinv` / `--dpi` CLI flags             | `EngineOptions.kind = EngineKind.Spinv \| EngineKind.Dpi` |
@@ -483,20 +492,7 @@ The full surface for legacy file handling:
 ```python
 import pickett
 
-# One-shot convenience: read files, run, return results
-fit_out = pickett.fit_files("path/to/molecule")              # .par + .lin
-cat_out = pickett.cat_files("path/to/molecule")              # .var + .int
-cat_out = pickett.cat_files("path/to/var_base",
-                            int_path="path/to/int_base")     # separate bases
-
-# Session form (single .run() per instance)
-session = pickett.FitSession("co_4.par", "co_4.lin", engine="spinv")
-fit_out = session.run()
-
-session = pickett.CatSession("co_4.int", "co_4.var", engine="spinv")
-cat_out = session.run()
-
-# Parse to struct, modify, re-run (recommended bridge)
+# 1. Recommended bridge: parse to struct, modify, run via the file-free path.
 fi = pickett.parse_fit_files("co_4.par", "co_4.lin")
 fi.parameters[2].fixed = True                  # freeze H
 out = pickett.FitSession.from_input(fi).run()
@@ -504,6 +500,19 @@ out = pickett.FitSession.from_input(fi).run()
 ci = pickett.parse_cat_files("co_4.var", "co_4.int")
 ci.control.fqmax = 500.0                       # cap at 500 GHz
 out = pickett.CatSession.from_input(ci).run()
+
+# 2. One-shot convenience when no modification is needed.
+fit_out = pickett.fit_files("path/to/molecule")              # .par + .lin
+cat_out = pickett.cat_files("path/to/molecule")              # .var + .int
+cat_out = pickett.cat_files("path/to/var_base",
+                            int_path="path/to/int_base")     # separate bases
+
+# 3. Session form (parses at construction time; .run() exactly once).
+session = pickett.FitSession("co_4.par", "co_4.lin", engine="spinv")
+fit_out = session.run()
+
+session = pickett.CatSession("co_4.int", "co_4.var", engine="spinv")
+cat_out = session.run()
 ```
 
 `parse_fit_files` / `parse_cat_files` produce structs whose `engine_options`
