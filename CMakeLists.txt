@@ -238,33 +238,45 @@ if(NOT BUILD_ALL)
   endforeach()
 endif()
 
+# ─── Reusable library for external C++ consumers ────────────────────────────
+#
+# Bundles all sources needed to use the file-free API (CalFit, CalCat, engines,
+# splib, common, api).  The executables above keep their flat source lists for
+# build-system simplicity; this target exists so downstream CMake projects can
+#   target_link_libraries(myapp PRIVATE pickett::core)
+# instead of enumerating the source list themselves.
+set(PICKETT_CORE_SRCS
+    ${ENGINE_SRCS}
+    ${SPLIB_SRCS}
+    ${COMMON_SRCS}
+    ${API_SRCS}
+    src/spfit/CalFit.cpp
+    src/spfit/CalFit_helpers.cpp
+    src/spfit/CalFitIO.cpp
+    src/spfit/subfit.cpp
+    src/splib/ftran.c
+    src/spcat/CalCat.cpp
+    src/spcat/CalCat_helpers.cpp
+    src/spcat/CalCatIO.cpp
+    src/legacy_apps/sortsub.c
+)
+if(NOT BLAS_FOUND)
+  list(APPEND PICKETT_CORE_SRCS src/splib/dblas.c)
+endif()
+add_library(pickett_core STATIC ${PICKETT_CORE_SRCS})
+add_library(pickett::core ALIAS pickett_core)
+target_include_directories(pickett_core PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>)
+set_property(TARGET pickett_core PROPERTY POSITION_INDEPENDENT_CODE ON)
+if(BLAS_FOUND AND BLAS_LIBRARIES)
+  target_link_libraries(pickett_core PUBLIC ${BLAS_LIBRARIES})
+endif()
+target_link_libraries(pickett_core PUBLIC m)
+
 # Programmatic C++ examples (cmake -DBUILD_EXAMPLES=ON)
 if(BUILD_EXAMPLES)
-  set(FIT_SRCS
-      src/spfit/CalFit.cpp
-      src/spfit/CalFit_helpers.cpp
-      src/spfit/CalFitIO.cpp
-      src/spfit/subfit.cpp
-      src/splib/ftran.c
-  )
-  set(CAT_SRCS
-      src/spcat/CalCat.cpp
-      src/spcat/CalCat_helpers.cpp
-      src/spcat/CalCatIO.cpp
-      src/legacy_apps/sortsub.c
-  )
-  add_executable_plus(fit_example TRUE
-      examples/fit_example.cpp
-      ${FIT_SRCS}
-      ${ENGINE_SRCS}
-      ${SPLIB_SRCS}
-      ${COMMON_SRCS}
-  )
-  add_executable_plus(cat_example TRUE
-      examples/cat_example.cpp
-      ${CAT_SRCS}
-      ${ENGINE_SRCS}
-      ${SPLIB_SRCS}
-      ${COMMON_SRCS}
-  )
+  add_executable(fit_example examples/fit_example.cpp)
+  target_link_libraries(fit_example PRIVATE pickett::core)
+  add_executable(cat_example examples/cat_example.cpp)
+  target_link_libraries(cat_example PRIVATE pickett::core)
 endif()

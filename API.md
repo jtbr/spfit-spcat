@@ -550,40 +550,100 @@ except pickett.CalError as e:
 
 ## C++ API
 
-The same structs and entry points exist in C++.  Headers of interest:
+The same structs and entry points exist in C++.  The CMake target
+`pickett::core` (defined in the project's root `CMakeLists.txt`) bundles
+everything needed for both the file-free and legacy paths; external
+projects need only link to it and `#include` the public headers.
 
-- `src/api/InputSchema.hpp` — `Parameter`, `LineRecord`, `DipoleMoment`,
-  `VibState`, `SpinvOptions`, `DpiOptions`, `EngineOptions`, `CatControl`,
-  `FitInput`, `CatInput`.
-- `src/api/builders.hpp` — `build_fit_input(fi, engine, logger)` and
-  `build_cat_input(ci, engine, logger)`, the bridges to `CalFitInput` /
-  `CalCatInput`.
-- `src/spfit/CalFit.hpp` / `src/spcat/CalCat.hpp` — the run-once classes
-  consumed by the bindings.
-- `src/engine/SpinvEngine.hpp` / `src/engine/DpiEngine.hpp` — engine
-  implementations of the abstract `CalculationEngine`.
-- `src/common/CalError.hpp` — exception hierarchy.
+### Public headers
 
-Minimal file-free fit in C++ mirrors the Python example: populate a
-`FitInput`, call `build_fit_input(fi, *engine, logger)` to get a
-`CalFitInput`, then `CalFit::run(input, output)`.  See
-`examples/fit_example.cpp` and `examples/cat_example.cpp` (build with
-`-DBUILD_EXAMPLES=ON`).
+| Header                            | Provides |
+|-----------------------------------|----------|
+| `api/InputSchema.hpp`             | `FitInput`, `CatInput`, `Parameter`, `LineRecord`, `DipoleMoment`, `VibState`, `SpinvOptions`, `DpiOptions`, `EngineOptions`, `CatControl` |
+| `api/builders.hpp`                | `build_fit_input(fi, engine, logger)`, `build_cat_input(ci, engine, logger)` — convert structs to the internal `CalFitInput` / `CalCatInput` |
+| `spfit/CalFit.hpp` / `spcat/CalCat.hpp` | The run-once `CalFit` / `CalCat` classes |
+| `engine/SpinvEngine.hpp` / `engine/DpiEngine.hpp` | Concrete `CalculationEngine` implementations |
+| `spcat/OutputSink.hpp`            | `FileSink`, `MemorySink` for catalog output capture |
+| `common/CalError.hpp`             | `CalError`, `IoError`, `InputError`, `ValidationError`, `NumericError` |
+| `common/Logger.hpp`               | `Logger` (override `log()` to redirect or filter diagnostics) |
 
-### `OutputSink` (CalCat only)
+### File-free fit — minimal example
 
-C++ `CalCat` writes its text outputs through an abstract `OutputSink`
-(`src/spcat/OutputSink.hpp`).  Use `FileSink` for direct file output (CLI
-path) or `MemorySink` to capture lines in memory — the Python bindings use
-`MemorySink` under the hood.  Each `CalCat` constructor takes four sinks:
-`luout` (.out / diagnostics), `lucat` (.cat), `luegy` (.egy), `lustr` (.str).
-Mix and match as needed.
+```cpp
+#include "api/InputSchema.hpp"
+#include "api/builders.hpp"
+#include "engine/SpinvEngine.hpp"
+#include "spfit/CalFit.hpp"
+#include "common/CalError.hpp"
+
+int main() {
+    FitInput fi;
+    fi.title = "CO v=0";
+    fi.n_iterations = 5;
+    fi.parameters = {
+        {.id = 100, .value = 57635.968},               // B
+        {.id = 200, .value = -0.184},                  // -D
+        {.id = 300, .value = 1.7e-9},                  // H
+        {.id = 400, .value = 0.0, .fixed = true},      // L (fixed)
+    };
+    auto add_line = [&](int Ju, int Jl, double f) {
+        LineRecord lr; lr.nqn = 1; lr.qn[0] = Ju; lr.qn[1] = Jl;
+        lr.freq = f; lr.err = 0.05; lr.weight = 1.0;
+        fi.lines.push_back(lr);
+    };
+    add_line(1, 0, 115271.2018);
+    add_line(2, 1, 230538.0000);
+    add_line(3, 2, 345795.9899);
+    add_line(4, 3, 461040.7681);
+
+    VibState vib;
+    vib.knmin = vib.knmax = 0;
+    vib.symmetric_rotor_quanta = true;
+    fi.engine_options.kind = EngineOptions::Kind::Spinv;
+    fi.engine_options.spinv.vibs = {vib};
+
+    std::unique_ptr<CalculationEngine> engine = std::make_unique<SpinvEngine>();
+    CalFitInput  input  = build_fit_input(fi, *engine);  // configures engine
+    CalFit calFit(engine, stdout);                       // takes ownership
+    CalFitOutput output;
+    try { calFit.run(input, output); }
+    catch (const CalError &e) { fprintf(stderr, "%s\n", e.what()); return 1; }
+
+    printf("RMS = %.4f  itr = %d\n", output.xsqbest, output.itr);
+}
+```
+
+`CalCat` is analogous: `build_cat_input(ci, *engine)` → `CalCat::run(...)`.
+`CalCat` writes text output through four `OutputSink` arguments — pass
+`FileSink(stdout)` for diagnostics or `MemorySink` to capture `.cat` / `.egy`
+/ `.str` lines in `std::vector<std::string>`s.  See
+`examples/fit_example.cpp` and `examples/cat_example.cpp` for full programs
+that build with `cmake -DBUILD_EXAMPLES=ON`.
+
+### Consuming `pickett::core` from your own CMake project
+
+Either vendor the repo as a submodule and `add_subdirectory()`:
+
+```cmake
+add_subdirectory(third_party/pickett)
+add_executable(myapp main.cpp)
+target_link_libraries(myapp PRIVATE pickett::core)
+```
+
+or, after a system install, `find_package` (not yet wired — currently only
+the subdirectory form is supported).  `pickett::core` exposes the public
+headers via its `INTERFACE_INCLUDE_DIRECTORIES`, so `#include "api/..."` etc.
+work without further configuration.  Build it from the same `build/`
+directory used for `spfit` / `spcat`:
+
+```sh
+cd build && cmake .. -DUSE_SYSTEM_BLAS=OFF && make pickett_core
+```
 
 ### Logger
 
-`src/common/Logger.hpp` provides an abstract `Logger` interface for
-diagnostic messages.  Pass a custom subclass to `CalFit` or `CalCat` to
-filter or redirect log output:
+Pass a `Logger` subclass to `CalFit` or `CalCat` to redirect or filter
+diagnostic messages:
 
 ```cpp
 struct QuietLogger : public Logger {

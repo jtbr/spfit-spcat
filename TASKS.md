@@ -116,7 +116,7 @@ This document outlines the prioritized tasks for modernizing the SPFIT/SPCAT sof
     - Create release bundles for tagged versions (tags are not yet pushed to github)
 
 - [~] **Task 12: Typed-struct input API (file-free programmatic use)**
-    Phases 1–4 complete. Phase 5 (API docs) pending.
+    Phases 1–5 complete. Phase 6 (modern file format) pending.
     - **Goal**: Define typed C++ input records as the canonical public API so that `CalFit::run` and `CalCat::run` can be driven entirely from in-memory structs — no `.par`/`.lin`/`.int`/`.var` files required. The legacy file-reading path becomes a backward-compat parser layer on top of the same core.
     - **Motivation**: Task 9.1 left `CalFitIO::readInput` and `CalCatIO::readInput` opening files with `fopen()`, calling `setopt(FILE*, …)` directly, and using `getpar`/`getvar(FILE*, …)` (`src/splib/ulib.c:576,658`). The internal structs (`CalFitInput::idpar_data`) are BCD-packed bytes, not values a Python user would naturally construct. Task 12 fixes this, and also enables a future clean file format (TOML/JSON as a serialization of the same structs).
     - **Schema** (new header `src/api/InputSchema.hpp`):
