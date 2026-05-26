@@ -1,66 +1,164 @@
 # pickett Python package
 
-Python bindings for [SPFIT/SPCAT](../README.md) via [nanobind](https://github.com/wjakob/nanobind).
+Python bindings for [SPFIT/SPCAT](../README.md) — the standard spectral fitting
+and catalog-generation programs for rotational spectroscopy — built with
+[nanobind](https://github.com/wjakob/nanobind).
 
 ## Prerequisites
 
-- CMake ≥ 3.15  
-- A C++17 compiler  
-- Python ≥ 3.8 with `pip` / `uv`
+- CMake ≥ 3.15
+- A C++17 compiler (e.g. `gcc`)
+- Python ≥ 3.8
 
 ## Build and install
 
 ```sh
-# From the project root, using uv
-uv venv && source .venv/bin/activate
-uv pip install ".[test]" ./python
+# From the python/ directory — recommended for development
+uv sync                    # creates .venv and installs with test extras
+uv run pytest              # verify the install
+
+# Or with plain pip (from the python/ directory)
+pip install -e ".[test]"
+pytest
 ```
 
-Or with plain pip:
+> **Never run `cmake` from the repository root** — that overwrites the
+> legacy `Makefile`.  The Python build runs CMake in a private temp directory
+> automatically; you don't need to invoke it manually.
 
-```sh
-pip install "./python[test]"
-```
+### Numerical reproducibility
 
-The build compiles the bundled `dblas.c` with `-ffp-contract=off` to preserve
-bit-identical numerical results with the v2008 reference baseline.  Do not
-override these flags or link an external BLAS.
+The extension compiles with **`-ffp-contract=off`** and links the bundled
+**`dblas.c`** rather than an external BLAS.  These flags are only required if
+you need bit-for-bit identical results to the v2008 reference baseline or to
+the `spfit`/`spcat` CLI binaries built the same way; for general spectroscopic
+use the results are physically equivalent regardless.
+
+The reason they matter for the test suite: FMA and optimised-BLAS routines can
+change floating-point accumulation order at the ULP level, which is enough to
+flip the sign of a near-zero Householder reflector column in the QR
+factorisation inside `lsqfit.c` and thereby negate entire columns of the
+Cholesky factor written to `.var` files.  Both outcomes are correct — the
+covariance matrix is the same — but the text file differs.  The
+`pyproject.toml` / `CMakeLists.txt` enforce both settings by default.
 
 ## Usage
+
+Three workflows are available; all are numerically identical.
+
+### 1. File-free (recommended for new code)
+
+Build the input structs directly — no `.par`/`.lin`/`.var`/`.int` files needed.
+
+```python
+import pickett
+from pickett import (
+    FitInput, Parameter, LineRecord,
+    EngineOptions, SpinvOptions, VibState,
+    FitSession,
+)
+
+fi = FitInput(
+    title="CO v=0",
+    n_iterations=5,
+    parameters=[
+        Parameter(id=100, value=57635.968, a_priori_error=1e37, label="B"),
+        Parameter(id=200, value=-0.184,    a_priori_error=1e37, label="-D"),
+        Parameter(id=300, value=1.7e-9,    a_priori_error=1e37, label="H"),
+        Parameter(id=400, value=0.0,       fixed=True,           label="L"),
+    ],
+    lines=[
+        LineRecord(qn=[1, 0], nqn=1, freq=115271.2018, err=0.05),
+        LineRecord(qn=[2, 1], nqn=1, freq=230538.0000, err=0.05),
+        LineRecord(qn=[3, 2], nqn=1, freq=345795.9899, err=0.05),
+        LineRecord(qn=[4, 3], nqn=1, freq=461040.7681, err=0.05),
+    ],
+    engine_options=EngineOptions(spinv=SpinvOptions(vibs=[
+        VibState(knmin=0, knmax=0, symmetric_rotor_quanta=True),
+    ])),
+)
+
+out = FitSession.from_input(fi).run()
+print(f"RMS = {out.xsqbest:.4f}   iterations = {out.itr}")
+for v, e in zip(out.par, out.erpar):
+    print(f"  {v:21.13E}  ±{e:12.5E}")
+```
+
+### 2. Parse legacy files → modify → run (bridge workflow)
+
+Reads existing `.par`/`.lin`/`.var`/`.int` files into the typed structs, where
+you can inspect or modify any field before running.
+
+```python
+from pickett import parse_fit_files, parse_cat_files, FitSession, CatSession
+
+# Fit: load, freeze one parameter, re-run
+fi = parse_fit_files("co_4.par", "co_4.lin")
+fi.parameters[2].fixed = True               # freeze H
+out = FitSession.from_input(fi).run()
+
+# Catalog: load, cap frequency, run
+ci = parse_cat_files("co_4.var", "co_4.int")
+ci.control.fqmax = 500.0                    # 500 GHz cap
+out = CatSession.from_input(ci).run()
+```
+
+### 3. One-shot convenience wrappers (equivalent to the CLI tools)
 
 ```python
 import pickett
 
-# Fit spectroscopic parameters
-fit = pickett.fit_files("path/to/molecule")  # reads .par + .lin
-print(f"RMS = {fit.xsqbest:.6f}, B = {fit.par[0]:.4f} MHz")
+fit_out = pickett.fit_files("path/to/molecule")           # reads .par + .lin
+cat_out = pickett.cat_files("path/to/molecule")           # reads .var + .int
+cat_out = pickett.cat_files("path/to/var_base",
+                            int_path="path/to/int_base")  # separate bases
 
-# Generate catalog (no disk output)
-cat = pickett.cat_files("path/to/molecule")  # reads .var + .int
-for line in cat.cat_lines[:3]:
+print(f"RMS = {fit_out.xsqbest:.4f},  B = {fit_out.par[0]:.4f} MHz")
+print(f"Q(300 K) = {dict(zip(cat_out.temp, cat_out.qsum)).get(300.0):.4f}")
+for line in cat_out.cat_lines[:3]:
     print(line)
-print(f"Q(300 K) ≈ {dict(zip(cat.temp, cat.qsum)).get(300.0, '?')}")
 ```
 
-For the low-level path (access to raw session objects and inputs):
+## Output fields
 
-```python
-session = pickett.FitSession("mol.par", "mol.lin", engine="spinv")
-out = session.run()  # may only be called once
+**`CalFitOutput`** — returned by `FitSession.run()` and `fit_files()`:
 
-session = pickett.CatSession("mol.int", "mol.var", engine="dpi")
-out = session.run()
-```
+| Field     | Description |
+|-----------|-------------|
+| `par`     | Fitted parameter values (same order as input) |
+| `erpar`   | Estimated 1σ errors |
+| `xsqbest` | Best RMS of (obs − calc) / err |
+| `itr`     | Number of iterations performed |
+
+**`CalCatOutput`** — returned by `CatSession.run()` and `cat_files()`:
+
+| Field       | Description |
+|-------------|-------------|
+| `cat_lines` | JPL `.cat`-format strings, sorted by frequency |
+| `egy_lines` | `.egy`-format energy lines (when `iflg` enables `EGYFLG`) |
+| `str_lines` | `.str`-format strength lines (when `iflg` enables `STRFLG`) |
+| `nline`     | Total catalog lines |
+| `temp`      | Partition-function temperature grid (K) |
+| `qsum`      | Partition function Q(T) at each `temp` |
 
 ## Running tests
 
+Tests require the full repository (`spfit_spcat_test_suite/` lives two levels
+up from this directory).  `conftest.py` sets the working directory to the
+repository root automatically.
+
 ```sh
-pytest python/tests
+uv run pytest           # from python/
+# or
+pytest python/tests     # from the repository root
 ```
 
-## Numerical reproducibility
+## Full API reference
 
-`-ffp-contract=off` disables FMA and `dblas.c` replaces OpenBLAS.  Together
-they prevent sign-flipped Cholesky columns and ensure the Python API returns
-results byte-identical to the CLI on the same machine.  See `CLAUDE.md` for
-the full explanation.
+See [`API.md`](../API.md) for the complete struct-by-struct reference,
+including all `FitInput`/`CatInput`/`EngineOptions`/`VibState`/`CatControl`
+fields, the `EngineKind.Dpi` path, exception hierarchy, and the C++ API.
+
+For the legacy `.par`/`.var`/`.lin`/`.int`/`.cat` file formats and the
+underlying spectroscopic conventions (parameter IDs, dipole IDs, QN encoding),
+see [`spinv.md`](../spinv.md) (SPFIT/SPCAT) and [`dpi.md`](../dpi.md) (DPFIT/DPCAT).
