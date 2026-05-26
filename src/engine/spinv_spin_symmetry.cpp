@@ -650,12 +650,11 @@ int getll(struct SpinvContext *ctx, const int llf_total_tensor_order, const int 
  */
 int setgsym(struct SpinvContext *ctx, const int gsym)
 {
-  static int oldgsym = -1;
-  static int nsym;
+  // No static cache — each ctx must be fully initialized so that fresh
+  // SpinvContext instances (created per CalFit/CalCat run) are not left
+  // with uninitialized fields when gsym happens to match a previous run.
+  int nsym;
   int k, kk;
-  if (gsym == oldgsym)
-    return nsym;
-  oldgsym = gsym;
   nsym = gsym >> 1;
   ctx->is_esym[0] = 0;
   for (k = 1, kk = nsym - 1; k < kk; ++k, --kk)
