@@ -259,20 +259,28 @@ static std::vector<Parameter> parse_parameter_lines(const std::vector<std::strin
 
 // Build a minimal idpar array (ndbcd=1) for getvar: only NEGBCD flags matter.
 // erpar_out gets the a_priori_error for each param (ermin for NEGBCD).
+//
+// Layout with ndbcd=1: param i is at idpar[i].  idpar[0] doubles as the ndbcd
+// count byte (value=1) and param 0's NEGBCD byte; the legacy format requires
+// param 0 to always be independent (otherwise ndbcd would be misread as 0x81),
+// so NEGBCD for param 0 is always 0 in idpar[0].  Params 1..n-1 get their
+// NEGBCD flags at idpar[1..n-1].
 static void build_minimal_idpar(const std::vector<Parameter> &params,
                                  std::vector<unsigned char> &idpar_out,
                                  std::vector<double> &erpar_out)
 {
     static const double ermin = 1.0e-37;
     size_t n = params.size();
-    idpar_out.assign(n + 1 + 3, 0);
-    idpar_out[0] = 1;  // ndbcd = 1
+    idpar_out.assign(n + 3, 0);
+    idpar_out[0] = 1;  // ndbcd = 1; param 0 NEGBCD = 0 (always independent per format)
     erpar_out.resize(n);
     for (size_t i = 0; i < n; ++i) {
         bool is_dep = (params[i].fixed || params[i].a_priori_error < 0.0);
-        idpar_out[1 + i] = is_dep ? 0x80 : 0x00;
-        erpar_out[i]     = is_dep ? ermin :
-                           (params[i].a_priori_error < ermin ? ermin : params[i].a_priori_error);
+        // Param i's NEGBCD flag lives at idpar[i] (matches getvar's ibcd = i*ndbcd = i)
+        if (i > 0)
+            idpar_out[i] = is_dep ? (unsigned char)0x80 : (unsigned char)0x00;
+        erpar_out[i] = is_dep ? ermin :
+                       (params[i].a_priori_error < ermin ? ermin : params[i].a_priori_error);
     }
 }
 
