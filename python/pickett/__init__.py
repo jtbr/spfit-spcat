@@ -73,6 +73,19 @@ def fit_files(base_path: str, engine: str = "spinv") -> CalFitOutput:
     return fit_from_files(base_path + ".par", base_path + ".lin", engine)
 
 
+from .toml_io import (
+    fit_input_to_dict,
+    fit_input_from_dict,
+    cat_input_to_dict,
+    fit_output_to_dict,
+    cat_output_to_dict,
+    load_fit_input,
+    load_cat_input,
+    save_fit_output,
+    save_cat_output,
+)
+
+
 def cat_files(base_path: str, int_path: str | None = None, engine: str = "spinv") -> CalCatOutput:
     """Generate a spectroscopic catalog from SPCAT input files.
 

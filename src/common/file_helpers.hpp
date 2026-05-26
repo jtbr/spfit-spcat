@@ -27,6 +27,14 @@ FILE *open_output(const char *fname, const char *mode = "w");
 int parse_file_args(int argc, char *argv[], int nfile,
                     char *cfil[], const char *cext[]);
 
+/* Returns the base name (no extension) from a path, allocated with malloc().
+   E.g. "mol.par" → "mol", "path/mol.toml" → "path/mol".
+   Caller must free() the result. */
+char *base_name(const char *path);
+
+/* True if a file with the given path exists and is readable. */
+bool file_exists(const char *path);
+
 } // namespace file_helpers
 
 #endif // FILE_HELPERS_HPP

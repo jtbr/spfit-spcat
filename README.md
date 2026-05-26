@@ -17,7 +17,16 @@ Key changes:
 - **`CalCat` class** encapsulates spcat's catalog generation. I/O separated into `CalCatIO`. Entry point `cat_main.cpp` is a thin wrapper.
 - Both classes take C++ input structs and produce output structs, enabling programmatic use without files.
 
-**Command-line usage of all executables (spfit, spcat, etc.) is unchanged from the original C code. Existing input files and workflows work without modification.** New or improved interfaces may be considered for the future however.
+**Command-line usage of all executables (spfit, spcat, etc.) is unchanged from the original C code. Existing input files and workflows work without modification.**
+
+A parallel TOML-based file format is also available as a cleaner alternative to the legacy fixed-width ASCII files.  `spfit` reads `mol.toml` (instead of `mol.par` + `mol.lin`) when it is present and writes `mol.var.toml`; `spcat` similarly reads `mol.var.toml` + `mol.int.toml` and writes `mol.cat.toml`.  The TOML files are human-readable representations of the same typed structs used by the Python API.
+
+To migrate an existing molecule from the legacy format, pass `--toml-out` to get TOML output alongside the usual legacy output:
+
+```sh
+spfit --toml-out mol   # writes mol.var.toml in addition to mol.var / mol.par
+spcat --toml-out mol   # writes mol.cat.toml in addition to mol.cat
+```
 
 See [TASKS.md](TASKS.md) for the full modernization roadmap and status.
 
@@ -64,10 +73,25 @@ subprocesses or writing intermediate files:
 pip install ./python      # builds the nanobind extension and installs pickett
 ```
 
+One-shot convenience wrappers (equivalent to the CLI tools):
+
 ```python
 import pickett
 fit_out = pickett.fit_files("path/to/molecule")   # reads .par + .lin
 cat_out = pickett.cat_files("path/to/molecule")   # reads .var + .int
+```
+
+Or with TOML files — a human-readable alternative to the legacy format:
+
+```python
+import pickett
+
+fi  = pickett.load_fit_input("molecule.toml")
+out = pickett.FitSession.from_input(fi).run()
+pickett.save_fit_output(out, fi, "molecule.var.toml")
+
+ci      = pickett.load_cat_input("molecule.var.toml", "molecule.int.toml")
+cat_out = pickett.CatSession.from_input(ci).run()
 ```
 
 See [API.md](API.md) for full C++ and Python API documentation.
@@ -102,6 +126,10 @@ src/
 │                spinv_utils.cpp, spinv_internal.h,
 │                DpiEngine.{cpp,hpp}, DpiContext.hpp, dpi.{cpp,h},
 │                spinit.{cpp,h}
+├── api/         InputSchema.hpp (FitInput, CatInput, Parameter, ...),
+│                builders.{cpp,hpp} (struct→CalFitInput/CalCatInput),
+│                legacy_parser.{cpp,hpp} (legacy file parsers),
+│                toml_io.{cpp,hpp} (TOML file I/O via toml++)
 ├── splib/       ulib.{c,h}, cnjj.{c,h}, catutil.{c,h},
 │                lsqfit.{c,h}, cblas.h, blas_compat.h, dblas.c,
 │                ftran.c, calpgm_types.h
@@ -111,6 +139,8 @@ src/
                  sortegy.cpp, termval.cpp, stark.cpp, moiam.cpp,
                  iamcalc.cpp, iambak.cpp
 ```
+
+`third_party/tomlplusplus/toml.hpp` — vendored [toml++](https://github.com/marzer/tomlplusplus) v3.4.0 single-header, used by `src/api/toml_io.cpp` and (transitively) by the CLI executables.
 
 **Key files:**
 

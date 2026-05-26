@@ -31,6 +31,7 @@ C++ surface* that exposes them.
   - [`CalCatOutput`](#calcatoutput)
 - [Differences from the legacy file format](#differences-from-the-legacy-file-format)
 - [Working with legacy files](#working-with-legacy-files)
+- [TOML file format](#toml-file-format)
 - [Exceptions](#exceptions)
 - [C++ API](#c-api)
 - [Installation and build](#installation-and-build)
@@ -40,14 +41,16 @@ C++ surface* that exposes them.
 ## Overview
 
 The library is organized around the typed-struct (file-free) route, with
-helpers that read or write legacy files at the edges.  All three workflows
-below produce numerically identical results — the difference is only in how
-inputs arrive and whether disk I/O is involved.
+helpers that read or write files at the edges.  All workflows below produce numerically identical results — the difference is only in how inputs arrive and whether disk I/O is involved.
 
 | Workflow                  | Entry points                                            | Input        | Returns        |
 |---------------------------|---------------------------------------------------------|--------------|----------------|
 | **File-free (recommended)** | `FitSession.from_input(fi).run()`                     | `FitInput`   | `CalFitOutput` |
 |                           | `CatSession.from_input(ci).run()`                       | `CatInput`   | `CalCatOutput` |
+| **TOML files**            | `load_fit_input(path)` → struct → run                   | `.toml`      | `FitInput`     |
+|                           | `save_fit_output(out, fi, path)`                        | `CalFitOutput` | `.var.toml`  |
+|                           | `load_cat_input(var, int)` → struct → run               | `.var.toml` + `.int.toml` | `CatInput` |
+|                           | `save_cat_output(out, path)`                            | `CalCatOutput` | `.cat.toml`  |
 | **Bridge — legacy files → structs** | `parse_fit_files(par, lin)`                   | file paths   | `FitInput`     |
 |                           | `parse_cat_files(var, int)`                             | file paths   | `CatInput`     |
 | **Pure legacy (one-shot)**  | `fit_files(base)`  /  `FitSession(par, lin).run()`    | file paths   | `CalFitOutput` |
@@ -418,11 +421,12 @@ SPINV and DPI engines; the file-free path uses `EngineOptions.kind` instead.
 | `erpar`    | `list[float]` | Estimated 1σ errors for each parameter |
 | `xsqbest`  | `float`       | Best RMS of (obs − calc) / err across all iterations |
 | `itr`      | `int`         | Number of iterations actually performed |
+| `variance` | `list[float]` | Packed upper-triangular variance matrix (`nfit*(nfit+1)/2` floats, column-major); pass to `save_fit_output` so `spcat` can compute accurate ERR values |
 
-The "extra" fields that `CalFitIO::writeOutput` uses to regenerate text files
-(`title_for_output`, `var_final_for_output`, etc.) are intentionally not
-exposed in Python — they're only useful for round-tripping through the legacy
-file format, which the typed-struct API replaces.
+`variance` is the same matrix written to the `.var` file by the legacy path.
+Pass it (via `FitInput.variance` or `CatInput.variance`) when constructing the
+next `CatInput` for accurate line-strength uncertainties; omit it to use the
+diagonal defaults from each parameter's `a_priori_error`.
 
 ### `CalCatOutput`
 
@@ -522,6 +526,133 @@ internally, so round-tripped runs match the legacy-file path to the last bit.
 
 ---
 
+## TOML file format
+
+`pickett.toml_io` provides functions to serialize the typed structs to/from
+TOML files — a human-readable alternative to the legacy fixed-width ASCII
+formats.  All functions are re-exported from the top-level `pickett` package.
+
+### File roles
+
+| File           | Struct       | Produced by            | Consumed by |
+|----------------|--------------|------------------------|-------------|
+| `mol.toml`     | `FitInput`   | hand-authored          | `load_fit_input`, `spfit` |
+| `mol.var.toml` | `CalFitOutput` (fitted params + variance) | `save_fit_output`, `spfit` | `load_cat_input`, `spcat` |
+| `mol.int.toml` | `CatInput` (control + dipoles only) | hand-authored | `load_cat_input`, `spcat` |
+| `mol.cat.toml` | `CalCatOutput` | `save_cat_output`, `spcat` | consumer code |
+
+### Python API
+
+```python
+from pickett import (
+    load_fit_input,    # path → FitInput
+    save_fit_output,   # (CalFitOutput, FitInput, path) → writes .var.toml
+    load_cat_input,    # (var_path, int_path) → CatInput
+    save_cat_output,   # (CalCatOutput, path) → writes .cat.toml
+    fit_input_to_dict, fit_input_from_dict,   # FitInput ↔ dict
+    cat_input_to_dict,                         # CatInput → dict (control+dipoles)
+    fit_output_to_dict, cat_output_to_dict,    # output structs → dict
+)
+```
+
+**`load_fit_input(path)`** — reads `mol.toml` and returns a `FitInput`.  All
+fields correspond directly to the struct fields documented above.  `error` in
+a parameter entry (as written by `save_fit_output`) is loaded into
+`a_priori_error`, so a `.var.toml` can also be used as a new starting `.toml`.
+
+**`save_fit_output(out, fi, path)`** — writes `mol.var.toml` from a
+`CalFitOutput` + the original `FitInput` (needed for engine options and
+parameter labels).  Includes the full `variance` array so `spcat` can compute
+accurate line-strength uncertainties.
+
+**`load_cat_input(var_path, int_path)`** — merges `mol.var.toml` (parameters +
+engine options + variance) with `mol.int.toml` (control + dipoles) into a
+`CatInput`.
+
+**`save_cat_output(out, path)`** — writes `mol.cat.toml` containing `nline`,
+`cat_lines`, `temp`, and `qsum`.
+
+### TOML schema sketches
+
+`mol.toml` (FitInput):
+```toml
+title = "CO v=0"
+n_iterations = 4
+marquardt_param = 1e-10   # optional
+
+[engine_options]
+kind = "spinv"
+  [engine_options.spinv]
+  nam_file = "spinl.nam"
+    [[engine_options.spinv.vibs]]
+    knmin = 0; knmax = 0; symmetric_rotor_quanta = true; esym_weight = -1
+    spin_degeneracies = [1]
+
+[[parameters]]
+id = 100; value = 57635.96804; a_priori_error = 1e35; label = "B"
+
+[[lines]]
+qn = [1, 0]; nqn = 1; freq = 115271.2018; err = 0.05
+```
+
+`mol.int.toml` (CatInput extras — control + dipoles):
+```toml
+title = "CO, v = 0"
+[control]
+itag = 28503; qrot = 108.8651; lblk = 99; fqmax = 10330.0
+thrsh = -40.0; thrsh1 = -40.0
+
+[[dipoles]]
+id = 1; value = 0.1101135
+```
+
+> **`lblk`** (ending F quantum) defaults to 0, which suppresses all output.
+> Set it to a suitably large value (e.g. 99 for most molecules) or copy it
+> from the legacy `.int` file.
+
+`mol.var.toml` (written by `save_fit_output` / `spfit`):
+```toml
+title = "CO v=0"
+itr = 4; xsqbest = 0.5119
+
+[engine_options]
+# … same as mol.toml …
+
+[[parameters]]
+id = 100; value = 57635.968040; error = 3.41e-05; label = "B"
+# error = fitted 1σ (from erpar); used as a_priori_error when re-loaded
+
+variance = [2.37e-05, 1.12e-05, …]   # packed upper-triangular, nfit*(nfit+1)/2 floats
+```
+
+### CLI auto-detection and `--toml-out`
+
+The CLI executables auto-detect TOML mode by checking for the TOML files at startup — no flags needed:
+
+```sh
+spfit mol      # uses mol.toml if present; otherwise mol.par + mol.lin
+spcat mol      # uses mol.var.toml + mol.int.toml if both present; otherwise legacy
+```
+
+To get TOML output from legacy input files (e.g. to migrate an existing
+molecule), pass `--toml-out`:
+
+```sh
+spfit --toml-out mol   # reads mol.par + mol.lin; writes mol.var + mol.par + mol.var.toml
+spcat --toml-out mol   # reads mol.var + mol.int; writes mol.cat + mol.cat.toml
+```
+
+`--toml-out` can be combined with `--dpi` or `--spinv` in any order:
+
+```sh
+spfit --dpi --toml-out mol
+```
+
+When TOML input files are already present (TOML mode), `--toml-out` is
+redundant — TOML output is written unconditionally in that path.
+
+---
+
 ## Exceptions
 
 The C++ exception hierarchy is exposed in Python; all classes inherit from
@@ -561,6 +692,7 @@ projects need only link to it and `#include` the public headers.
 |-----------------------------------|----------|
 | `api/InputSchema.hpp`             | `FitInput`, `CatInput`, `Parameter`, `LineRecord`, `DipoleMoment`, `VibState`, `SpinvOptions`, `DpiOptions`, `EngineOptions`, `CatControl` |
 | `api/builders.hpp`                | `build_fit_input(fi, engine, logger)`, `build_cat_input(ci, engine, logger)` — convert structs to the internal `CalFitInput` / `CalCatInput` |
+| `api/toml_io.hpp`                 | `load_fit_input_toml(path)`, `load_cat_input_toml(var, int)`, `save_fit_output_toml(out, fi, path)`, `save_cat_output_toml(out, path)` — requires toml++ (vendored at `third_party/tomlplusplus/toml.hpp`) |
 | `spfit/CalFit.hpp` / `spcat/CalCat.hpp` | The run-once `CalFit` / `CalCat` classes |
 | `engine/SpinvEngine.hpp` / `engine/DpiEngine.hpp` | Concrete `CalculationEngine` implementations |
 | `spcat/OutputSink.hpp`            | `FileSink`, `MemorySink` for catalog output capture |

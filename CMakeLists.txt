@@ -19,6 +19,10 @@ set(CMAKE_CXX_STANDARD 17)
 
 include_directories(src)
 
+# ── toml++ (vendored single-header, CLI binaries only) ──────────────────────
+add_library(tomlplusplus INTERFACE)
+target_include_directories(tomlplusplus INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
+
 # Find BLAS
 option(USE_SYSTEM_BLAS "Use system BLAS library (OpenBLAS, etc.)" OFF)
 if(USE_SYSTEM_BLAS)
@@ -149,11 +153,13 @@ add_executable_plus(spfit TRUE
     src/spfit/CalFitIO.cpp
     src/spfit/subfit.cpp
     src/splib/ftran.c
+    src/api/toml_io.cpp
     ${ENGINE_SRCS}
     ${SPLIB_SRCS}
     ${COMMON_SRCS}
     ${API_SRCS}
 )
+target_link_libraries(spfit PRIVATE tomlplusplus)
 
 # Add spcat
 add_executable_plus(spcat TRUE
@@ -161,11 +167,13 @@ add_executable_plus(spcat TRUE
     src/spcat/CalCat.cpp
     src/spcat/CalCat_helpers.cpp
     src/spcat/CalCatIO.cpp
+    src/api/toml_io.cpp
     ${ENGINE_SRCS}
     ${SPLIB_SRCS}
     ${COMMON_SRCS}
     ${API_SRCS}
 )
+target_link_libraries(spcat PRIVATE tomlplusplus)
 
 # Shared helpers required by all legacy executables
 set(CPP_HELPERS ${COMMON_SRCS})

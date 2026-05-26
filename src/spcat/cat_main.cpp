@@ -7,8 +7,9 @@
 /*   Revised version in c, 22 March 1999                               */
 /*   Revised version in C++, 2026                                      */
 
-/* THIS IS A GENERALIZED INTENSITY AND FREQUENCY CALCULATOR            */
+/* SPCAT — Spectroscopic Catalog Generator                             */
 
+/* THIS IS A GENERALIZED INTENSITY AND FREQUENCY CALCULATOR            */
 /* THE HAMILTONIAN IS ASSUMED TO BE ORGANIZED INTO BLOCKS              */
 /*     SUCH THAT ADJACENT SETS OF BLOCKS ARE CONNECTED BY TRANSITIONS  */
 /***********************************************************************/
@@ -23,6 +24,8 @@
 #include "splib/calpgm_types.h"
 #include "splib/ulib.h"
 #include "spcat/OutputSink.hpp"
+#include "api/toml_io.hpp"
+#include "api/builders.hpp"
 #include "common/CalError.hpp"
 #include "common/file_helpers.hpp"
 #include "common/SigintFlag.hpp"
@@ -36,23 +39,85 @@ int main(int argc, char *argv[])
   char *fname[NFILE + 1];
 
   /* Choose the calculation engine (SPINV by default, or DPI) */
-  std::unique_ptr<CalculationEngine> calc_engine = std::make_unique<SpinvEngine>();
-  if (argc > 1) {
-    if (strcasecmp(argv[1], "--dpi") == 0) {
-      calc_engine = std::make_unique<DpiEngine>();
-      char *name = *argv;
-      argv++;
-      *argv = name;
-      argc--;
-    } else if (strcasecmp(argv[1], "--spinv") == 0) {
-      char *name = *argv;
-      argv++;
-      *argv = name;
-      argc--;
-    }
+  std::string engineType = "spinv";
+  bool toml_out = false;
+  // Strip leading option flags in any order: --spinv | --dpi | --toml-out
+  for (bool stripped = true; stripped && argc > 1; ) {
+    stripped = false;
+    if      (strcasecmp(argv[1], "--dpi")      == 0) { engineType = "dpi"; stripped = true; }
+    else if (strcasecmp(argv[1], "--spinv")    == 0) {                      stripped = true; }
+    else if (strcasecmp(argv[1], "--toml-out") == 0) { toml_out = true;     stripped = true; }
+    if (stripped) { char *n = *argv; argv++; *argv = n; argc--; }
   }
 
   file_helpers::parse_file_args(argc, argv, NFILE, fname, ext);
+
+  // ── TOML mode: mol.var.toml + mol.int.toml present ──────────────────────
+  //
+  // Derive base from fname[evar] ("base.var" → "base").
+  // If "base.var.toml" exists, use the TOML path.
+
+  char *base = file_helpers::base_name(fname[evar]);
+  std::string var_toml = base ? (std::string(base) + ".var.toml") : "";
+  std::string int_toml = base ? (std::string(base) + ".int.toml") : "";
+  std::string cat_toml = base ? (std::string(base) + ".cat.toml") : "";
+  free(base);
+
+  // Also accept int.toml derived from fname[eint]
+  if (!int_toml.empty() && !file_helpers::file_exists(int_toml.c_str())) {
+    char *ibase = file_helpers::base_name(fname[eint]);
+    if (ibase) { int_toml = std::string(ibase) + ".int.toml"; free(ibase); }
+  }
+
+  bool toml_mode = !var_toml.empty() && file_helpers::file_exists(var_toml.c_str())
+                && !int_toml.empty() && file_helpers::file_exists(int_toml.c_str());
+
+  if (toml_mode) {
+    // ── TOML path ─────────────────────────────────────────────────────────
+    try {
+      CatInput ci = load_cat_input_toml(var_toml, int_toml);
+      if (engineType == "dpi")   ci.engine_options.kind = EngineOptions::Kind::Dpi;
+      if (engineType == "spinv") ci.engine_options.kind = EngineOptions::Kind::Spinv;
+
+      std::unique_ptr<CalculationEngine> eng =
+          (ci.engine_options.kind == EngineOptions::Kind::Dpi)
+          ? std::unique_ptr<CalculationEngine>(std::make_unique<DpiEngine>())
+          : std::unique_ptr<CalculationEngine>(std::make_unique<SpinvEngine>());
+
+      CalCatInput cci = build_cat_input(ci, *eng);
+
+      FILE *luout_f = file_helpers::open_output(fname[eout], "w");
+      FileSink luout_sink(luout_f);
+      MemorySink lucat_sink;
+      FileSink   luegy_sink(luout_f);
+      FileSink   lustr_sink(luout_f);
+
+      CalCatOutput output;
+      {
+        SigintFlag sigint_guard;
+        CalCat calCat(eng, &luout_sink, &lucat_sink, &luegy_sink, &lustr_sink);
+        calCat.run(cci, output);
+      }
+
+      output.cat_lines = lucat_sink.drain_lines();
+      output.sort_cat_lines();
+      fclose(luout_f);
+
+      save_cat_output_toml(output, cat_toml);
+      fprintf(stderr, "spcat: wrote %s\n", cat_toml.c_str());
+    } catch (const CalError &e) {
+      fprintf(stderr, "spcat error: %s\n", e.what());
+      return EXIT_FAILURE;
+    }
+    return 0;
+  }
+
+  // ── Legacy path (.var / .int) ─────────────────────────────────────────────
+
+  std::unique_ptr<CalculationEngine> calc_engine =
+      (engineType == "dpi")
+      ? std::unique_ptr<CalculationEngine>(std::make_unique<DpiEngine>())
+      : std::unique_ptr<CalculationEngine>(std::make_unique<SpinvEngine>());
 
   /* Open output stream */
   FILE *luout_f = file_helpers::open_output(fname[eout], "w");
@@ -121,6 +186,15 @@ int main(int argc, char *argv[])
   if (lustr_f != luout_f)
     fclose(lustr_f);
   fclose(luout_f);
+
+  if (toml_out && !cat_toml.empty()) {
+    try {
+      save_cat_output_toml(output, cat_toml);
+      fprintf(stderr, "spcat: wrote %s\n", cat_toml.c_str());
+    } catch (const CalError &e) {
+      fprintf(stderr, "spcat: --toml-out: failed to write %s: %s\n", cat_toml.c_str(), e.what());
+    }
+  }
 
   return 0;
 }

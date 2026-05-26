@@ -117,4 +117,21 @@ int parse_file_args(int argc, char *argv[], int nfile,
 #undef NSTR
 }
 
+char *base_name(const char *path)
+{
+    if (!path) return nullptr;
+    const char *ext = strrchr(path, '.');
+    size_t len = ext ? (size_t)(ext - path) : strlen(path);
+    char *buf = (char *)malloc(len + 1);
+    if (buf) { memcpy(buf, path, len); buf[len] = '\0'; }
+    return buf;
+}
+
+bool file_exists(const char *path)
+{
+    FILE *f = fopen(path, "r");
+    if (f) { fclose(f); return true; }
+    return false;
+}
+
 } // namespace file_helpers

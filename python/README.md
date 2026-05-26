@@ -44,7 +44,7 @@ covariance matrix is the same — but the text file differs.  The
 
 ## Usage
 
-Three workflows are available; all are numerically identical.
+Four workflows are available; all are numerically identical.
 
 ### 1. File-free (recommended for new code)
 
@@ -119,16 +119,56 @@ for line in cat_out.cat_lines[:3]:
     print(line)
 ```
 
+### 4. TOML file format
+
+Human-readable TOML files as an alternative to the legacy fixed-width ASCII formats.  `mol.toml` plays the role of `mol.par` + `mol.lin`;
+`mol.var.toml` + `mol.int.toml` play the role of `mol.var` + `mol.int`.
+
+```python
+from pickett import (
+    load_fit_input, save_fit_output,
+    load_cat_input, save_cat_output,
+    FitSession, CatSession,
+)
+
+# Fit from TOML input
+fi  = load_fit_input("co.toml")
+out = FitSession.from_input(fi).run()
+save_fit_output(out, fi, "co.var.toml")      # fitted params + variance
+
+# Catalog from TOML input
+ci      = load_cat_input("co.var.toml", "co.int.toml")
+cat_out = CatSession.from_input(ci).run()
+save_cat_output(cat_out, "co.cat.toml")
+```
+
+The CLI tools auto-detect TOML mode: if `mol.toml` is present, `spfit mol`
+uses it and writes `mol.var.toml`; `spcat mol` uses `mol.var.toml` +
+`mol.int.toml` and writes `mol.cat.toml`.
+
+To migrate an existing molecule from legacy files, pass `--toml-out` — the
+usual legacy output is written plus a `.var.toml` / `.cat.toml` alongside:
+
+```sh
+spfit --toml-out mol
+spcat --toml-out mol
+```
+
+Lower-level helpers for dict-level serialization are also exported:
+`fit_input_to_dict`, `fit_input_from_dict`, `cat_input_to_dict`,
+`fit_output_to_dict`, `cat_output_to_dict`.
+
 ## Output fields
 
 **`CalFitOutput`** — returned by `FitSession.run()` and `fit_files()`:
 
-| Field     | Description |
-|-----------|-------------|
-| `par`     | Fitted parameter values (same order as input) |
-| `erpar`   | Estimated 1σ errors |
-| `xsqbest` | Best RMS of (obs − calc) / err |
-| `itr`     | Number of iterations performed |
+| Field      | Description |
+|------------|-------------|
+| `par`      | Fitted parameter values (same order as input) |
+| `erpar`    | Estimated 1σ errors |
+| `xsqbest`  | Best RMS of (obs − calc) / err |
+| `itr`      | Number of iterations performed |
+| `variance` | Packed upper-triangular variance matrix (`nfit*(nfit+1)/2` floats); pass to `save_fit_output` so spcat gets accurate ERR values |
 
 **`CalCatOutput`** — returned by `CatSession.run()` and `cat_files()`:
 

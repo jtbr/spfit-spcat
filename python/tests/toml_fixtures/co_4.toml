@@ -1,0 +1,226 @@
+title = "CO; G. Winnewisser, et al."
+n_iterations = 4
+marquardt_param = 1e-10
+max_lines = 31
+
+[engine_options]
+kind = "spinv"
+
+[engine_options.spinv]
+nam_file = "spinl.nam"
+
+[[engine_options.spinv.vibs]]
+knmax = 0
+esym_weight = -1
+spin_degeneracies = [1]
+symmetric_rotor_quanta = true
+
+[[parameters]]
+id = 100
+value = 57635.96804050475
+a_priori_error = 1.0e35
+label = "B"
+
+[[parameters]]
+id = 200
+value = -0.1835052837049869
+a_priori_error = 1.0e35
+label = "-D"
+
+[[parameters]]
+id = 300
+value = 1.723021592925111e-7
+a_priori_error = 1.0e35
+label = "H"
+
+[[parameters]]
+id = 400
+value = -2.555738024719730e-13
+a_priori_error = 1.0e35
+label = "L"
+
+[[lines]]
+qn = [1, 0]
+nqn = 1
+freq = 115271.2018
+err = 0.0005
+
+[[lines]]
+qn = [2, 1]
+nqn = 1
+freq = 230538.0000
+err = 0.0005
+
+[[lines]]
+qn = [3, 2]
+nqn = 1
+freq = 345795.9899
+err = 0.0005
+
+[[lines]]
+qn = [4, 3]
+nqn = 1
+freq = 461040.7682
+err = 0.0005
+
+[[lines]]
+qn = [5, 4]
+nqn = 1
+freq = 576267.9305
+err = 0.0005
+
+[[lines]]
+qn = [6, 5]
+nqn = 1
+freq = 691473.0763
+err = 0.0005
+
+[[lines]]
+qn = [7, 6]
+nqn = 1
+freq = 806651.806
+err = 0.005
+
+[[lines]]
+qn = [8, 7]
+nqn = 1
+freq = 921799.700
+err = 0.005
+
+[[lines]]
+qn = [9, 8]
+nqn = 1
+freq = 1036912.393
+err = 0.005
+
+[[lines]]
+qn = [10, 9]
+nqn = 1
+freq = 1151985.452
+err = 0.011
+
+[[lines]]
+qn = [11, 10]
+nqn = 1
+freq = 1267014.486
+err = 0.005
+
+[[lines]]
+qn = [12, 11]
+nqn = 1
+freq = 1381995.105
+err = 0.013
+
+[[lines]]
+qn = [13, 12]
+nqn = 1
+freq = 1496922.909
+err = 0.012
+
+[[lines]]
+qn = [14, 13]
+nqn = 1
+freq = 1611793.518
+err = 0.011
+
+[[lines]]
+qn = [16, 15]
+nqn = 1
+freq = 1841345.506
+err = 0.011
+
+[[lines]]
+qn = [17, 16]
+nqn = 1
+freq = 1956018.139
+err = 0.011
+
+[[lines]]
+qn = [18, 17]
+nqn = 1
+freq = 2070615.993
+err = 0.014
+
+[[lines]]
+qn = [19, 18]
+nqn = 1
+freq = 2185134.680
+err = 0.013
+
+[[lines]]
+qn = [20, 19]
+nqn = 1
+freq = 2299569.842
+err = 0.010
+
+[[lines]]
+qn = [21, 20]
+nqn = 1
+freq = 2413917.113
+err = 0.011
+
+[[lines]]
+qn = [22, 21]
+nqn = 1
+freq = 2528172.060
+err = 0.011
+
+[[lines]]
+qn = [24, 23]
+nqn = 1
+freq = 2756387.584
+err = 0.017
+
+[[lines]]
+qn = [25, 24]
+nqn = 1
+freq = 2870339.407
+err = 0.013
+
+[[lines]]
+qn = [26, 25]
+nqn = 1
+freq = 2984181.455
+err = 0.014
+
+[[lines]]
+qn = [27, 26]
+nqn = 1
+freq = 3097909.361
+err = 0.017
+
+[[lines]]
+qn = [30, 29]
+nqn = 1
+freq = 3438364.611
+err = 0.010
+
+[[lines]]
+qn = [31, 30]
+nqn = 1
+freq = 3551592.361
+err = 0.010
+
+[[lines]]
+qn = [33, 32]
+nqn = 1
+freq = 3777635.728
+err = 0.016
+
+[[lines]]
+qn = [34, 33]
+nqn = 1
+freq = 3890442.717
+err = 0.013
+
+[[lines]]
+qn = [36, 35]
+nqn = 1
+freq = 4115605.585
+err = 0.022
+
+[[lines]]
+qn = [38, 37]
+nqn = 1
+freq = 4340138.112
+err = 0.043

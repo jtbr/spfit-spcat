@@ -115,8 +115,8 @@ This document outlines the prioritized tasks for modernizing the SPFIT/SPCAT sof
     - Check that it builds cross platform (win/mac/linux x64/linux arm) if possible
     - Create release bundles for tagged versions (tags are not yet pushed to github)
 
-- [~] **Task 12: Typed-struct input API (file-free programmatic use)**
-    Phases 1–5 complete. Phase 6 (modern file format) pending.
+- [x] **Task 12: Typed-struct input API (file-free programmatic use)**
+    All phases complete (1–6).
     - **Goal**: Define typed C++ input records as the canonical public API so that `CalFit::run` and `CalCat::run` can be driven entirely from in-memory structs — no `.par`/`.lin`/`.int`/`.var` files required. The legacy file-reading path becomes a backward-compat parser layer on top of the same core.
     - **Motivation**: Task 9.1 left `CalFitIO::readInput` and `CalCatIO::readInput` opening files with `fopen()`, calling `setopt(FILE*, …)` directly, and using `getpar`/`getvar(FILE*, …)` (`src/splib/ulib.c:576,658`). The internal structs (`CalFitInput::idpar_data`) are BCD-packed bytes, not values a Python user would naturally construct. Task 12 fixes this, and also enables a future clean file format (TOML/JSON as a serialization of the same structs).
     - **Schema** (new header `src/api/InputSchema.hpp`):
@@ -139,7 +139,7 @@ This document outlines the prioritized tasks for modernizing the SPFIT/SPCAT sof
     - **Phase 3 — Python bindings**: bind `FitInput`, `CatInput`, `EngineOptions`, `Parameter`, `LineRecord`, `DipoleMoment`, `VibState`, `SpinvOptions`, `DpiOptions`; add `FitSession.from_input(FitInput)` / `CatSession.from_input(CatInput)`; keep file-path constructors (now go through parser internally).
     - **Phase 4 — Tests**: 55-molecule regression remains the gate; add `python/tests/test_typed_input.py` with round-trip (parse→build→run) and typed-only (hand-constructed structs) tests.
     - **Phase 5 — API Docs**: Update `API.md` with new input structures and constructors and `README.md` with synopsis.
-    - **Phase 6 — (Optional) clean file format**: Make new version of executables that accept TOML/JSON/similar format inputs and produce same-format outputs. Construct equivalent full round-trip regression test using the new format inputs.
+    - **Phase 6 — clean file format** ✓: spfit/spcat auto-detect `mol.toml`/`mol.var.toml`+`mol.int.toml` and use TOML path (toml++ v3.4.0, vendored at `third_party/tomlplusplus/toml.hpp`). Python `pickett.toml_io` serialises all input/output structs. 16 Python tests + full 55-file CLI regression pass. Key files: `src/api/toml_io.{hpp,cpp}`, `python/pickett/toml_io.py`, `python/tests/test_toml_format.py`, `python/tests/toml_fixtures/co_4.{toml,int.toml}`.
     - **Key files**: new `src/api/InputSchema.hpp`, `src/api/builders.{hpp,cpp}`, `src/api/legacy_parser.{hpp,cpp}`; modify `src/engine/CalculationEngine.hpp`, `SpinvEngine.{hpp,cpp}`, `DpiEngine.{hpp,cpp}`, `spinv_setup.cpp`, `dpi.cpp`, `CalFitIO.{hpp,cpp}`, `CalCatIO.{hpp,cpp}`, `CalFit_helpers.cpp`, `python/src/bindings.cpp`, `python/pickett/__init__.py`, `API.md`.
     - **Constraint**: 55-file regression baseline must remain bit-identical.
 

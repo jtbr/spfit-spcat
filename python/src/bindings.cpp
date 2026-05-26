@@ -166,10 +166,13 @@ NB_MODULE(_pickett, m)
 
     // ---- CalFitOutput ----
     nb::class_<CalFitOutput>(m, "CalFitOutput")
-        .def_ro("par",     &CalFitOutput::par,     "Fitted parameter values")
-        .def_ro("erpar",   &CalFitOutput::erpar,   "Estimated parameter errors")
-        .def_ro("xsqbest", &CalFitOutput::xsqbest, "Best RMS (obs-calc)/err after fitting")
-        .def_ro("itr",     &CalFitOutput::itr,     "Number of iterations performed")
+        .def_ro("par",      &CalFitOutput::par,     "Fitted parameter values")
+        .def_ro("erpar",    &CalFitOutput::erpar,   "Estimated parameter errors")
+        .def_ro("xsqbest",  &CalFitOutput::xsqbest, "Best RMS (obs-calc)/err after fitting")
+        .def_ro("itr",      &CalFitOutput::itr,     "Number of iterations performed")
+        .def_ro("variance", &CalFitOutput::var_final_for_output,
+                "Packed upper-triangular variance matrix (nfit*(nfit+1)/2 elements); "
+                "pass to save_fit_output so spcat gets accurate ERR values")
         .def("__repr__", [](const CalFitOutput &o) {
             std::ostringstream oss;
             oss << "CalFitOutput(xsqbest=" << o.xsqbest
