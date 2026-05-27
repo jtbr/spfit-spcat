@@ -73,11 +73,11 @@ int main(int argc, char *argv[])
   // ── TOML mode: mol.toml present ──────────────────────────────────────────
   //
   // Derive base from fname[epar] ("base.par" → "base").
-  // If "base.toml" exists, use the TOML path instead of the legacy .par/.lin path.
+  // If "base.toml" exists, use the TOML path; writes base.fitted.toml.
 
   char *base = file_helpers::base_name(fname[epar]);
   std::string toml_in  = base ? (std::string(base) + ".toml")     : "";
-  std::string var_toml = base ? (std::string(base) + ".var.toml") : "";
+  std::string var_toml = base ? (std::string(base) + ".fitted.toml") : "";
   free(base);
 
   bool toml_mode = !toml_in.empty() && file_helpers::file_exists(toml_in.c_str());

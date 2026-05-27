@@ -48,9 +48,9 @@ helpers that read or write files at the edges.  All workflows below produce nume
 | **File-free (recommended)** | `FitSession.from_input(fi).run()`                     | `FitInput`   | `CalFitOutput` |
 |                           | `CatSession.from_input(ci).run()`                       | `CatInput`   | `CalCatOutput` |
 | **TOML files**            | `load_fit_input(path)` → struct → run                   | `.toml`      | `FitInput`     |
-|                           | `save_fit_output(out, fi, path)`                        | `CalFitOutput` | `.var.toml`  |
-|                           | `load_cat_input(var, int)` → struct → run               | `.var.toml` + `.int.toml` | `CatInput` |
-|                           | `save_cat_output(out, path)`                            | `CalCatOutput` | `.cat.toml`  |
+|                           | `save_fit_output(out, fi, path)`                        | `CalFitOutput` | `.fitted.toml`  |
+|                           | `load_cat_input(var, int)` → struct → run               | `.fitted.toml` + `.dipoles.toml` | `CatInput` |
+|                           | `save_cat_output(out, path)`                            | `CalCatOutput` | `.catalog.toml`  |
 | **Bridge — legacy files → structs** | `parse_fit_files(par, lin)`                   | file paths   | `FitInput`     |
 |                           | `parse_cat_files(var, int)`                             | file paths   | `CatInput`     |
 | **Pure legacy (one-shot)**  | `fit_files(base)`  /  `FitSession(par, lin).run()`    | file paths   | `CalFitOutput` |
@@ -537,18 +537,18 @@ formats.  All functions are re-exported from the top-level `pickett` package.
 | File           | Struct       | Produced by            | Consumed by |
 |----------------|--------------|------------------------|-------------|
 | `mol.toml`     | `FitInput`   | hand-authored          | `load_fit_input`, `spfit` |
-| `mol.var.toml` | `CalFitOutput` (fitted params + variance) | `save_fit_output`, `spfit` | `load_cat_input`, `spcat` |
-| `mol.int.toml` | `CatInput` (control + dipoles only) | hand-authored | `load_cat_input`, `spcat` |
-| `mol.cat.toml` | `CalCatOutput` | `save_cat_output`, `spcat` | consumer code |
+| `mol.fitted.toml`  | `CalFitOutput` (fitted params + variance) | `save_fit_output`, `spfit` | `load_cat_input`, `spcat` |
+| `mol.dipoles.toml` | `CatInput` (control + dipoles only) | hand-authored | `load_cat_input`, `spcat` |
+| `mol.catalog.toml` | `CalCatOutput` | `save_cat_output`, `spcat` | consumer code |
 
 ### Python API
 
 ```python
 from pickett import (
     load_fit_input,    # path → FitInput
-    save_fit_output,   # (CalFitOutput, FitInput, path) → writes .var.toml
+    save_fit_output,   # (CalFitOutput, FitInput, path) → writes .fitted.toml
     load_cat_input,    # (var_path, int_path) → CatInput
-    save_cat_output,   # (CalCatOutput, path) → writes .cat.toml
+    save_cat_output,   # (CalCatOutput, path) → writes .catalog.toml
     fit_input_to_dict, fit_input_from_dict,   # FitInput ↔ dict
     cat_input_to_dict,                         # CatInput → dict (control+dipoles)
     fit_output_to_dict, cat_output_to_dict,    # output structs → dict
@@ -558,18 +558,22 @@ from pickett import (
 **`load_fit_input(path)`** — reads `mol.toml` and returns a `FitInput`.  All
 fields correspond directly to the struct fields documented above.  `error` in
 a parameter entry (as written by `save_fit_output`) is loaded into
-`a_priori_error`, so a `.var.toml` can also be used as a new starting `.toml`.
+`a_priori_error`, so `mol.fitted.toml` can also be used as a new starting `.toml`.
+When it contains a `variance` array, loading it into `FitInput` and re-running
+the fit uses the full covariance matrix as a correlated Bayesian prior rather
+than independent diagonal `a_priori_error` values — tighter and more physically
+meaningful than restarting from scratch.
 
-**`save_fit_output(out, fi, path)`** — writes `mol.var.toml` from a
+**`save_fit_output(out, fi, path)`** — writes `mol.fitted.toml` from a
 `CalFitOutput` + the original `FitInput` (needed for engine options and
 parameter labels).  Includes the full `variance` array so `spcat` can compute
 accurate line-strength uncertainties.
 
-**`load_cat_input(var_path, int_path)`** — merges `mol.var.toml` (parameters +
-engine options + variance) with `mol.int.toml` (control + dipoles) into a
+**`load_cat_input(var_path, int_path)`** — merges `mol.fitted.toml` (parameters +
+engine options + variance) with `mol.dipoles.toml` (control + dipoles) into a
 `CatInput`.
 
-**`save_cat_output(out, path)`** — writes `mol.cat.toml` containing `nline`,
+**`save_cat_output(out, path)`** — writes `mol.catalog.toml` containing `nline`,
 `cat_lines`, `temp`, and `qsum`.
 
 ### TOML schema sketches
@@ -595,7 +599,7 @@ id = 100; value = 57635.96804; a_priori_error = 1e35; label = "B"
 qn = [1, 0]; nqn = 1; freq = 115271.2018; err = 0.05
 ```
 
-`mol.int.toml` (CatInput extras — control + dipoles):
+`mol.dipoles.toml` (CatInput extras — control + dipoles):
 ```toml
 title = "CO, v = 0"
 [control]
@@ -610,7 +614,7 @@ id = 1; value = 0.1101135
 > Set it to a suitably large value (e.g. 99 for most molecules) or copy it
 > from the legacy `.int` file.
 
-`mol.var.toml` (written by `save_fit_output` / `spfit`):
+`mol.fitted.toml` (written by `save_fit_output` / `spfit`):
 ```toml
 title = "CO v=0"
 itr = 4; xsqbest = 0.5119
@@ -631,15 +635,15 @@ The CLI executables auto-detect TOML mode by checking for the TOML files at star
 
 ```sh
 spfit mol      # uses mol.toml if present; otherwise mol.par + mol.lin
-spcat mol      # uses mol.var.toml + mol.int.toml if both present; otherwise legacy
+spcat mol      # uses mol.fitted.toml + mol.dipoles.toml if both present; otherwise legacy
 ```
 
 To get TOML output from legacy input files (e.g. to migrate an existing
 molecule), pass `--toml-out`:
 
 ```sh
-spfit --toml-out mol   # reads mol.par + mol.lin; writes mol.var + mol.par + mol.var.toml
-spcat --toml-out mol   # reads mol.var + mol.int; writes mol.cat + mol.cat.toml
+spfit --toml-out mol   # reads mol.par + mol.lin; writes mol.var + mol.par + mol.fitted.toml
+spcat --toml-out mol   # reads mol.var + mol.int; writes mol.cat + mol.catalog.toml
 ```
 
 `--toml-out` can be combined with `--dpi` or `--spinv` in any order:

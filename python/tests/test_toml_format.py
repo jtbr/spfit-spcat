@@ -168,22 +168,22 @@ class TestFitViaTOML:
         assert out.xsqbest < 1.0
 
 
-# ── Full round-trip: fit → save var.toml → load → cat ──────────────────────
+# ── Full round-trip: fit → save fitted.toml → load → cat ────────────────────
 
 class TestFullRoundTrip:
     def test_co4_full_round_trip(self, tmp_path):
-        """TOML fit input → fit → save mol.var.toml → load → cat → check freq."""
+        """TOML fit input → fit → save mol.fitted.toml → load → cat → check freq."""
         # Step 1: load FitInput from fixture and run fit
         fi = load_fit_input(FIXTURES / "co_4.toml")
         fit_out = FitSession.from_input(fi).run()
 
-        # Step 2: save mol.var.toml
-        var_toml = tmp_path / "co.var.toml"
+        # Step 2: save mol.fitted.toml
+        var_toml = tmp_path / "co.fitted.toml"
         save_fit_output(fit_out, fi, var_toml)
         assert var_toml.exists()
 
-        # Step 3: load CatInput from var.toml + int.toml fixture
-        int_toml = FIXTURES / "co_4.int.toml"
+        # Step 3: load CatInput from fitted.toml + dipoles.toml fixture
+        int_toml = FIXTURES / "co_4.dipoles.toml"
         ci = load_cat_input(var_toml, int_toml)
         assert len(ci.parameters) == 4
         assert ci.control.itag == 28503
@@ -198,12 +198,12 @@ class TestFullRoundTrip:
         assert math.isclose(freq, 115271.2021, rel_tol=1e-4)
 
     def test_co4_var_toml_fields(self, tmp_path):
-        """Saved mol.var.toml has expected top-level fields."""
+        """Saved mol.fitted.toml has expected top-level fields."""
         import tomllib as tl  # stdlib 3.11+; falls back via conftest
 
         fi = load_fit_input(FIXTURES / "co_4.toml")
         fit_out = FitSession.from_input(fi).run()
-        var_toml = tmp_path / "co.var.toml"
+        var_toml = tmp_path / "co.fitted.toml"
         save_fit_output(fit_out, fi, var_toml)
 
         with open(var_toml, "rb") as f:
@@ -228,7 +228,7 @@ class TestFullRoundTrip:
         import tomllib as tl
         ci = parse_cat_files(CO4_VAR + ".var", CO4_BASE + ".int")
         cat_out = CatSession.from_input(ci).run()
-        cat_toml = tmp_path / "co.cat.toml"
+        cat_toml = tmp_path / "co.catalog.toml"
         save_cat_output(cat_out, cat_toml)
 
         with open(cat_toml, "rb") as f:

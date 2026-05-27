@@ -122,7 +122,7 @@ for line in cat_out.cat_lines[:3]:
 ### 4. TOML file format
 
 Human-readable TOML files as an alternative to the legacy fixed-width ASCII formats.  `mol.toml` plays the role of `mol.par` + `mol.lin`;
-`mol.var.toml` + `mol.int.toml` play the role of `mol.var` + `mol.int`.
+`mol.fitted.toml` + `mol.dipoles.toml` play the role of `mol.var` + `mol.int`.
 
 ```python
 from pickett import (
@@ -134,20 +134,20 @@ from pickett import (
 # Fit from TOML input
 fi  = load_fit_input("co.toml")
 out = FitSession.from_input(fi).run()
-save_fit_output(out, fi, "co.var.toml")      # fitted params + variance
+save_fit_output(out, fi, "co.fitted.toml")      # fitted params + variance
 
 # Catalog from TOML input
-ci      = load_cat_input("co.var.toml", "co.int.toml")
+ci      = load_cat_input("co.fitted.toml", "co.dipoles.toml")
 cat_out = CatSession.from_input(ci).run()
-save_cat_output(cat_out, "co.cat.toml")
+save_cat_output(cat_out, "co.catalog.toml")
 ```
 
 The CLI tools auto-detect TOML mode: if `mol.toml` is present, `spfit mol`
-uses it and writes `mol.var.toml`; `spcat mol` uses `mol.var.toml` +
-`mol.int.toml` and writes `mol.cat.toml`.
+uses it and writes `mol.fitted.toml`; `spcat mol` uses `mol.fitted.toml` +
+`mol.dipoles.toml` and writes `mol.catalog.toml`.
 
 To migrate an existing molecule from legacy files, pass `--toml-out` — the
-usual legacy output is written plus a `.var.toml` / `.cat.toml` alongside:
+usual legacy output is written plus a `.fitted.toml` / `.catalog.toml` alongside:
 
 ```sh
 spfit --toml-out mol

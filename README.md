@@ -19,13 +19,13 @@ Key changes:
 
 **Command-line usage of all executables (spfit, spcat, etc.) is unchanged from the original C code. Existing input files and workflows work without modification.**
 
-A parallel TOML-based file format is also available as a cleaner alternative to the legacy fixed-width ASCII files.  `spfit` reads `mol.toml` (instead of `mol.par` + `mol.lin`) when it is present and writes `mol.var.toml`; `spcat` similarly reads `mol.var.toml` + `mol.int.toml` and writes `mol.cat.toml`.  The TOML files are human-readable representations of the same typed structs used by the Python API.
+A parallel TOML-based file format is also available as a cleaner alternative to the legacy fixed-width ASCII files.  `spfit` reads `mol.toml` (instead of `mol.par` + `mol.lin`) when it is present and writes `mol.fitted.toml`; `spcat` similarly reads `mol.fitted.toml` + `mol.dipoles.toml` and writes `mol.catalog.toml`.  The TOML files are human-readable representations of the same typed structs used by the Python API.
 
 To migrate an existing molecule from the legacy format, pass `--toml-out` to get TOML output alongside the usual legacy output:
 
 ```sh
-spfit --toml-out mol   # writes mol.var.toml in addition to mol.var / mol.par
-spcat --toml-out mol   # writes mol.cat.toml in addition to mol.cat
+spfit --toml-out mol   # writes mol.fitted.toml in addition to mol.var / mol.par
+spcat --toml-out mol   # writes mol.catalog.toml in addition to mol.cat
 ```
 
 See [TASKS.md](TASKS.md) for the full modernization roadmap and status.
@@ -88,9 +88,9 @@ import pickett
 
 fi  = pickett.load_fit_input("molecule.toml")
 out = pickett.FitSession.from_input(fi).run()
-pickett.save_fit_output(out, fi, "molecule.var.toml")
+pickett.save_fit_output(out, fi, "molecule.fitted.toml")
 
-ci      = pickett.load_cat_input("molecule.var.toml", "molecule.int.toml")
+ci      = pickett.load_cat_input("molecule.fitted.toml", "molecule.dipoles.toml")
 cat_out = pickett.CatSession.from_input(ci).run()
 ```
 

@@ -1,14 +1,14 @@
 """TOML serialization/deserialization for SPFIT/SPCAT input/output structs.
 
 File roles:
-  mol.toml       FitInput  — user-authored, read by spfit
-  mol.var.toml   FitOutput — written by spfit, read by spcat
-  mol.int.toml   CatInput extras (control + dipoles) — user-authored, read by spcat
-  mol.cat.toml   CatOutput — written by spcat
+  mol.toml         FitInput  — user-authored, read by spfit
+  mol.fitted.toml  FitOutput — written by spfit, read by spcat
+  mol.dipoles.toml CatInput extras (control + dipoles) — user-authored, read by spcat
+  mol.catalog.toml CatOutput — written by spcat
 
 Round-trip workflow:
-  mol.toml → spfit mol → mol.var.toml
-  mol.var.toml + mol.int.toml → spcat mol → mol.cat.toml
+  mol.toml → spfit mol → mol.fitted.toml
+  mol.fitted.toml + mol.dipoles.toml → spcat mol → mol.catalog.toml
 """
 
 import sys
@@ -201,7 +201,7 @@ def _parameter_from_dict(d: dict) -> Parameter:
 
 
 def _var_parameter_from_dict(d: dict) -> Parameter:
-    """Parse a parameter from mol.var.toml; 'error' maps to a_priori_error."""
+    """Parse a parameter from mol.fitted.toml; 'error' maps to a_priori_error."""
     p = Parameter()
     p.id = int(d["id"])
     p.value = float(d["value"])
@@ -330,9 +330,9 @@ def fit_input_from_dict(d: dict) -> FitInput:
 
 
 def cat_input_to_dict(ci: CatInput) -> dict:
-    """Convert CatInput → plain dict for mol.int.toml (control + dipoles only).
+    """Convert CatInput → plain dict for mol.dipoles.toml (control + dipoles only).
 
-    Engine options and parameters are stored in mol.var.toml (written by spfit).
+    Engine options and parameters are stored in mol.fitted.toml (written by spfit).
     """
     d: dict = {"title": ci.title}
     ctrl_d = _cat_control_to_dict(ci.control)
@@ -344,7 +344,7 @@ def cat_input_to_dict(ci: CatInput) -> dict:
 
 
 def fit_output_to_dict(out: CalFitOutput, fi: FitInput) -> dict:
-    """Build mol.var.toml dict from CalFitOutput + FitInput metadata.
+    """Build mol.fitted.toml dict from CalFitOutput + FitInput metadata.
 
     Carries engine_options and parameter labels forward from fi so that spcat
     can read this file without any additional inputs.
@@ -373,7 +373,7 @@ def fit_output_to_dict(out: CalFitOutput, fi: FitInput) -> dict:
 
 
 def cat_output_to_dict(out: CalCatOutput) -> dict:
-    """Convert CalCatOutput → plain dict for mol.cat.toml."""
+    """Convert CalCatOutput → plain dict for mol.catalog.toml."""
     return {
         "nline": out.nline,
         "temp": list(out.temp),
@@ -392,11 +392,11 @@ def load_fit_input(path: PathLike) -> FitInput:
 
 
 def load_cat_input(var_path: PathLike, int_path: PathLike) -> CatInput:
-    """Read mol.var.toml + mol.int.toml → CatInput.
+    """Read mol.fitted.toml + mol.dipoles.toml → CatInput.
 
-    var_path: path to mol.var.toml (written by spfit, contains engine_options +
+    var_path: path to mol.fitted.toml (written by spfit, contains engine_options +
               fitted parameters + variance).
-    int_path: path to mol.int.toml (user-authored, contains control + dipoles).
+    int_path: path to mol.dipoles.toml (user-authored, contains control + dipoles).
     """
     with open(var_path, "rb") as f:
         var_d = tomllib.load(f)
@@ -415,12 +415,12 @@ def load_cat_input(var_path: PathLike, int_path: PathLike) -> CatInput:
 
 
 def save_fit_output(out: CalFitOutput, fi: FitInput, path: PathLike) -> None:
-    """Write CalFitOutput → mol.var.toml."""
+    """Write CalFitOutput → mol.fitted.toml."""
     with open(path, "wb") as f:
         tomli_w.dump(fit_output_to_dict(out, fi), f)
 
 
 def save_cat_output(out: CalCatOutput, path: PathLike) -> None:
-    """Write CalCatOutput → mol.cat.toml."""
+    """Write CalCatOutput → mol.catalog.toml."""
     with open(path, "wb") as f:
         tomli_w.dump(cat_output_to_dict(out), f)

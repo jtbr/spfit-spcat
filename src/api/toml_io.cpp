@@ -2,9 +2,10 @@
  * toml_io.cpp — TOML file I/O for SPFIT/SPCAT
  *
  * Converts between the typed InputSchema structs and TOML files via toml++.
- * The mol.var.toml format mirrors the legacy .var file: it carries engine
- * options + fitted parameters + packed variance so spcat can read it without
- * the original .par file.
+ * mol.fitted.toml mirrors the legacy .var file: it carries engine options +
+ * fitted parameters + packed variance so spcat can read it without .par.
+ * Loading mol.fitted.toml as FitInput re-uses the full covariance matrix as a
+ * correlated (Bayesian) prior, not independent a_priori_error values.
  */
 
 #define TOML_EXCEPTIONS 0  // use error_code returns, convert to exceptions below
@@ -152,7 +153,7 @@ static Parameter parameter_from_toml(const toml::table &t)
     return p;
 }
 
-// var.toml uses 'error' (fitted sigma) in place of 'a_priori_error'
+// fitted.toml uses 'error' (fitted sigma) in place of 'a_priori_error'
 static Parameter var_parameter_from_toml(const toml::table &t)
 {
     Parameter p = parameter_from_toml(t);

@@ -52,21 +52,21 @@ int main(int argc, char *argv[])
 
   file_helpers::parse_file_args(argc, argv, NFILE, fname, ext);
 
-  // ── TOML mode: mol.var.toml + mol.int.toml present ──────────────────────
+  // ── TOML mode: mol.fitted.toml + mol.dipoles.toml present ───────────────
   //
   // Derive base from fname[evar] ("base.var" → "base").
-  // If "base.var.toml" exists, use the TOML path.
+  // If "base.fitted.toml" exists, use the TOML path.
 
   char *base = file_helpers::base_name(fname[evar]);
-  std::string var_toml = base ? (std::string(base) + ".var.toml") : "";
-  std::string int_toml = base ? (std::string(base) + ".int.toml") : "";
-  std::string cat_toml = base ? (std::string(base) + ".cat.toml") : "";
+  std::string var_toml = base ? (std::string(base) + ".fitted.toml") : "";
+  std::string int_toml = base ? (std::string(base) + ".dipoles.toml") : "";
+  std::string cat_toml = base ? (std::string(base) + ".catalog.toml") : "";
   free(base);
 
-  // Also accept int.toml derived from fname[eint]
+  // Also accept dipoles.toml derived from fname[eint]
   if (!int_toml.empty() && !file_helpers::file_exists(int_toml.c_str())) {
     char *ibase = file_helpers::base_name(fname[eint]);
-    if (ibase) { int_toml = std::string(ibase) + ".int.toml"; free(ibase); }
+    if (ibase) { int_toml = std::string(ibase) + ".dipoles.toml"; free(ibase); }
   }
 
   bool toml_mode = !var_toml.empty() && file_helpers::file_exists(var_toml.c_str())
