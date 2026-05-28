@@ -1,0 +1,13 @@
+title = "CH3CN                                                   Thu May 28 19:37:25 2026\n"
+
+[control]
+iflg = 1
+itag = 41505
+qrot = 14683.6324
+lblk = 135
+thrsh = -7.0
+thrsh1 = -8.5
+fqmax = 1807.0
+[[dipoles]]
+id = 1
+value = 3.92197

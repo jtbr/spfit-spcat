@@ -1,0 +1,12 @@
+title = "FSO3                                                    Thu May 28 19:37:25 2026\n"
+
+[control]
+itag = 99500
+qrot = 75644.7093
+lblk = 99
+thrsh = -7.0
+thrsh1 = -6.0
+fqmax = 300.0
+[[dipoles]]
+id = 111
+value = 1.0

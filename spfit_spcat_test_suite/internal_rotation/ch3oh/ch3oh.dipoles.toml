@@ -1,0 +1,13 @@
+title = "H2COH                                                   Thu May 28 19:37:25 2026\n"
+
+[control]
+itag = 31515
+qrot = 36239.1835
+lblk = 65
+thrsh = -7.5
+thrsh1 = -5.5
+fqmax = 1000.0
+[[dipoles]]
+id = 12
+value = 1.47
+label = "b dipole moment"

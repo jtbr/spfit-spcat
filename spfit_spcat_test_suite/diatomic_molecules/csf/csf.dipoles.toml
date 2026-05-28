@@ -1,0 +1,14 @@
+title = "  IF                                                    Thu May 28 19:37:25 2026\n"
+
+[control]
+iflg = 1
+itag = 146001
+qrot = 6887.8333
+lblk = 6
+thrsh = -9.3
+thrsh1 = -9.3
+fqmax = 40.0
+tmq = 225.0
+[[dipoles]]
+id = 1
+value = 1.948

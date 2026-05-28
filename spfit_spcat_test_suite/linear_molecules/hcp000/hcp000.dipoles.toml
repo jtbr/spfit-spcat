@@ -1,0 +1,11 @@
+title = "  HCP                                                   Thu May 28 19:37:25 2026\n"
+
+[control]
+itag = 44502
+qrot = 313.4649
+lblk = 99
+thrsh = -6.0
+thrsh1 = -8.0
+[[dipoles]]
+id = 1
+value = 0.39

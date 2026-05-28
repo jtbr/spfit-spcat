@@ -1,0 +1,19 @@
+title = "O2                                                      Thu May 28 19:37:25 2026\n"
+
+[control]
+iflg = 1
+itag = 32508
+qrot = 218.529
+lblk = 99
+thrsh = -20.0
+thrsh1 = -20.0
+fqmax = 15000.0
+[[dipoles]]
+id = 1000
+value = 2.004838
+[[dipoles]]
+id = 11000
+value = -0.002813
+[[dipoles]]
+id = 0
+value = -0.000126

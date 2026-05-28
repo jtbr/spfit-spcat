@@ -1,9 +1,10 @@
 """TOML-path regression tests for SPFIT/SPCAT.
 
 For each molecule in the test suite:
-  1. Convert mol.par + mol.lin  → mol.toml         (FitInput TOML, spfit input)
-  2. Convert v2008_results/mol.var + mol.int
-                                → mol.dipoles.toml  (control + dipoles, spcat input)
+  1. Use mol.toml from the molecule directory (generated once from mol.par + mol.lin
+     and saved there; subsequent runs use it directly without any legacy-file conversion).
+  2. Use mol.dipoles.toml from the molecule directory (generated once from mol.int +
+     a reference mol.var and saved there).
   3. Run spfit mol   (TOML auto-detect: reads mol.toml)
      → writes mol.fit + mol.fitted.toml
   4. Run spcat mol   (TOML auto-detect: reads mol.fitted.toml + mol.dipoles.toml)
@@ -11,12 +12,17 @@ For each molecule in the test suite:
   5. Extract cat_lines from mol.catalog.toml → write mol.cat
   6. Move mol.fit, mol.cat, mol.out to <output_subdir>
 
-Compare outputs against the reference baseline using compare_results.py:
-    python compare_results.py --no-intermediates <output_subdir> [ref_dir]
+First-run generation:
+  If mol.toml / mol.dipoles.toml do not exist in the molecule directory they are
+  generated automatically from the legacy input files (mol.par + mol.lin for the
+  fit input; mol.int + a reference mol.var for the dipoles) and saved into the
+  molecule directory for all future runs.
 
-Requires the pickett Python package:
-    pip install ./python        (from repository root)
-    # or: uv sync && uv run ... (from python/)
+Compare outputs against the reference baseline using compare_results.py:
+    python3 compare_results.py --no-intermediates <output_subdir> toml_reference
+
+Regenerate the reference baseline (e.g. after a deliberate code change):
+    python3 run_toml_tests.py --all --regenerate-reference toml_reference
 """
 
 import os
@@ -46,7 +52,8 @@ EXE_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 spfit_path = os.path.join(EXE_PATH, "spfit")
 spcat_path = os.path.join(EXE_PATH, "spcat")
 
-DEFAULT_REF_DIR = "v2008_results"   # source of mol.var used for dipoles conversion
+TOML_REFERENCE  = "toml_reference"  # protected baseline; requires --regenerate-reference
+LEGACY_REF_DIR  = "v2008_results"   # used as fallback .var source for first-run dipoles generation
 SPFIT_OUTPUTS   = [".fit"]
 SPCAT_OUTPUTS   = [".cat", ".out"]
 
@@ -57,26 +64,29 @@ def _write_toml(path: str, d: dict) -> None:
 
 
 def run_toml_tests(output_subdir_name: str, suite_base_path: str = ".",
-                   skip: list = [], ref_dir_name: str = DEFAULT_REF_DIR) -> None:
+                   skip: list = [], allow_overwrite_reference: bool = False) -> None:
     original_cwd = os.getcwd()
 
     if not _PICKETT_AVAILABLE:
         print(f"Error: pickett package not importable — {_PICKETT_IMPORT_ERROR}")
-        print("Install with:  uv pip install -e .  (from python/ directory)")
+        print("Install with:  cd python && uv pip install -e .")
         return
 
     if not os.path.exists(spfit_path):
         print(f"Error: spfit not found at {spfit_path}")
         return
 
-    if output_subdir_name == ref_dir_name:
-        print(f"Error: output subdir '{output_subdir_name}' is the same as the "
-              f"reference dir — refusing to overwrite baseline results.")
+    if output_subdir_name == LEGACY_REF_DIR:
+        print(f"Error: '{LEGACY_REF_DIR}' is the legacy regression baseline — cannot use as output.")
+        return
+
+    if output_subdir_name == TOML_REFERENCE and not allow_overwrite_reference:
+        print(f"Error: '{TOML_REFERENCE}' is the TOML regression baseline.")
+        print("Pass --regenerate-reference to overwrite it intentionally.")
         return
 
     print(f"Starting TOML-path tests for suite in {suite_base_path}")
     print(f"Outputs will be placed in '{output_subdir_name}' subdirectories.")
-    print(f"Reference (dipoles source): '{ref_dir_name}'")
     print("-" * 50)
 
     for category_name in sorted(os.listdir(suite_base_path)):
@@ -101,67 +111,83 @@ def run_toml_tests(output_subdir_name: str, suite_base_path: str = ".",
 
             try:
                 with tempfile.TemporaryDirectory() as tmp:
-                    # Copy molecule input files into temp dir (writable)
+                    # Copy all molecule files into temp dir (writable working directory).
                     for fn in os.listdir(mol_path):
                         src = os.path.join(mol_path, fn)
                         if os.path.isfile(src):
-                            dst = os.path.join(tmp, fn)
-                            shutil.copy2(src, dst)
-                            os.chmod(dst, 0o644)
+                            shutil.copy2(src, os.path.join(tmp, fn))
+                            os.chmod(os.path.join(tmp, fn), 0o644)
 
                     os.chdir(tmp)
 
                     output_dir = os.path.join(mol_path_abs, output_subdir_name)
                     os.makedirs(output_dir, exist_ok=True)
 
-                    par_path     = os.path.join(tmp, f"{local_basename}.par")
-                    lin_path     = os.path.join(tmp, f"{local_basename}.lin")
-                    int_path     = os.path.join(tmp, f"{local_basename}.int")
-                    ref_var      = os.path.join(mol_path_abs, ref_dir_name, f"{local_basename}.var")
+                    toml_src    = os.path.join(mol_path_abs, f"{local_basename}.toml")
+                    dipoles_src = os.path.join(mol_path_abs, f"{local_basename}.dipoles.toml")
                     toml_in      = os.path.join(tmp, f"{local_basename}.toml")
                     dipoles_toml = os.path.join(tmp, f"{local_basename}.dipoles.toml")
                     fitted_toml  = os.path.join(tmp, f"{local_basename}.fitted.toml")
                     catalog_toml = os.path.join(tmp, f"{local_basename}.catalog.toml")
+                    par_path     = os.path.join(tmp, f"{local_basename}.par")
+                    lin_path     = os.path.join(tmp, f"{local_basename}.lin")
+                    int_path     = os.path.join(tmp, f"{local_basename}.int")
 
-                    if not os.path.exists(par_path):
-                        print(f"    Skipping: {local_basename}.par not found.")
-                        continue
+                    # ── Step 1: obtain mol.toml ───────────────────────────────
+                    if os.path.exists(toml_src):
+                        # Already saved — use directly (no legacy conversion needed).
+                        shutil.copy(toml_src, toml_in)
+                        print(f"    Using {local_basename}.toml")
+                    else:
+                        # First run: generate from .par + .lin and save for future use.
+                        if not os.path.exists(par_path):
+                            print(f"    Skipping: no {local_basename}.toml and no {local_basename}.par found.")
+                            continue
+                        try:
+                            fi = pickett.parse_fit_files(par_path, lin_path)
+                            _write_toml(toml_in, fit_input_to_dict(fi))
+                            shutil.copy(toml_in, toml_src)
+                            print(f"    Generated and saved {local_basename}.toml")
+                        except Exception as e:
+                            print(f"    ERROR generating {local_basename}.toml: {e}")
+                            continue
 
-                    # ── Step 1: .par + .lin → mol.toml ───────────────────────
-                    try:
-                        fi = pickett.parse_fit_files(par_path, lin_path)
-                        _write_toml(toml_in, fit_input_to_dict(fi))
-                        print(f"    Wrote {local_basename}.toml")
-                    except Exception as e:
-                        print(f"    ERROR writing {local_basename}.toml: {e}")
-                        continue
-
-                    # Remove spfit legacy inputs so spfit sees only TOML input.
-                    for legacy_ext in (".par", ".lin"):
-                        p = os.path.join(tmp, local_basename + legacy_ext)
+                    # Remove legacy fit inputs so spfit sees only TOML mode.
+                    for ext in (".par", ".lin"):
+                        p = os.path.join(tmp, local_basename + ext)
                         if os.path.exists(p):
                             os.remove(p)
 
-                    # ── Step 2: v2008_results/.var + .int → mol.dipoles.toml ─
+                    # ── Step 2: obtain mol.dipoles.toml ──────────────────────
                     have_dipoles = False
-                    if os.path.exists(int_path):
+                    if os.path.exists(dipoles_src):
+                        # Already saved — use directly.
+                        shutil.copy(dipoles_src, dipoles_toml)
+                        print(f"    Using {local_basename}.dipoles.toml")
+                        have_dipoles = True
+                    elif os.path.exists(int_path):
+                        # First run: generate from .int + reference .var, then save.
+                        ref_var = os.path.join(mol_path_abs, LEGACY_REF_DIR,
+                                               f"{local_basename}.var")
                         if not os.path.exists(ref_var):
-                            print(f"    WARNING: {ref_dir_name}/{local_basename}.var not found; "
-                                  f"skipping dipoles.toml (run legacy tests first to generate it).")
+                            print(f"    WARNING: no {local_basename}.dipoles.toml and no "
+                                  f"{LEGACY_REF_DIR}/{local_basename}.var; "
+                                  f"run legacy tests first to generate the .var file.")
                         else:
                             try:
                                 ci = pickett.parse_cat_files(ref_var, int_path)
                                 _write_toml(dipoles_toml, cat_input_to_dict(ci))
-                                print(f"    Wrote {local_basename}.dipoles.toml")
+                                shutil.copy(dipoles_toml, dipoles_src)
+                                print(f"    Generated and saved {local_basename}.dipoles.toml")
                                 have_dipoles = True
                             except Exception as e:
-                                print(f"    WARNING: could not write {local_basename}.dipoles.toml: {e}")
+                                print(f"    WARNING: could not generate {local_basename}.dipoles.toml: {e}")
                     else:
                         print(f"    Note: {local_basename}.int not found; skipping dipoles.")
 
-                    # Remove spcat legacy inputs so spcat sees only TOML input.
-                    for legacy_ext in (".var", ".int"):
-                        p = os.path.join(tmp, local_basename + legacy_ext)
+                    # Remove legacy cat inputs so spcat sees only TOML mode.
+                    for ext in (".var", ".int"):
+                        p = os.path.join(tmp, local_basename + ext)
                         if os.path.exists(p):
                             os.remove(p)
 
@@ -251,7 +277,7 @@ def run_toml_tests(output_subdir_name: str, suite_base_path: str = ".",
         print("-" * 50)
     print("\nAll TOML-path tests finished.")
     print(f"\nTo compare against reference outputs, run:")
-    print(f"  python compare_results.py --no-intermediates {output_subdir_name} {ref_dir_name}")
+    print(f"  python3 compare_results.py --no-intermediates {output_subdir_name} toml_reference")
 
 
 if __name__ == "__main__":
@@ -262,10 +288,10 @@ if __name__ == "__main__":
                     help="Subdirectory name for outputs within each molecule directory")
     ap.add_argument("--all", dest="include_all", action="store_true",
                     help="Include clclo2 (very slow, excluded by default)")
-    ap.add_argument("--ref-dir", default=DEFAULT_REF_DIR, metavar="DIR",
-                    help=f"Reference subdirectory supplying mol.var for dipoles "
-                         f"conversion (default: {DEFAULT_REF_DIR})")
+    ap.add_argument("--regenerate-reference", action="store_true",
+                    help=f"Allow writing to {TOML_REFERENCE}/ (normally protected as baseline)")
     args = ap.parse_args()
 
     skip = [] if args.include_all else ["clclo2"]
-    run_toml_tests(args.output_subdir, skip=skip, ref_dir_name=args.ref_dir)
+    run_toml_tests(args.output_subdir, skip=skip,
+                   allow_overwrite_reference=args.regenerate_reference)

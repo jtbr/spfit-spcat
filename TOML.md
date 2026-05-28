@@ -244,6 +244,14 @@ and labels from the original `FitInput`, producing everything `spcat` needs.
 errors will corrupt the line-strength uncertainties.  Labels, `itag`, and
 dipole entries live in `mol.dipoles.toml` (see below) and are safe to edit.
 
+**Precision note:** The variance array is stored at full double precision
+(~17 significant figures), whereas the legacy `.var` format writes it at ~7
+significant figures after normalization (`%10.7f` in `putvar`).  As a result,
+the ERR column (field 2) of `.cat` lines computed from `mol.fitted.toml` is
+slightly more accurate than the v2008 reference for a small number of lines in
+molecules with many parameters (h2s, o2_1and3, ch3oh).  All other output
+columns are bit-identical.
+
 ```toml
 title   = "CO v=0"
 itr     = 4           # iterations performed

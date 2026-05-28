@@ -1,0 +1,15 @@
+title = "H2COH+                                                  Thu May 28 19:37:25 2026\n"
+
+[control]
+itag = 31504
+qrot = 1975.4721
+lblk = 60
+thrsh = -7.0
+thrsh1 = -5.0
+fqmax = 2000.0
+[[dipoles]]
+id = 1
+value = 1.0
+[[dipoles]]
+id = 2
+value = 1.0

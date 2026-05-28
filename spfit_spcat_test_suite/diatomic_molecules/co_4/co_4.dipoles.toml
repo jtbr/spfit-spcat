@@ -1,0 +1,24 @@
+title = "CO, v = 0                                               Thu May 28 19:37:25 2026\n"
+
+[control]
+itag = 28503
+qrot = 108.8651
+lblk = 99
+thrsh = -40.0
+thrsh1 = -40.0
+fqmax = 10330.0
+[[dipoles]]
+id = 1
+value = 0.1101135
+[[dipoles]]
+id = 30001
+value = -1.133238e-05
+[[dipoles]]
+id = 50001
+value = 3.3215210000000004e-08
+[[dipoles]]
+id = 90001
+value = -3.8106080000000004e-11
+[[dipoles]]
+id = 100001
+value = -3.1563260000000003e-12

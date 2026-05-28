@@ -1,0 +1,26 @@
+title = "    (35)Cl(35)ClO2                                      Thu May 28 19:37:25 2026\n"
+
+[control]
+itag = 102000
+qrot = 51468.0
+lblk = 80
+thrsh = -6.5
+thrsh1 = -6.5
+fqmax = 500.0
+tmq = 255.0
+[[dipoles]]
+id = 3
+value = 1.512
+label = "c"
+[[dipoles]]
+id = 1
+value = 0.457
+label = "a"
+[[dipoles]]
+id = 113
+value = 1.512
+label = "c"
+[[dipoles]]
+id = 111
+value = 0.457
+label = "a"

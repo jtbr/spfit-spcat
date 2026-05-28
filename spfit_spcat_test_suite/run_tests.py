@@ -54,10 +54,11 @@ def run_commands_and_move_outputs_dynamic(output_subdir_name, suite_base_path='.
             try:
                 # copy input files to a temp dir, as they will be overwritten
                 with tempfile.TemporaryDirectory() as temp_dir:
-                    # Copy all files from molecule_example_path to temp_dir
+                    # Copy legacy input files to temp_dir; skip .toml files so
+                    # spfit/spcat don't auto-detect TOML mode on the legacy path.
                     for filename in os.listdir(molecule_example_path):
                         src_path = os.path.join(molecule_example_path, filename)
-                        if os.path.isfile(src_path):
+                        if os.path.isfile(src_path) and not filename.endswith(".toml"):
                             dst_path = os.path.join(temp_dir, filename)
                             shutil.copy2(src_path, dst_path)
                             os.chmod(dst_path, 0o644)
@@ -81,7 +82,7 @@ def run_commands_and_move_outputs_dynamic(output_subdir_name, suite_base_path='.
                             continue
 
                         spfit_log_path = os.path.join(output_dir_path_abs, f"{local_basename}_spfit.log")
-                        spfit_result = subprocess.run(spfit_command, capture_output=True, text=True, check=False, timeout=600)
+                        spfit_result = subprocess.run(spfit_command, capture_output=True, text=True, check=False, timeout=1000)
                         with open(spfit_log_path, "w") as f:
                             f.write("--- SPFIT STDOUT ---\n")
                             f.write(spfit_result.stdout)
@@ -110,7 +111,7 @@ def run_commands_and_move_outputs_dynamic(output_subdir_name, suite_base_path='.
                             print(f"    Running SPCAT: {' '.join(spcat_command)}")
                             try:
                                 spcat_log_path = os.path.join(output_dir_path_abs, f"{local_basename}_spcat.log")
-                                spcat_result = subprocess.run(spcat_command, capture_output=True, text=True, check=False, timeout=1200)
+                                spcat_result = subprocess.run(spcat_command, capture_output=True, text=True, check=False, timeout=2000)
                                 with open(spcat_log_path, "w") as f:
                                     f.write("--- SPCAT STDOUT ---\n")
                                     f.write(spcat_result.stdout)

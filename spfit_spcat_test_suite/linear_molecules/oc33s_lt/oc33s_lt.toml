@@ -1,0 +1,59 @@
+title = "HCN  v2=1, Hyperfein                                    Thu May 28 19:37:25 2026\n"
+n_iterations = 3
+marquardt_param = 1e-10
+max_obs_calc_err = 100000.0
+max_lines = 23
+raw_lines = ["  1 -1  3  1  1  2                           8.94085    .0010  .273E-13", "  1 -1  2  1  1  2                          12.65645    .0010  .156E-13", "  1 -1  3  1  1  3                          12.36085    .0010  .130E-12", "  1 -1  2  1  1  3                          16.07590    .0010  .902E-13", "  1 -1  2  1  1  1                          18.85435    .0010  .118E-12", "  2  1  4  2 -1  4                          37.17495    .0010  .623E-12", "  2  1  2  2 -1  2                          37.25870    .0010  .146E-12", "  2  1  2  2 -1  3                          39.91853    .0010  .147E-12", "  2  1  1  2 -1  2                          40.69360    .0020  .109E-12", "  2  1  4  2 -1  3                          40.91805    .0010  .126E-12", "  3 -1  5  3  1  5                          74.41935    .0005  .166E-11", "  3 -1  3  3  1  3                          74.57740    .0005  .751E-12", "  3 -1  3  3  1  4                          77.14858    .0005  .208E-12", "  3 -1  2  3  1  3                          79.80285    .00065 .166E-12", "  3 -1  5  3  1  4                          79.95391    .0008  .174E-12", "  4  1  6  4 -1  6                         124.08806    .0005  .340E-11", "  4  1  4  4 -1  4                         124.27980    .0010  .195E-11", "  4  1  4  4 -1  5                         126.46180    .0005  .266E-12", "  4  1  3  4 -1  4                         130.22205    .0005  .212E-12", "  4  1  6  4 -1  5                         130.33988    .0005  .217E-12", "  5 -1  7  5  1  7                         186.17853    .0005  .600E-11", "  5 -1  4  5  1  5                         192.69020    .0005  .254E-12", "  5 -1  7  5  1  6                         192.78980    .0005  .257E-12"]
+
+[engine_options]
+kind = "spinv"
+
+[engine_options.spinv]
+nam_file = "spinl.nam"
+
+[[engine_options.spinv.vibs]]
+knmax = 1
+iwtpl = 0
+esym_weight = 1
+spin_degeneracies = [4]
+symmetric_rotor_quanta = true
+[[parameters]]
+id = 100
+value = 6030.0
+a_priori_error = 1.0000000000000001e-19
+label = "B"
+[[parameters]]
+id = 40000
+value = 3.10493848139645
+a_priori_error = 1e+19
+label = "q(v+1)/4"
+[[parameters]]
+id = 40100
+value = -2.178247675567748e-06
+a_priori_error = 1e+19
+label = "qJ(v+1)/4"
+[[parameters]]
+id = 110010000
+value = -43.02390146743554
+a_priori_error = 1e+19
+label = "1.5eQq"
+[[parameters]]
+id = 110040000
+value = -0.2951473043118371
+a_priori_error = 1e+19
+label = "eQqeta/4"
+[[parameters]]
+id = 10000000
+value = 0.001148472257109159
+a_priori_error = 1e+19
+label = "C"
+[[parameters]]
+id = 10010000
+value = 0.01173747512366651
+a_priori_error = 1e+19
+label = "C(||)-C"
+[[parameters]]
+id = 10040000
+value = -2.6195334725576933e-05
+a_priori_error = 1e+19
+label = "(Cx-Cy)/4"

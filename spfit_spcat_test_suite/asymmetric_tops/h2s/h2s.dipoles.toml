@@ -1,0 +1,13 @@
+title = "    H2S                                                 Thu May 28 19:37:25 2026\n"
+
+[control]
+itag = 34002
+qrot = 514.447
+lblk = 21
+thrsh = -8.9
+thrsh1 = -9.9
+fqmax = 9999.0
+[[dipoles]]
+id = 2
+value = 0.974
+label = "b dipole moment"

@@ -1,0 +1,23 @@
+title = "Ar-SO2, 1K                                              Thu May 28 19:37:25 2026\n"
+
+[control]
+iflg = 1
+itag = 104599
+qrot = 39.7761
+lblk = 50
+thrsh = -8.0
+thrsh1 = -6.0
+fqmax = 200.0
+tmq = 1.0
+[[dipoles]]
+id = 1
+value = 0.2674
+label = "a dipole moment"
+[[dipoles]]
+id = 111
+value = 0.2674
+label = "a dipole moment"
+[[dipoles]]
+id = 13
+value = 1.465
+label = "c dipole moment"
