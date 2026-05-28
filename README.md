@@ -19,7 +19,7 @@ Key changes:
 
 **Command-line usage of all executables (spfit, spcat, etc.) is unchanged from the original C code. Existing input files and workflows work without modification.**
 
-A parallel TOML-based file format is available as a cleaner alternative to the legacy fixed-width ASCII files.  In TOML mode:
+A parallel [TOML-based file format](TOML.md) is available as a cleaner, more readable alternative to the legacy fixed-width ASCII files. If TOML files are present:
 
 - `spfit` reads `mol.toml` (instead of `mol.par` + `mol.lin`) and writes `mol.fitted.toml` (updated parameters + variance) plus `mol.fit` (human-readable fit report).  The legacy `.par`, `.var`, and `.bak` files are not written.
 - `spcat` reads `mol.fitted.toml` + `mol.dipoles.toml` and writes `mol.catalog.toml` (catalog lines + partition function) plus `mol.out` (human-readable preamble and partition function table).  The separate `.cat` file is not written; catalog lines are the `cat_lines` array inside `mol.catalog.toml`.  `.egy` and `.str` are still written when the `iflg` flags request them.

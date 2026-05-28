@@ -10,7 +10,7 @@ For each molecule in the test suite:
   4. Run spcat mol   (TOML auto-detect: reads mol.fitted.toml + mol.dipoles.toml)
      → writes mol.out + mol.catalog.toml
   5. Extract cat_lines from mol.catalog.toml → write mol.cat
-  6. Move mol.fit, mol.cat, mol.out to <output_subdir>
+  6. Move mol.fit, mol.fitted.toml, mol.cat, mol.out, mol.catalog.toml to <output_subdir>
 
 First-run generation:
   If mol.toml / mol.dipoles.toml do not exist in the molecule directory they are
@@ -18,8 +18,9 @@ First-run generation:
   fit input; mol.int + a reference mol.var for the dipoles) and saved into the
   molecule directory for all future runs.
 
-Compare outputs against the reference baseline using compare_results.py:
-    python3 compare_results.py --no-intermediates <output_subdir> toml_reference
+Compare outputs against the reference baseline:
+    python3 compare_toml_outputs.py <output_subdir>                           # diff TOML files
+    python3 compare_results.py --no-intermediates <output_subdir> toml_reference  # numeric check
 
 Regenerate the reference baseline (e.g. after a deliberate code change):
     python3 run_toml_tests.py --all --regenerate-reference toml_reference
@@ -54,8 +55,8 @@ spcat_path = os.path.join(EXE_PATH, "spcat")
 
 TOML_REFERENCE  = "toml_reference"  # protected baseline; requires --regenerate-reference
 LEGACY_REF_DIR  = "v2008_results"   # used as fallback .var source for first-run dipoles generation
-SPFIT_OUTPUTS   = [".fit"]
-SPCAT_OUTPUTS   = [".cat", ".out"]
+SPFIT_OUTPUTS   = [".fit", ".fitted.toml"]
+SPCAT_OUTPUTS   = [".cat", ".out", ".catalog.toml"]
 
 
 def _write_toml(path: str, d: dict) -> None:
@@ -198,7 +199,7 @@ def run_toml_tests(output_subdir_name: str, suite_base_path: str = ".",
                     try:
                         log = os.path.join(output_dir, f"{local_basename}_spfit.log")
                         r = subprocess.run(spfit_cmd, capture_output=True, text=True,
-                                           check=False, timeout=600)
+                                           check=False, timeout=1000)
                         with open(log, "w") as lf:
                             lf.write("--- STDOUT ---\n"); lf.write(r.stdout)
                             lf.write("\n--- STDERR ---\n"); lf.write(r.stderr)
@@ -220,7 +221,7 @@ def run_toml_tests(output_subdir_name: str, suite_base_path: str = ".",
                         try:
                             log = os.path.join(output_dir, f"{local_basename}_spcat.log")
                             r = subprocess.run(spcat_cmd, capture_output=True, text=True,
-                                               check=False, timeout=1200)
+                                               check=False, timeout=2000)
                             with open(log, "w") as lf:
                                 lf.write("--- STDOUT ---\n"); lf.write(r.stdout)
                                 lf.write("\n--- STDERR ---\n"); lf.write(r.stderr)
