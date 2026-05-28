@@ -22,8 +22,12 @@ build/
 CMakeFiles/
 CMakeCache.txt
 # test outputs:
-spfit_spcat_test_suite/*/*/*/*
+spfit_spcat_test_suite/*/*/*
 spfit_spcat_test_suite/temp*
+!spfit_spcat_test_suite/*/*/v2008_results
+!spfit_spcat_test_suite/*/*/toml_reference
+!spfit_spcat_test_suite/*/*/reference_outputs
+spfit_spcat_test_suite/*/*/*/*.log
 # python artefacts
 python//*.pyc
 __pycache__

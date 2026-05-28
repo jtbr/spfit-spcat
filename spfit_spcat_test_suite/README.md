@@ -1,31 +1,25 @@
 # SPFIT/SPCAT Test Suite
 
-This directory contains a collection of test cases for the SPFIT and SPCAT programs,
-based on examples from the [CDMS Pickett software examples page](https://cdms.astro.uni-koeln.de/classic/predictions/pickett/beispiele/).
-
-## Purpose
-
-The purpose of this suite is to:
-1. Provide a standardized set of inputs for testing SPFIT and SPCAT installations.
-2. Allow verification of results by comparing generated outputs against reference outputs.
+This directory contains regression tests for the SPFIT and SPCAT programs, based
+on examples from the [CDMS Pickett software examples page](https://cdms.astro.uni-koeln.de/classic/predictions/pickett/beispiele/).
 
 ## Directory Structure
-
-The test suite is organized as follows:
 
 ```
 spfit_spcat_test_suite/
 ├── README.md
 ├── run_tests.py              # legacy-path test runner
 ├── run_toml_tests.py         # TOML-path test runner
-├── compare_results.py        # comparison script
+├── compare_results.py        # numeric comparison (both paths)
+├── compare_toml_outputs.py   # diff-based comparison (TOML path)
+├── validate_variance.py      # cross-validates fitted.toml against v2008 .var
 ├── [category]/               # e.g., diatomic_molecules, asymmetric_tops
 │   └── [molecule]/           # e.g., co_4, h2s
 │       ├── [basename].par            # legacy SPFIT input
 │       ├── [basename].lin            # legacy line input
 │       ├── [basename].int            # legacy SPCAT input
-│       ├── [basename].toml           # TOML fit input (saved on first TOML run if not there)
-│       ├── [basename].dipoles.toml   # TOML dipoles input (saved on first TOML run if not there)
+│       ├── [basename].toml           # TOML fit input (generated on first TOML run)
+│       ├── [basename].dipoles.toml   # TOML dipoles input (generated on first TOML run)
 │       ├── v2008_results/            # authoritative reference for legacy path
 │       │   ├── [basename].fit
 │       │   ├── [basename].cat
@@ -38,118 +32,115 @@ spfit_spcat_test_suite/
 │           └── [basename].out           # spcat output: human-readable catalog listing
 ```
 
-## Running Tests
+**Prerequisites:** SPFIT and SPCAT pre-built in the parent directory (`../spfit`,
+`../spcat`, as produced by running `make`).  Run all scripts from the `spfit_spcat_test_suite/` directory.
 
-**Prerequisites:**
-* SPFIT and SPCAT programs pre-built in the parent directory (`../spfit`, `../spcat`)
+---
 
-Navigate to the `spfit_spcat_test_suite` subdirectory before running any scripts.
+## Legacy path — best practice
 
-### Legacy path (`.par`/`.lin`/`.int` files)
+The legacy path runs `spfit`/`spcat` on `.par`/`.lin`/`.int` files and compares
+against `v2008_results/` (the authoritative 2008 reference).
 
 ```sh
-cd spfit_spcat_test_suite
+# 1. Run
 python3 run_tests.py <output_subdir>
+
+# 2. Compare against v2008 reference
 python3 compare_results.py <output_subdir> v2008_results
 ```
 
-Runs `spfit` and `spcat` on copies of each molecule's legacy input files and stores the outputs in `<output_subdir>/` within each molecule directory.  `clclo2` is skipped by default (very slow); pass `--all` before `<output_subdir>` to include it.
+`clclo2` is excluded by default (very slow); pass `--all` before `<output_subdir>`
+to include it.  Exit code of `compare_results.py` is the number of differing file
+pairs (0 = all pass).
 
-### TOML path (`mol.toml` / `mol.dipoles.toml` files)
+---
 
-Requires the `pickett` Python package.  Build and install it with uv from the
-`python/` directory:
+## TOML path — best practice
 
-```sh
-cd ../python && uv pip install -e .
-```
-
-Then from `spfit_spcat_test_suite/`:
+The TOML path requires the `pickett` Python package (build with
+`cd ../python && uv pip install -e .`).
 
 ```sh
+# 1. Run spfit and spcat in TOML mode
 uv run --project ../python python3 run_toml_tests.py <output_subdir>
-python3 compare_toml_outputs.py <output_subdir>                          # primary: diff TOML files
-python3 compare_results.py --no-intermediates <output_subdir> toml_reference  # secondary: numeric check
+
+# 2. Primary regression check: diff the TOML output files against toml_reference
+python3 compare_toml_outputs.py <output_subdir>
+
+# 3. Secondary check: numeric comparison of human-readable outputs
+python3 compare_results.py --no-intermediates <output_subdir> toml_reference
+
+# 4. Cross-validation: compare toml_reference fitted.toml against v2008 .var
+python3 validate_variance.py
 ```
 
-#### What the TOML path produces
+`clclo2` is excluded by default; pass `--all` to include it.  All four steps
+should report 0 failures.
 
-Each program writes different outputs depending on mode:
+### What each step checks
 
-| Program | File | Notes |
-|---------|------|-------|
-| spfit   | `mol.fit`        | Human-readable fit summary; written in both modes |
-| spfit   | `mol.fitted.toml`| Full-precision parameter + variance output (TOML mode only) |
-| spcat   | `mol.out`        | Human-readable catalog listing; written in both modes |
-| spcat   | `mol.catalog.toml` | Catalog data including all transitions (TOML mode only) |
+**Step 2 — `compare_toml_outputs.py` (primary):**
+Diffs `mol.fitted.toml` and `mol.catalog.toml` directly against `toml_reference/`.
+These files contain the complete numerical output at full double precision:
+parameters, full variance matrix, all catalog transitions.  Any change to computed
+results is caught here.
 
-spcat does **not** write a separate `.cat` file in TOML mode — that data lives inside
-`mol.catalog.toml`.  `run_toml_tests.py` extracts the `cat_lines` array from
-`mol.catalog.toml` and writes it as `mol.cat` so that `compare_results.py` can
-compare it against the reference.  The `.par`, `.var`, and `.bak` files produced
-by the legacy spfit path are not written in TOML mode.
-
-Two complementary comparisons are run against `toml_reference/`:
-
-**Primary — `compare_toml_outputs.py` (plain diff):**  
-Diffs `mol.fitted.toml` and `mol.catalog.toml` directly.  These are the canonical
-TOML outputs and contain the complete data at native double precision — parameters,
-full variance matrix, all catalog transitions.  Any numerical change is caught here.
-
-**Secondary — `compare_results.py --no-intermediates` (numeric):**  
-Numerically compares the human-readable text outputs.  These cover content that has
-no equivalent in the TOML files:
-
-* `mol.fit` — the per-iteration fit log (Marquardt parameter, RMS per iteration,
-  trust-region changes).  `mol.fitted.toml` captures only the final fitted state.
-* `mol.out` — the energy level table, per-transition verbose listing, and partition
-  function.  Not present in `mol.catalog.toml`.
-* `mol.cat` — redundant with `mol.catalog.toml` but kept for `compare_results.py`
-  compatibility.
+**Step 3 — `compare_results.py --no-intermediates` (secondary):**
+Numerically compares the human-readable text outputs, which contain content not
+present in the TOML files:
+- `mol.fit` — per-iteration log (Marquardt parameter, RMS per iteration,
+  trust-region changes); `mol.fitted.toml` captures only the final state
+- `mol.out` — energy level table, per-transition listing, partition function
+- `mol.cat` — catalog lines extracted from `mol.catalog.toml` (redundant with
+  step 2, but confirms the extraction is correct)
 
 `--no-intermediates` skips `.par` and `.var`, which TOML mode does not produce.
 
-**What is not covered by either comparison:**  
-Neither script cross-validates the `fitted.toml` variance matrix against the
-independent v2008 `.var` baseline.  The ERR column in `.cat` (which is a quadratic
-form in the variance) provides indirect evidence, but cannot catch indexing bugs in
-`save_fit_output_toml` that happen to cancel in the quadratic form.
-`validate_variance.py` fills this gap — see below.
+**Step 4 — `validate_variance.py` (cross-validation):**
+Compares `toml_reference/mol.fitted.toml` directly against `v2008_results/mol.var`
+for every molecule, checking that the TOML serialization is correct relative to the
+independent v2008 baseline:
+- Parameter values: relative tolerance ≤ 5×10⁻¹⁴  (`%21.13E` format bound)
+- Parameter errors: relative tolerance ≤ 5×10⁻⁷   (`%15.6E` format bound)
+- Variance matrix:  absolute tolerance ≤ 5×10⁻⁸    (`%10.7f` format bound)
 
-#### TOML input files
+This is a fixed check on `toml_reference/` rather than `<output_subdir>`, so it
+only needs to be re-run after regenerating `toml_reference/`. It's there to ensure the toml_reference
+is still correct with respect to the v2008 baseline. Tests against the toml_reference can rely on
+`compare_toml_outputs` alone.
 
-`mol.toml` and `mol.dipoles.toml` are the permanent TOML-format inputs stored in
-each molecule directory.  On the first run they are generated from the legacy
-`.par`/`.lin` and `.int` files using the pickett Python library and saved for all
-subsequent runs.  `run_tests.py` (legacy path) skips `.toml` files when copying
-inputs to its temp directory, so the two paths remain independent.
+### What the TOML path produces
 
-The `toml_reference/` subdirectories are the authoritative regression baseline
-for the TOML path.  They differ from `v2008_results/` in the ERR column (field 2)
-of `.cat` for three molecules (h2s, o2_1and3, ch3oh); see
-[Precision differences: TOML vs legacy](#precision-differences-toml-vs-legacy)
-below.
+| Program | File | Notes |
+|---------|------|-------|
+| spfit | `mol.fit`          | Human-readable fit summary; written in both modes |
+| spfit | `mol.fitted.toml`  | Full-precision parameters and variance (TOML mode only) |
+| spcat | `mol.out`          | Human-readable catalog listing; written in both modes |
+| spcat | `mol.catalog.toml` | All catalog transitions (TOML mode only) |
 
-## Verifying Results
+spcat does **not** write a separate `.cat` file in TOML mode — that data lives
+inside `mol.catalog.toml`.  `run_toml_tests.py` extracts the `cat_lines` array
+and writes it as `mol.cat` for use by `compare_results.py`.  The `.par`, `.var`,
+and `.bak` files produced by the legacy path are not written in TOML mode.
 
-`compare_results.py` compares each output file numerically against a reference
-subdirectory, ignoring timestamps and using tolerances for floating-point values.
+### TOML input files
 
-```sh
-python3 compare_results.py [--no-intermediates] <output_subdir> <reference_subdir>
-```
+`mol.toml` and `mol.dipoles.toml` are permanent TOML-format inputs stored in each
+molecule directory.  On the first run they are generated from the legacy
+`.par`/`.lin` and `.int` files via the pickett library and saved for all subsequent
+runs.  `run_tests.py` (legacy path) skips `.toml` files when copying to its temp
+directory, so the two paths remain independent.
 
-Pass `v2008_results` as the reference for legacy-path outputs, or `toml_reference`
-for TOML-path outputs.  Exit code is the number of differing file pairs (0 = all pass).
+---
 
 ## Precision differences: TOML vs legacy
 
 The TOML path stores the variance matrix at full double precision (~17 significant
-figures) in `mol.fitted.toml`.  The legacy `.var` format applies a different
-treatment: `putvar` normalizes each column of the Cholesky factor by
-`1/erpar[i]` (making values dimensionless, near 1.0), writes them as `%10.7f`
-(7 decimal places), and `getvar` multiplies back by `erpar[i]`.  The net effect
-is that the legacy path passes only ~7 significant figures of variance to `calerr`.
+figures) in `mol.fitted.toml`.  The legacy `.var` format normalizes each row `i`
+of the variance by `1/erpar[i]`, writes it as `%10.7f` (7 decimal places), and
+`getvar` multiplies back — passing only ~7 significant figures of variance to
+`calerr`.
 
 `calerr` computes the ERR column (field 2) of each `.cat` line as a quadratic
 form in the variance matrix.  With higher-precision variance, the TOML path
@@ -157,63 +148,25 @@ produces slightly more accurate ERR values — differing from v2008 by 1 ULP in
 the last printed digit for 17 lines across h2s, o2_1and3, and ch3oh.  Every
 other field (frequency, log-intensity, QN columns) is bit-identical to v2008.
 
-The `toml_reference/` outputs capture the TOML path's full-precision ERR values
-and serve as the regression baseline: any change that alters `toml_reference`
-outputs indicates a genuine regression in the TOML path.
-
-To regenerate `toml_reference/` (e.g. after a code change that legitimately
-changes numerical results):
+`toml_reference/` captures the TOML path's full-precision ERR values and serves
+as the regression baseline.  To regenerate it (after a code change that
+legitimately alters numerical results):
 
 ```sh
-uv run --project ../python python3 run_toml_tests.py toml_reference
+uv run --project ../python python3 run_toml_tests.py --all --regenerate-reference toml_reference
+python3 compare_results.py --no-intermediates toml_reference v2008_baseline # recheck results based upon legacy files including .cat
+python3 validate_variance.py   # re-run cross-validation against v2008_baseline for .par files
 ```
 
-## Parameter and variance cross-validation (`validate_variance.py`)
-
-`validate_variance.py` cross-validates both the fitted parameter values/errors and
-the variance matrix in each `toml_reference/mol.fitted.toml` against the
-corresponding `v2008_results/mol.var`.
-
-**Encoding in the `.var` file:**
-
-| Data | Format | Precision |
-|------|--------|-----------|
-| Parameter value | `%21.13E` | ~14 sig figs |
-| Parameter error | `%15.6E` | ~7 sig figs |
-| Variance `V[i,j] / erpar[i]` | `%10.7f` | ~7 sig figs |
-
-Variance values are written 10 characters wide, 8 per line, with no delimiter
-between adjacent values.  The layout is column-major packed upper-triangular:
-element `(i,j)` with `i ≤ j` is at flat index `j*(j+1)/2 + i`.
-
-**Which parameters appear in the variance:**  
-NEGBCD parameters (negative id in the `.var` file) represent component-group
-continuation entries and are excluded from the variance matrix.  All positive-id
-parameters — including those with small errors such as 1×10⁻³⁶ — do appear in
-the variance.  In `mol.fitted.toml`, NEGBCD params appear as positive-id with
-`fixed=True`.  Some `.var` files have more than one spin/symmetry header line
-before the parameter list (e.g., ar-so2 has two); the script detects these by
-their letter-initial first character.
-
-**What the script checks:**
-
-* Parameter values: `|value_toml − value_var| / |value_var| ≤ 5×10⁻¹⁴`
-* Parameter errors: `|error_toml − error_var| / |error_var| ≤ 5×10⁻⁷`
-* Variance: `|V_toml[i,j] / erpar[i] − stored[i,j]| ≤ 5×10⁻⁸`
-
-```sh
-python3 validate_variance.py
-```
-
-Exit code is the number of molecules with failures (0 = all pass).  All
-TOML-path outputs (`.cat`, `.fit`, `.out`) have also been verified against
-`v2008_results` and match except for the ERR column precision improvement
-described above.
+---
 
 ## Notes
 
-*   Both scripts copy input files to, and run from, a temporary directory before running, so the originals are never overwritten.
-*   The `v2008_results/` subdirectories are the authoritative reference for the legacy path; any change to the code must preserve them.
-*   The `toml_reference/` subdirectories are the authoritative reference for the TOML path.
-*   The `reference_outputs/` files were downloaded from the CDMS Pickett examples website and may differ slightly from `v2008_results/` (different compiler/era; they appear unrelated to changes made by laser_kelvin).
-*   `clclo2` (general_interactions) is excluded from default runs because it is very slow.
+- Both test runners copy inputs to a temporary directory before running; originals
+  are never overwritten.
+- `v2008_results/` is the authoritative reference for the legacy path; any code
+  change must preserve it.
+- `toml_reference/` is the authoritative reference for the TOML path.
+- `reference_outputs/` files were downloaded from the CDMS website and may differ
+  slightly from `v2008_results/` (different compiler/era).
+- `clclo2` (general_interactions) is excluded from default runs — it is very slow.

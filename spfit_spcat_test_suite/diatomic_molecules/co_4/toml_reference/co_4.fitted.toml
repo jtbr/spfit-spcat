@@ -1,0 +1,52 @@
+itr = 1
+title = '''CO; G. Winnewisser, et al.                              Thu May 28 19:37:25 2026
+'''
+variance = [
+    2.3680055945573231e-05,
+    1.1223586841482365e-05,
+    -4.1208665436752122e-08,
+    1.2138815191695627e-05,
+    -1.6049741256303466e-07,
+    1.0405858304735458e-10,
+    1.8177143137011479e-05,
+    -3.3531043059706789e-07,
+    5.2132692814452115e-10,
+    -2.1533747084264386e-13
+]
+xsqbest = 0.90565670127164799
+
+[engine_options]
+kind = 'spinv'
+
+    [engine_options.spinv]
+    nam_file = 'spinl.nam'
+
+        [[engine_options.spinv.vibs]]
+        esym_weight = -1
+        knmax = 0
+        spin_degeneracies = [ 1 ]
+        symmetric_rotor_quanta = true
+
+[[parameters]]
+error = 3.4124380112396447e-05
+id = 100
+label = 'B'
+value = 57635.968040504755
+
+[[parameters]]
+error = 3.7401959629636817e-07
+id = 200
+label = '-D'
+value = -0.18350528370498692
+
+[[parameters]]
+error = 5.3161071726821492e-10
+id = 300
+label = 'H'
+value = 1.7230215929251113e-07
+
+[[parameters]]
+error = 2.1533747084264386e-13
+id = 400
+label = 'L'
+value = -2.5557380247197298e-13

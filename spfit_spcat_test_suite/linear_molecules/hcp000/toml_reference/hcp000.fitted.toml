@@ -1,0 +1,35 @@
+itr = 1
+title = ''' HCP                                                    Thu May 28 19:37:25 2026
+'''
+variance = [ 0.00012821372004450288, 0.00044288222116013189, -7.0166625497209638e-07, -0.00036281999130856948, 1.1156556556814261e-06, -1.0530977436915136e-09 ]
+xsqbest = 0.69708530058946117
+
+[engine_options]
+kind = 'spinv'
+
+    [engine_options.spinv]
+    nam_file = 'spins.nam'
+
+        [[engine_options.spinv.vibs]]
+        esym_weight = -1
+        knmax = 0
+        spin_degeneracies = [ 1 ]
+        symmetric_rotor_quanta = true
+
+[[parameters]]
+error = 0.00058670415536327385
+id = 100
+label = 'B'
+value = 19975.994222111931
+
+[[parameters]]
+error = 1.3179617124258654e-06
+id = 200
+label = '-DJ'
+value = -0.021103830474369242
+
+[[parameters]]
+error = 1.0530977436915136e-09
+id = 300
+label = 'HJ'
+value = 1.4674025191309943e-08
