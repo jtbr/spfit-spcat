@@ -265,6 +265,8 @@ def _dipole_to_dict(dm: DipoleMoment) -> dict:
     d: dict = {"id": dm.id, "value": dm.value}
     if dm.starts_new_component:
         d["starts_new_component"] = True
+    if dm.label:
+        d["label"] = dm.label
     return d
 
 
@@ -274,6 +276,8 @@ def _dipole_from_dict(d: dict) -> DipoleMoment:
     dm.value = float(d["value"])
     if "starts_new_component" in d:
         dm.starts_new_component = bool(d["starts_new_component"])
+    if "label" in d:
+        dm.label = str(d["label"])
     return dm
 
 

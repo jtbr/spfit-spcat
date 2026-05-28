@@ -213,6 +213,7 @@ static DipoleMoment dipole_from_toml(const toml::table &t)
     if (auto x = t["id"].value<int64_t>())    dm.id    = *x;
     if (auto x = t["value"].value<double>())  dm.value = *x;
     if (auto x = t["starts_new_component"].value<bool>()) dm.starts_new_component = *x;
+    if (auto x = t["label"].value<std::string>()) dm.label = *x;
     return dm;
 }
 

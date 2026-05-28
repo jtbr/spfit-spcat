@@ -31,7 +31,7 @@ C++ surface* that exposes them.
   - [`CalCatOutput`](#calcatoutput)
 - [Differences from the legacy file format](#differences-from-the-legacy-file-format)
 - [Working with legacy files](#working-with-legacy-files)
-- [TOML file format](#toml-file-format)
+- [TOML file format](#toml-file-format) (full schema: [`TOML.md`](TOML.md))
 - [Exceptions](#exceptions)
 - [C++ API](#c-api)
 - [Installation and build](#installation-and-build)
@@ -330,7 +330,9 @@ Top-level container for an SPCAT run.
 
 | Field             | Type                   | Default       | Notes |
 |-------------------|------------------------|---------------|-------|
-| `title`           | `str`                  | `""`          | |
+| `title`           | `str`                  | `""`          | Hamiltonian title (from `.var` / `mol.fitted.toml`); appears as the `.VAR FILE TITLE` line in `.out` |
+| `int_title`       | `str`                  | `""`          | Catalog title (from `.int` / `mol.dipoles.toml`); appears as the first title line in `.out`.  Falls back to `title` when empty. |
+| `extended_qn`     | `bool`                 | `False`       | True → use up to `MAXQN=10` QN per state instead of `MAXCAT=6`; needed for molecules with many coupled spins (e.g. CH₃OH).  Set automatically by `parse_cat_files` when NLINE < 0 in the legacy `.var`; propagated through the TOML path via `mol.fitted.toml`. |
 | `control`         | `CatControl`           | defaults      | See below |
 | `dipoles`         | `list[DipoleMoment]`   | `[]`          | At least one usually required |
 | `engine_options`  | `EngineOptions`        | spinv default | Same struct as `FitInput` |
@@ -346,6 +348,7 @@ Single row in the dipole list.
 | `id`                      | `int`  | `0`     | Decimal dipole identifier (`IDIP` in spinv.md §"FORMAT of the .int file") |
 | `value`                   | `float`| `0.0`   | Dipole moment in Debye (or unit consistent with parameters) |
 | `starts_new_component`    | `bool` | `False` | True → applies the `NEGBCD` flag (begins a new component group when `STRFLG=2`) |
+| `label`                   | `str`  | `""`    | Optional display label; appears after `/` in the `.out` dipole listing and in `mol.dipoles.toml` |
 
 ### `CatControl`
 
@@ -532,14 +535,8 @@ internally, so round-tripped runs match the legacy-file path to the last bit.
 TOML files — a human-readable alternative to the legacy fixed-width ASCII
 formats.  All functions are re-exported from the top-level `pickett` package.
 
-### File roles
-
-| File           | Struct       | Produced by            | Consumed by |
-|----------------|--------------|------------------------|-------------|
-| `mol.toml`     | `FitInput`   | hand-authored          | `load_fit_input`, `spfit` |
-| `mol.fitted.toml`  | `CalFitOutput` (fitted params + variance) | `save_fit_output`, `spfit` | `load_cat_input`, `spcat` |
-| `mol.dipoles.toml` | `CatInput` (control + dipoles only) | hand-authored | `load_cat_input`, `spcat` |
-| `mol.catalog.toml` | `CalCatOutput` | `save_cat_output`, `spcat` | consumer code |
+For the full TOML file schemas, CLI auto-detection, migration guide, and
+round-trip workflow see **[`TOML.md`](TOML.md)**.
 
 ### Python API
 
@@ -555,105 +552,21 @@ from pickett import (
 )
 ```
 
-**`load_fit_input(path)`** — reads `mol.toml` and returns a `FitInput`.  All
-fields correspond directly to the struct fields documented above.  `error` in
-a parameter entry (as written by `save_fit_output`) is loaded into
-`a_priori_error`, so `mol.fitted.toml` can also be used as a new starting `.toml`.
-When it contains a `variance` array, loading it into `FitInput` and re-running
-the fit uses the full covariance matrix as a correlated Bayesian prior rather
-than independent diagonal `a_priori_error` values — tighter and more physically
-meaningful than restarting from scratch.
+**`load_fit_input(path)`** — reads `mol.toml`, returns a `FitInput`.  The
+`error` field written by `save_fit_output` is loaded back as `a_priori_error`,
+so `mol.fitted.toml` doubles as a starting point for a subsequent fit.
 
 **`save_fit_output(out, fi, path)`** — writes `mol.fitted.toml` from a
-`CalFitOutput` + the original `FitInput` (needed for engine options and
-parameter labels).  Includes the full `variance` array so `spcat` can compute
-accurate line-strength uncertainties.
+`CalFitOutput` + the original `FitInput`.  Includes the `variance` array for
+accurate line-strength uncertainties in `spcat`.
 
-**`load_cat_input(var_path, int_path)`** — merges `mol.fitted.toml` (parameters +
-engine options + variance) with `mol.dipoles.toml` (control + dipoles) into a
-`CatInput`.
+**`load_cat_input(var_path, int_path)`** — merges `mol.fitted.toml`
+(parameters + engine options + variance) with `mol.dipoles.toml` (control +
+dipoles) into a `CatInput`.
 
-**`save_cat_output(out, path)`** — writes `mol.catalog.toml` containing `nline`,
-`cat_lines`, `temp`, and `qsum`.
-
-### TOML schema sketches
-
-`mol.toml` (FitInput):
-```toml
-title = "CO v=0"
-n_iterations = 4
-marquardt_param = 1e-10   # optional
-
-[engine_options]
-kind = "spinv"
-  [engine_options.spinv]
-  nam_file = "spinl.nam"
-    [[engine_options.spinv.vibs]]
-    knmin = 0; knmax = 0; symmetric_rotor_quanta = true; esym_weight = -1
-    spin_degeneracies = [1]
-
-[[parameters]]
-id = 100; value = 57635.96804; a_priori_error = 1e35; label = "B"
-
-[[lines]]
-qn = [1, 0]; nqn = 1; freq = 115271.2018; err = 0.05
-```
-
-`mol.dipoles.toml` (CatInput extras — control + dipoles):
-```toml
-title = "CO, v = 0"
-[control]
-itag = 28503; qrot = 108.8651; lblk = 99; fqmax = 10330.0
-thrsh = -40.0; thrsh1 = -40.0
-
-[[dipoles]]
-id = 1; value = 0.1101135
-```
-
-> **`lblk`** (ending F quantum) defaults to 0, which suppresses all output.
-> Set it to a suitably large value (e.g. 99 for most molecules) or copy it
-> from the legacy `.int` file.
-
-`mol.fitted.toml` (written by `save_fit_output` / `spfit`):
-```toml
-title = "CO v=0"
-itr = 4; xsqbest = 0.5119
-
-[engine_options]
-# … same as mol.toml …
-
-[[parameters]]
-id = 100; value = 57635.968040; error = 3.41e-05; label = "B"
-# error = fitted 1σ (from erpar); used as a_priori_error when re-loaded
-
-variance = [2.37e-05, 1.12e-05, …]   # packed upper-triangular, nfit*(nfit+1)/2 floats
-```
-
-### CLI auto-detection and `--toml-out`
-
-The CLI executables auto-detect TOML mode by checking for the TOML files at startup — no flags needed:
-
-```sh
-spfit mol      # uses mol.toml if present; otherwise mol.par + mol.lin
-spcat mol      # uses mol.fitted.toml + mol.dipoles.toml if both present; otherwise legacy
-```
-
-To get TOML output from legacy input files (e.g. to migrate an existing
-molecule), pass `--toml-out`:
-
-```sh
-spfit --toml-out mol   # reads mol.par + mol.lin; writes mol.var + mol.par + mol.fitted.toml
-spcat --toml-out mol   # reads mol.var + mol.int; writes mol.cat + mol.catalog.toml
-```
-
-`--toml-out` can be combined with `--dpi` or `--spinv` in any order:
-
-```sh
-spfit --dpi --toml-out mol
-```
-
-When TOML input files are already present (TOML mode), `--toml-out` is
-redundant — TOML output is written unconditionally in that path.
+**`save_cat_output(out, path)`** — writes `mol.catalog.toml` containing
+`nline`, `cat_lines`, `temp`, and `qsum`.  In TOML mode (`spcat` CLI) this is
+the primary catalog output; the separate `.cat` file is not written.
 
 ---
 

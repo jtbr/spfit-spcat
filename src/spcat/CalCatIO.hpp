@@ -10,6 +10,7 @@
 
 #include <string>
 #include "CalCat.hpp"
+#include "api/InputSchema.hpp"
 
 /**
  * @brief Class for handling I/O operations for CalCat
@@ -31,6 +32,20 @@ public:
                         CalCatInput &input,
                         std::unique_ptr<CalculationEngine> &calc_engine,
                         OutputSink *luout);
+
+  /**
+   * @brief Write the catalog-settings preamble to a .out file (TOML path).
+   *
+   * Reproduces the header that CalCatIO::readInput writes when parsing legacy
+   * .int / .var files: title line, ID/QSPINROT/QN line, log-strength line,
+   * dipole list, .VAR FILE TITLE line, and PARAMETERS table.
+   *
+   * @param luout   Output file (mol.out, opened for writing)
+   * @param ci      CatInput from load_cat_input_toml (ci.int_title = dipoles.toml title;
+   *                ci.title = fitted.toml title; ci.dipoles = dipole list)
+   * @param cci     CalCatInput from build_cat_input (has BCD-encoded idpar/idip, par, derv)
+   */
+  static void write_cat_preamble(FILE *luout, const CatInput &ci, const CalCatInput &cci);
 };
 
 #endif // CALCAT_IO_HPP

@@ -9,6 +9,7 @@
 #include <string.h>
 #include <math.h>
 #include "CalCatIO.hpp"
+#include "api/InputSchema.hpp"
 #include "splib/calpgm_types.h"
 #include "splib/ulib.h"
 #include "common/CalError.hpp"
@@ -226,4 +227,91 @@ bool CalCatIO::readInput(const std::string &intFile,
 
   free(dvec);
   return true;
+}
+
+void CalCatIO::write_cat_preamble(FILE *luout, const CatInput &ci, const CalCatInput &cci)
+{
+    char titl[NCARD];
+
+    /* 1. Title line (from .int/dipoles.toml) + timestamp */
+    const std::string &int_t = ci.int_title.empty() ? ci.title : ci.int_title;
+    strncpy(titl, int_t.c_str(), NCARD - 27);
+    titl[NCARD - 27] = '\0';
+    chtime(titl, 82);
+    fputs(titl, luout);
+
+    /* 2. ID / QSPINROT / QN line */
+    fprintf(luout, "ID=%6ld QSPINROT= %14.4f MIN, MAX QN= %3d %3d\n",
+            cci.itag, cci.qrot, cci.inblk, cci.lblk);
+
+    /* 3. LOG.STR / FREQ / TEMP line */
+    fprintf(luout, "MIN.LOG.STR= %9.3f MIN.LOG.STR(FRQ/300GHZ)**2= %9.3f",
+            cci.thrsh, cci.thrsh1);
+    fprintf(luout, " MAX FREQ %10.1f GHZ, TEMP= %8.2f\n", cci.fqmax, cci.tmq);
+
+    /* 4. Dipole lines — reconstruct the .int line format from the BCD id + value */
+    {
+        int nd = NDECDIP + NDECDIP;
+        char sbcd[NDECDIP * 2 + 2];
+        int k = -1;
+        int ndip = cci.ndip;
+        for (int j = 0; j < ndip && j < (int)ci.dipoles.size(); ++j) {
+            if (NEGBCD(cci.idip[(size_t)j * NDECDIP]) == 0 || j == 0)
+                ++k;
+            putbcd(sbcd, nd, &cci.idip[(size_t)j * NDECDIP]);
+            const std::string &lbl = ci.dipoles[j].label;
+            if (!lbl.empty())
+                fprintf(luout, "%6d %s  %.7g / %s\n", k + 1, sbcd, ci.dipoles[j].value, lbl.c_str());
+            else
+                fprintf(luout, "%6d %s  %.7g\n", k + 1, sbcd, ci.dipoles[j].value);
+        }
+    }
+
+    /* 5. .VAR FILE TITLE line (from .var/fitted.toml) + timestamp */
+    strncpy(titl, ci.title.c_str(), NCARD - 27);
+    titl[NCARD - 27] = '\0';
+    chtime(titl, 82);
+    fputs(".VAR FILE TITLE :", luout);
+    fputs(titl, luout);
+
+    /* 6. PARAMETERS - A.PRIORI ERROR header */
+    for (int i = 0; i < 30; ++i) fputc(' ', luout);
+    fputs("PARAMETERS - A.PRIORI ERROR \n", luout);
+
+    /* 7. One row per parameter */
+    {
+        int ndbcd = cci.ndbcd;
+        int nd = ndbcd + ndbcd;
+        char sbcd[32];
+        int kfit = 0;
+        const double ermin = 1.0e-37;
+        double parbase = 1.0;
+        int npar = cci.npar;
+
+        for (int i = 0; i < npar; ++i) {
+            const bcd_t *id_slot = cci.idpar.data() + (size_t)i * ndbcd;
+            bool is_dep = (NEGBCD(id_slot[0]) != 0);
+            putbcd(sbcd, nd, id_slot);
+
+            double val = cci.par[i];   /* ratio for dep, absolute for indep */
+            double err = cci.derv[i];
+
+            const char *label = "";
+            if (i < (int)ci.parameters.size())
+                label = ci.parameters[i].label.c_str();
+
+            if (!is_dep) {
+                ++kfit;
+                parbase = val;
+                if (fabs(parbase) < ermin) parbase = ermin;
+                fprintf(luout, "%6d %6d %s %21.13E %15.6E %s\n",
+                        i + 1, kfit, sbcd, val, err, label);
+            } else {
+                double abs_val = val * parbase;
+                fprintf(luout, "%6d %6d %s %21.13E %15.6f %s\n",
+                        i + 1, kfit, sbcd, abs_val, val, label);
+            }
+        }
+        fprintf(luout, "%d parameters read, %d independent parameters\n", npar, kfit);
+    }
 }

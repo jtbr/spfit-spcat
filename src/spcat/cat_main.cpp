@@ -58,9 +58,10 @@ int main(int argc, char *argv[])
   // If "base.fitted.toml" exists, use the TOML path.
 
   char *base = file_helpers::base_name(fname[evar]);
-  std::string var_toml = base ? (std::string(base) + ".fitted.toml") : "";
-  std::string int_toml = base ? (std::string(base) + ".dipoles.toml") : "";
-  std::string cat_toml = base ? (std::string(base) + ".catalog.toml") : "";
+  std::string base_str  = base ? std::string(base) : "";
+  std::string var_toml  = base_str.empty() ? "" : (base_str + ".fitted.toml");
+  std::string int_toml  = base_str.empty() ? "" : (base_str + ".dipoles.toml");
+  std::string cat_toml  = base_str.empty() ? "" : (base_str + ".catalog.toml");
   free(base);
 
   // Also accept dipoles.toml derived from fname[eint]
@@ -95,10 +96,25 @@ int main(int argc, char *argv[])
       CalCatInput cci = build_cat_input(ci, *eng);
 
       FILE *luout_f = file_helpers::open_output(fname[eout], "w");
+      CalCatIO::write_cat_preamble(luout_f, ci, cci);
+
+      // Route .egy and .str to separate files if flags request it (matching legacy path)
+      int iflg_tmp = cci.iflg;
+      if (iflg_tmp >= 1000) iflg_tmp %= 1000;
+      iflg_tmp %= 100;
+      FILE *luegy_f = luout_f;
+      FILE *lustr_f = luout_f;
+      std::string egy_path = base_str.empty() ? "" : (base_str + ".egy");
+      std::string str_path = base_str.empty() ? "" : (base_str + ".str");
+      if (iflg_tmp >= 10 && !str_path.empty())
+        lustr_f = file_helpers::open_output(str_path.c_str(), "w");
+      if ((iflg_tmp % 10) != 0 && !egy_path.empty())
+        luegy_f = file_helpers::open_output(egy_path.c_str(), "w");
+
       FileSink luout_sink(luout_f);
       MemorySink lucat_sink;
-      FileSink   luegy_sink(luout_f);
-      FileSink   lustr_sink(luout_f);
+      FileSink   luegy_sink(luegy_f);
+      FileSink   lustr_sink(lustr_f);
 
       CalCatOutput output;
       {
@@ -109,6 +125,8 @@ int main(int argc, char *argv[])
 
       output.cat_lines = lucat_sink.drain_lines();
       output.sort_cat_lines();
+      if (luegy_f != luout_f) fclose(luegy_f);
+      if (lustr_f != luout_f) fclose(lustr_f);
       fclose(luout_f);
 
       save_cat_output_toml(output, cat_toml);

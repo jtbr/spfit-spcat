@@ -45,6 +45,7 @@ struct DipoleMoment {
     int64_t id = 0;                       // dipole identifier (decimal); builder BCD-packs it
     double  value = 0.0;                  // dipole moment (Debye)
     bool    starts_new_component = false; // true → NEGBCD flag on BCD id (new component group)
+    std::string label;                    // optional label (text after '/' in .int file)
 };
 
 // ── Engine options (SPINV) ─────────────────────────────────────────────────
@@ -146,7 +147,8 @@ struct FitInput {
 };
 
 struct CatInput {
-    std::string title;
+    std::string title;           // from .var/fitted.toml (Hamiltonian title)
+    std::string int_title;       // from .int/dipoles.toml (catalog title for .out line 1)
     bool extended_qn = false;        // true → catqn = MAXQN instead of MAXCAT
     CatControl control;
     std::vector<DipoleMoment> dipoles;

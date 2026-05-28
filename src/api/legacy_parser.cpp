@@ -470,10 +470,23 @@ CatInput parse_cat_files(const std::string &varFile,
         double val = 0.0;
         pcard(&cstr[kk], &val, 1, NULL);
 
+        // Extract optional label after '/'
+        std::string label;
+        const char *slash = strchr(&cstr[kk], '/');
+        if (slash) {
+            const char *lp = slash + 1;
+            while (*lp == ' ') ++lp;
+            label = lp;
+            // strip trailing whitespace
+            while (!label.empty() && (label.back() == ' ' || label.back() == '\n' || label.back() == '\r'))
+                label.pop_back();
+        }
+
         DipoleMoment dm;
         dm.id    = id;
         dm.value = val;
         dm.starts_new_component = negbcd && (li > 2);
+        dm.label = label;
         ci.dipoles.push_back(dm);
     }
 

@@ -356,6 +356,7 @@ NB_MODULE(_pickett, m)
         .def_rw("id",                   &DipoleMoment::id,                   "Dipole identifier (decimal)")
         .def_rw("value",                &DipoleMoment::value,                "Dipole moment (Debye)")
         .def_rw("starts_new_component", &DipoleMoment::starts_new_component, "True → NEGBCD flag (new component group)")
+        .def_rw("label",                &DipoleMoment::label,                "Optional label (text after '/' in .int file)")
         .def("__repr__", [repr_double](const DipoleMoment &d) {
             std::ostringstream oss;
             oss << "DipoleMoment(id=" << d.id
@@ -637,6 +638,7 @@ NB_MODULE(_pickett, m)
              "parameters"_a = std::vector<Parameter>{},
              "variance"_a = std::vector<double>{})
         .def_rw("title",          &CatInput::title)
+        .def_rw("int_title",     &CatInput::int_title, "Catalog title (from .int/dipoles.toml); used as .out line 1 in TOML mode")
         .def_rw("extended_qn",   &CatInput::extended_qn, "Use MAXQN QNs instead of MAXCAT")
         .def_rw("control",        &CatInput::control)
         .def_rw("dipoles",        &CatInput::dipoles)

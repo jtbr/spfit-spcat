@@ -276,10 +276,17 @@ def main_comparison(new_output_dir_name, ref_output_dir_name):
     return overall_summary['differs']
 
 if __name__ == "__main__":
-    REF_OUTPUT_DIR_NAME = "v2008_results"  # "reference_outputs"
+    REF_OUTPUT_DIR_NAME = "v2008_results"
 
-    if len(sys.argv) < 2:
-        print("Usage: compare_results.py <comparison_subdir> [baseline_reference_subdir]")
+    raw_args = sys.argv[1:]
+    if "--no-intermediates" in raw_args:
+        # TOML mode: .par/.var not produced; compare only .fit/.cat/.out
+        COMPARE_INTERMEDIATE_FILES = False
+        raw_args = [a for a in raw_args if a != "--no-intermediates"]
+
+    if len(raw_args) < 1:
+        print("Usage: compare_results.py [--no-intermediates] <comparison_subdir> [baseline_reference_subdir]")
+        print("  --no-intermediates  skip .par/.var comparison (use for TOML-path results)")
         sys.exit(1)
 
-    sys.exit(main_comparison(sys.argv[1], sys.argv[2] if len(sys.argv) > 2 else REF_OUTPUT_DIR_NAME ))
+    sys.exit(main_comparison(raw_args[0], raw_args[1] if len(raw_args) > 1 else REF_OUTPUT_DIR_NAME))
