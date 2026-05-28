@@ -2,7 +2,7 @@ CC=gcc
 CXX=g++
 #CFLAGS=-g -Od -Wall -Wextra  # debug
 #CFLAGS=-O3 -Wall  # optimized for distribution
-CFLAGS=-O3 -Wall -Wextra -march=native -ffp-contract=off -Isrc  # optimized for speed on current device (-Ofast is faster but math results may differ very slightly)
+CFLAGS=-O3 -Wall -Wextra -march=native -ffp-contract=off -Isrc -I.  # optimized for speed on current device (-Ofast is faster but math results may differ very slightly)
 CXXFLAGS=$(CFLAGS)
 EXEQ=spfit spcat calmrg  # dpcat and dpfit are optional variations to spcat and spfit respectively
 EXEA=${EXEQ} moiam stark termval sortn calbak reassign sortegy iambak iamcalc
@@ -32,7 +32,7 @@ clean:
 SPLIB_OBJFILES=ulib.o cnjj.o catutil.o lsqfit.o
 SPINV_OBJFILES=spinv_setup.o spinv_spin_symmetry.o spinv_linalg_sort.o spinv_hamiltonian.o spinv_utils.o
 CPP_HELPERS=file_helpers.o SigintFlag.o Logger.o
-OBJFILES=dpi.o spinit.o $(SPLIB_OBJFILES) $(SPINV_OBJFILES) SpinvEngine.o DpiEngine.o $(CPP_HELPERS) builders.o legacy_parser.o
+OBJFILES=dpi.o spinit.o $(SPLIB_OBJFILES) $(SPINV_OBJFILES) SpinvEngine.o DpiEngine.o $(CPP_HELPERS) builders.o legacy_parser.o toml_io.o
 spfit: fit_main.o CalFit.o CalFit_helpers.o CalFitIO.o subfit.o $(OBJFILES) $(LBLAS); g++ -o $@ $^ $(BLASLIB) -lm
 spcat: cat_main.o CalCat.o CalCat_helpers.o CalCatIO.o $(OBJFILES) $(LBLAS); g++ -o $@ $^ $(BLASLIB) -lm
 calmrg: calmrg.o $(CPP_HELPERS) splib.a; g++ -o $@ $^ $(BLASLIB) -lm
@@ -53,10 +53,10 @@ splib.a: ulib.o cnjj.o catutil.o lsqfit.o $(LBLAS)
 	ar r splib.a $^
 	ranlib splib.a
 
-fit_main.o: fit_main.cpp SpinvEngine.hpp DpiEngine.hpp CalFit.hpp CalFitIO.hpp lsqfit.h subfit.h CalError.hpp file_helpers.hpp SigintFlag.hpp
+fit_main.o: fit_main.cpp SpinvEngine.hpp DpiEngine.hpp CalFit.hpp CalFitIO.hpp lsqfit.h subfit.h CalError.hpp file_helpers.hpp SigintFlag.hpp toml_io.hpp
 subfit.o: subfit.cpp calpgm_types.h blas_compat.h ulib.h subfit.h CalError.hpp file_helpers.hpp
 lsqfit.o: lsqfit.c lsqfit.h cblas.h
-cat_main.o: cat_main.cpp calpgm_types.h SpinvEngine.hpp DpiEngine.hpp CalCat.hpp CalCatIO.hpp OutputSink.hpp ulib.h CalError.hpp file_helpers.hpp SigintFlag.hpp
+cat_main.o: cat_main.cpp calpgm_types.h SpinvEngine.hpp DpiEngine.hpp CalCat.hpp CalCatIO.hpp OutputSink.hpp ulib.h CalError.hpp file_helpers.hpp SigintFlag.hpp toml_io.hpp
 sortsub.o: sortsub.c calpgm_types.h sortsub.h
 calmrg.o: calmrg.cpp calpgm_types.h ulib.h catutil.h CalError.hpp file_helpers.hpp SigintFlag.hpp
 termval.o: termval.cpp calpgm_types.h ulib.h CalError.hpp file_helpers.hpp SigintFlag.hpp
@@ -93,5 +93,6 @@ CalCat_helpers.o: CalCat_helpers.cpp CalCat.hpp OutputSink.hpp CalculationEngine
 CalCatIO.o: CalCatIO.cpp CalCatIO.hpp CalCat.hpp OutputSink.hpp CalculationEngine.hpp calpgm_types.h ulib.h CalError.hpp file_helpers.hpp
 builders.o: builders.cpp builders.hpp InputSchema.hpp CalFit.hpp CalCat.hpp CalculationEngine.hpp ulib.h calpgm_types.h lsqfit.h CalError.hpp Logger.hpp
 legacy_parser.o: legacy_parser.cpp legacy_parser.hpp InputSchema.hpp builders.hpp ulib.h calpgm_types.h CalError.hpp
+toml_io.o: toml_io.cpp toml_io.hpp InputSchema.hpp CalFit.hpp CalCat.hpp CalError.hpp
 fit_example.o: fit_example.cpp SpinvEngine.hpp CalFit.hpp CalFitIO.hpp CalError.hpp Logger.hpp
 cat_example.o: cat_example.cpp SpinvEngine.hpp CalCat.hpp CalCatIO.hpp OutputSink.hpp CalError.hpp Logger.hpp

@@ -605,6 +605,7 @@ NB_MODULE(_pickett, m)
         .def_rw("parameters",       &FitInput::parameters)
         .def_rw("variance",         &FitInput::variance,         "Packed upper-triangular variance matrix")
         .def_rw("lines",            &FitInput::lines)
+        .def_rw("raw_lines",        &FitInput::raw_lines,        "Raw .lin-format line strings (from parse_fit_files; alternative to `lines`)")
         .def("__repr__", [repr_string](const FitInput &fi) {
             std::ostringstream oss;
             oss << "FitInput(title=" << repr_string(fi.title)
@@ -636,6 +637,7 @@ NB_MODULE(_pickett, m)
              "parameters"_a = std::vector<Parameter>{},
              "variance"_a = std::vector<double>{})
         .def_rw("title",          &CatInput::title)
+        .def_rw("extended_qn",   &CatInput::extended_qn, "Use MAXQN QNs instead of MAXCAT")
         .def_rw("control",        &CatInput::control)
         .def_rw("dipoles",        &CatInput::dipoles)
         .def_rw("engine_options", &CatInput::engine_options)

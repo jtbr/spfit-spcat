@@ -523,3 +523,80 @@ bool CalFitIO::writeOutput(const std::string &par_filepath_final,
   printf("Output files %s and %s written successfully.\n", par_filepath_final.c_str(), var_filepath_final.c_str());
   return true;
 }
+
+void CalFitIO::write_fit_preamble(FILE *lufit, const CalFitInput &input)
+{
+  if (!lufit) return;
+
+  // Title line (first line of .par in legacy mode)
+  if (!input.title.empty())
+    fputs(input.title.c_str(), lufit);
+
+  // Optional parfac scaling notice
+  if (fabs(input.parfac_initial - 1.0) > 1e-10)
+  {
+    fprintf(lufit, "PARAMETER ERRORS SCALED BY %15.6f", fabs(input.parfac_initial));
+    if (input.parfac_initial < 0.0)
+      fputs(" times the standard error", lufit);
+    fputc('\n', lufit);
+  }
+
+  // LINES REQUESTED / MARQUARDT summary (same format as CalFitIO::readInput)
+  fprintf(lufit, "LINES REQUESTED=%5lu NUMBER OF PARAMETERS=%3d NUMBER OF ITERATIONS=%3d\n",
+          (unsigned long)input.limlin, input.npar, input.nitr);
+  fprintf(lufit, "  MARQUARDT PARAMETER =%11.4E max (OBS-CALC)/ERROR =%10.4E\n",
+          input.marqp0, input.xerrmx);
+
+  // PARAMETERS - A.PRIORI ERROR section (mirrors getpar output in ulib.c)
+  int ndbcd = input.ndbcd_from_setopt;
+  if (ndbcd <= 0 || input.npar <= 0) return;
+
+  int nd = ndbcd * 2;
+  char *sbcd = (char *)malloc((size_t)nd + 1);
+  if (!sbcd) return;
+  sbcd[nd] = '\0';
+
+  for (int i = 0; i < 30; ++i) fputc(' ', lufit);
+  fputs("PARAMETERS - A.PRIORI ERROR \n", lufit);
+
+  int kfit = 0;
+  double parbase = 1.0;
+  const double ermin = 1.0e-37;
+  int ibcd = 0;
+
+  for (int i = 0; i < input.npar; ++i, ibcd += ndbcd)
+  {
+    const bcd_t *pid = input.idpar_data.data() + ibcd;
+    putbcd(sbcd, nd, pid);
+
+    double val = (i < (int)input.par_initial.size()) ? input.par_initial[i] : 0.0;
+    double err = (i < (int)input.erp_initial.size()) ? input.erp_initial[i] : ermin;
+
+    bool is_positive = (NEGBCD(*pid) == 0);
+    if (is_positive) ++kfit;
+
+    char lbl[LBLEN + 1] = {};
+    if (!input.parlbl_data_flat.empty())
+      strncpy(lbl, input.parlbl_data_flat.data() + (size_t)i * LBLEN, LBLEN);
+
+    if (is_positive)
+    {
+      // val IS the raw parameter value; write it, then the error.
+      if (err < ermin) err = ermin;
+      fprintf(lufit, "%6d %6d %s %21.13E %15.6E %s\n", i + 1, kfit, sbcd, val, err, lbl);
+      parbase = val;
+      if (fabs(parbase) < ermin) parbase = ermin;
+    }
+    else
+    {
+      // For negative-BCD params, par_initial[i] holds the SCALED value (val/parbase
+      // was applied by getpar when reading the .par file).  Reconstruct the raw value
+      // that getpar would have written in the first numeric column.
+      double raw = val * parbase;
+      fprintf(lufit, "%6d %6d %s %21.13E %15.6f %s\n", i + 1, kfit, sbcd, raw, val, lbl);
+    }
+  }
+
+  fprintf(lufit, "%d parameters read, %d independent parameters\n", input.npar, kfit);
+  free(sbcd);
+}

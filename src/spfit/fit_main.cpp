@@ -66,8 +66,6 @@ int main(int argc, char *argv[])
   }
 
   Logger &logger = Logger::defaultLogger();
-  logger.info("Using %s engine.", engineType.c_str());
-
   file_helpers::parse_file_args(argc, argv, NFILE, fname, ext);
 
   // ── TOML mode: mol.toml present ──────────────────────────────────────────
@@ -81,6 +79,14 @@ int main(int argc, char *argv[])
   free(base);
 
   bool toml_mode = !toml_in.empty() && file_helpers::file_exists(toml_in.c_str());
+
+  logger.info("Using %s engine, %s mode.", engineType.c_str(), toml_mode ? "TOML" : "legacy");
+  if (toml_mode) {
+    if (file_helpers::file_exists(fname[epar]))
+      logger.warn("TOML mode active but legacy file %s also present (ignored).", fname[epar]);
+    if (file_helpers::file_exists(fname[elin]))
+      logger.warn("TOML mode active but legacy file %s also present (ignored).", fname[elin]);
+  }
 
   if (toml_mode) {
     // ── TOML path ─────────────────────────────────────────────────────────
@@ -101,6 +107,7 @@ int main(int argc, char *argv[])
       if (engineType == "spinv") fi.engine_options.kind = EngineOptions::Kind::Spinv;
 
       CalFitInput ci = build_fit_input(fi, *eng);
+      CalFitIO::write_fit_preamble(lufit, ci);
       CalFit calFit(eng, lufit, logger);
       CalFitOutput output;
       SigintFlag sigint_guard;

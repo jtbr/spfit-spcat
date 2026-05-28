@@ -41,6 +41,16 @@ public:
    * @param output Output data to write
    * @return True if writing is successful, false otherwise
    */
+  /**
+   * @brief Write the pre-fit header section to the .fit file.
+   *
+   * Replicates the header written by readInput in the legacy path: title line,
+   * optional parfac scaling notice, "LINES REQUESTED" summary, and the
+   * "PARAMETERS - A.PRIORI ERROR" section with one line per parameter.
+   * Call this from the TOML path before CalFit::run().
+   */
+  static void write_fit_preamble(FILE *lufit, const CalFitInput &input);
+
   static bool writeOutput(const std::string &par_filepath_final,
                           const std::string &bak_filepath_original,
                           const std::string &var_filepath_final,

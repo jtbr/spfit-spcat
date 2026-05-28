@@ -275,7 +275,7 @@ CalCatInput build_cat_input(const CatInput &ci, CalculationEngine &eng, Logger &
     input.tmq    = cc.tmq;
     input.maxv   = cc.maxv;
     input.npar   = npar;
-    input.catqn  = MAXCAT;
+    input.catqn  = ci.extended_qn ? MAXQN : MAXCAT;
 
     int temp_nfmt  = input.catqn;
     int temp_itd   = 2;

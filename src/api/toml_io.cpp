@@ -269,7 +269,13 @@ FitInput load_fit_input_toml(const std::string &path)
                 fi.variance.push_back(*el);
         });
     }
-    if (auto *la = tbl["lines"].as_array()) {
+    // raw_lines: raw .lin text (from legacy round-trip); prefer over lines when present
+    if (auto *la = tbl["raw_lines"].as_array()) {
+        la->for_each([&](auto &&el) {
+            if constexpr (toml::is_string<decltype(el)>)
+                fi.raw_lines.push_back(*el);
+        });
+    } else if (auto *la = tbl["lines"].as_array()) {
         la->for_each([&](auto &&el) {
             if constexpr (toml::is_table<decltype(el)>)
                 fi.lines.push_back(line_record_from_toml(*el.as_table()));
@@ -286,7 +292,9 @@ CatInput load_cat_input_toml(const std::string &var_path, const std::string &int
     const toml::table &int_tbl = require_table(int_result, int_path);
 
     CatInput ci;
-    ci.title = var_tbl["title"].value_or(std::string{});
+    ci.title       = var_tbl["title"].value_or(std::string{});
+    ci.int_title   = int_tbl["title"].value_or(std::string{});
+    ci.extended_qn = var_tbl["extended_qn"].value_or(false);
 
     if (auto *et = var_tbl["engine_options"].as_table())
         ci.engine_options = engine_options_from_toml(*et);
@@ -322,13 +330,29 @@ void save_fit_output_toml(const CalFitOutput &out, const FitInput &src_fi,
     tbl.insert("title",   src_fi.title);
     tbl.insert("xsqbest", out.xsqbest);
     tbl.insert("itr",     (int64_t)out.itr);
+    if (src_fi.extended_qn) tbl.insert("extended_qn", true);
     tbl.insert("engine_options", engine_options_to_toml(src_fi.engine_options));
 
     toml::array params_arr;
     size_t n = std::min({src_fi.parameters.size(), out.par.size(), out.erpar.size()});
-    for (size_t i = 0; i < n; ++i)
-        params_arr.push_back(var_parameter_to_toml(src_fi.parameters[i],
-                                                   out.par[i], out.erpar[i]));
+    int last_independent = -1;
+    for (size_t i = 0; i < n; ++i) {
+        const Parameter &p = src_fi.parameters[i];
+        bool is_dep = (p.fixed || p.a_priori_error < 0.0);
+
+        double fitted_val = out.par[i];
+        double err        = out.erpar[i];
+        if (is_dep && last_independent >= 0) {
+            // out.par[i] is a ratio; reconstruct absolute = ratio × fitted master.
+            // Mirrors CalFitIO::writeOutput's dependent-param reconstruction.
+            fitted_val = out.par[i] * out.par[(size_t)last_independent];
+            err        = std::fabs(out.par[i]) * out.erpar[(size_t)last_independent];
+        }
+        if (!is_dep)
+            last_independent = (int)i;
+
+        params_arr.push_back(var_parameter_to_toml(p, fitted_val, err));
+    }
     tbl.insert("parameters", std::move(params_arr));
 
     if (!out.var_final_for_output.empty()) {

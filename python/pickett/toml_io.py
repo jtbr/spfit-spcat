@@ -28,8 +28,6 @@ else:
                 "Python < 3.11 requires 'tomli' for TOML reading: pip install tomli"
             ) from exc
 
-import tomli_w
-
 from ._pickett import (
     FitInput,
     CatInput,
@@ -305,7 +303,11 @@ def fit_input_to_dict(fi: FitInput) -> dict:
     d["parameters"] = [_parameter_to_dict(p) for p in fi.parameters]
     if fi.variance:
         d["variance"] = list(fi.variance)
-    d["lines"] = [_line_record_to_dict(lr) for lr in fi.lines]
+    # raw_lines (from parse_fit_files legacy round-trip) takes precedence over parsed lines
+    if fi.raw_lines:
+        d["raw_lines"] = list(fi.raw_lines)
+    else:
+        d["lines"] = [_line_record_to_dict(lr) for lr in fi.lines]
     return d
 
 
@@ -325,7 +327,12 @@ def fit_input_from_dict(d: dict) -> FitInput:
         fi.engine_options = _engine_options_from_dict(d["engine_options"])
     fi.parameters = [_parameter_from_dict(p) for p in d.get("parameters", [])]
     fi.variance   = [float(v) for v in d.get("variance", [])]
-    fi.lines      = [_line_record_from_dict(lr) for lr in d.get("lines", [])]
+    # raw_lines (from legacy round-trip) takes precedence; otherwise use parsed lines
+    raw = d.get("raw_lines", [])
+    if raw:
+        fi.raw_lines = list(raw)
+    else:
+        fi.lines = [_line_record_from_dict(lr) for lr in d.get("lines", [])]
     return fi
 
 
@@ -354,10 +361,23 @@ def fit_output_to_dict(out: CalFitOutput, fi: FitInput) -> dict:
         "xsqbest": out.xsqbest,
         "itr": out.itr,
     }
+    if fi.extended_qn:
+        d["extended_qn"] = True
     d["engine_options"] = _engine_options_to_dict(fi.engine_options)
 
     params_out = []
-    for p, val, err in zip(fi.parameters, out.par, out.erpar):
+    last_independent = -1
+    for i, (p, raw_val, raw_err) in enumerate(zip(fi.parameters, out.par, out.erpar)):
+        is_dep = p.fixed or p.a_priori_error < 0.0
+        if is_dep and last_independent >= 0:
+            # out.par[i] is a ratio; reconstruct absolute = ratio × fitted master.
+            # Mirrors CalFitIO::writeOutput's dependent-param reconstruction.
+            val = raw_val * out.par[last_independent]
+            err = abs(raw_val) * out.erpar[last_independent]
+        else:
+            val, err = raw_val, raw_err
+        if not is_dep:
+            last_independent = i
         pd: dict = {"id": p.id, "value": val, "error": err}
         if p.fixed:
             pd["fixed"] = True
@@ -404,7 +424,9 @@ def load_cat_input(var_path: PathLike, int_path: PathLike) -> CatInput:
         int_d = tomllib.load(f)
 
     ci = CatInput()
-    ci.title = str(var_d.get("title", ""))
+    ci.title     = str(var_d.get("title", ""))
+    ci.int_title = str(int_d.get("title", ""))
+    ci.extended_qn = bool(var_d.get("extended_qn", False))
     if "engine_options" in var_d:
         ci.engine_options = _engine_options_from_dict(var_d["engine_options"])
     ci.parameters = [_var_parameter_from_dict(p) for p in var_d.get("parameters", [])]
@@ -414,13 +436,84 @@ def load_cat_input(var_path: PathLike, int_path: PathLike) -> CatInput:
     return ci
 
 
+def _toml_scalar(v: object) -> str:
+    """Render a scalar value as a TOML literal."""
+    if isinstance(v, bool):
+        return "true" if v else "false"
+    if isinstance(v, int):
+        return str(v)
+    if isinstance(v, float):
+        if v != v:  # NaN
+            return "nan"
+        return repr(v)
+    if isinstance(v, str):
+        escaped = v.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n").replace("\r", "\\r")
+        return f'"{escaped}"'
+    raise TypeError(f"_toml_scalar: unsupported type {type(v)}")
+
+
+def _toml_inline_table(d: dict) -> str:
+    """Render a dict as a TOML inline table {k = v, ...}."""
+    parts = []
+    for k, v in d.items():
+        if isinstance(v, (dict, list)):
+            raise TypeError(f"_toml_inline_table: nested containers not supported for key '{k}'")
+        parts.append(f"{k} = {_toml_scalar(v)}")
+    return "{" + ", ".join(parts) + "}"
+
+
+def _toml_dumps(d: dict, prefix: str = "") -> str:
+    """Minimal TOML serializer for nested dicts with scalar/list/dict values.
+
+    Supports: scalars, lists of scalars, lists of dicts (→ [[table]] arrays),
+    and nested dicts (→ [table] sections). No inline-table nesting.
+    """
+    lines: list[str] = []
+    deferred_sections: list[tuple[str, object]] = []
+
+    for key, val in d.items():
+        full_key = f"{prefix}.{key}" if prefix else key
+        if isinstance(val, dict):
+            deferred_sections.append((full_key, val))
+        elif isinstance(val, list) and val and isinstance(val[0], dict):
+            deferred_sections.append((full_key, val))
+        elif isinstance(val, list):
+            if val and isinstance(val[0], dict):
+                deferred_sections.append((full_key, val))
+            else:
+                items = ", ".join(_toml_scalar(item) for item in val)
+                lines.append(f"{key} = [{items}]")
+        else:
+            lines.append(f"{key} = {_toml_scalar(val)}")
+
+    result = "\n".join(lines)
+    if lines and deferred_sections:
+        result += "\n"
+
+    for full_key, val in deferred_sections:
+        if isinstance(val, dict):
+            result += f"\n[{full_key}]\n"
+            result += _toml_dumps(val, full_key)
+        else:  # list of dicts
+            for item in val:
+                result += f"\n[[{full_key}]]\n"
+                result += _toml_dumps(item, full_key)
+
+    return result
+
+
+def _toml_dump(d: dict, f: object) -> None:
+    """Write dict as TOML to a binary file object."""
+    f.write(_toml_dumps(d).encode())  # type: ignore[union-attr]
+
+
 def save_fit_output(out: CalFitOutput, fi: FitInput, path: PathLike) -> None:
     """Write CalFitOutput → mol.fitted.toml."""
     with open(path, "wb") as f:
-        tomli_w.dump(fit_output_to_dict(out, fi), f)
+        _toml_dump(fit_output_to_dict(out, fi), f)
 
 
 def save_cat_output(out: CalCatOutput, path: PathLike) -> None:
     """Write CalCatOutput → mol.catalog.toml."""
     with open(path, "wb") as f:
-        tomli_w.dump(cat_output_to_dict(out), f)
+        _toml_dump(cat_output_to_dict(out), f)

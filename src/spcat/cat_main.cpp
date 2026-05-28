@@ -72,6 +72,14 @@ int main(int argc, char *argv[])
   bool toml_mode = !var_toml.empty() && file_helpers::file_exists(var_toml.c_str())
                 && !int_toml.empty() && file_helpers::file_exists(int_toml.c_str());
 
+  fprintf(stderr, "Using %s engine, %s mode.\n", engineType.c_str(), toml_mode ? "TOML" : "legacy");
+  if (toml_mode) {
+    if (file_helpers::file_exists(fname[evar]))
+      fprintf(stderr, "WARNING: TOML mode active but legacy file %s also present (ignored).\n", fname[evar]);
+    if (file_helpers::file_exists(fname[eint]))
+      fprintf(stderr, "WARNING: TOML mode active but legacy file %s also present (ignored).\n", fname[eint]);
+  }
+
   if (toml_mode) {
     // ── TOML path ─────────────────────────────────────────────────────────
     try {

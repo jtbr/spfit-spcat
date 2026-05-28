@@ -149,6 +149,8 @@ This document outlines the prioritized tasks for modernizing the SPFIT/SPCAT sof
     - `MAXQN` is currently 10, matching the Pickett catalog format specification. Changing it would break compatibility with existing catalogs and tools.
     - A better approach may be to support extended formats through new code paths (e.g., a wider output format option) rather than changing the constant.
     - Relevant code: `calpgm_types.h` (MAXQN), `spinv_utils.cpp:getqn`, `CalFit_helpers.cpp:getblk`, `CalCat.cpp:computeCatalog`.
+    - Consider whether any other limitations stemming from the legacy file format should be loosened when using the toml format files
+
 ## Build & Test
 
 ```bash

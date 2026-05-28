@@ -147,6 +147,7 @@ struct FitInput {
 
 struct CatInput {
     std::string title;
+    bool extended_qn = false;        // true → catqn = MAXQN instead of MAXCAT
     CatControl control;
     std::vector<DipoleMoment> dipoles;
     EngineOptions engine_options;

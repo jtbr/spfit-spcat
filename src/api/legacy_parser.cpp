@@ -489,9 +489,7 @@ CatInput parse_cat_files(const std::string &varFile,
     {
         double dvec[2] = {0, 1};
         pcard(var_lines[1].c_str(), dvec, 2, NULL);
-        if (dvec[1] < 0.0) {
-            // Extended QN flag (negative second field)
-        }
+        ci.extended_qn = (dvec[1] < 0.0);
         // npar is informational; we read however many lines are present
     }
 

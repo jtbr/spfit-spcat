@@ -98,15 +98,15 @@ See [API.md](API.md) for full C++ and Python API documentation.
 
 ## Documentation and Getting Started
 
-There is a very useful set of notes and usage information available [here](http://info.ifpan.edu.pl/~kisiel/asym/pickett/crib.htm).
-
 To get started, you'll need to reference the full documentation explaining inputs and outputs for each of the programs:
  - [SPCAT and SPFIT](spinv.md)
  - [DPFIT and DPCAT](dpi.md)
 
 These are conversions of the original PDF-format documentation into markdown format; this was not trivial so in case of doubt, refer to the originals and please report any mistakes.
 
-There is also a separate [python wrapper](https://github.com/Ltotheois/Pyckett) available for the original tools.
+There is a very useful set of notes and usage information for the original library available [here](http://info.ifpan.edu.pl/~kisiel/asym/pickett/crib.htm).
+
+There is also a separate [python wrapper](https://github.com/Ltotheois/Pyckett) available for the original tools which should still work with the legacy-format mode of these executables.
 
 
 ## Source Layout
@@ -140,7 +140,7 @@ src/
                  iamcalc.cpp, iambak.cpp
 ```
 
-`third_party/tomlplusplus/toml.hpp` — vendored [toml++](https://github.com/marzer/tomlplusplus) v3.4.0 single-header, used by `src/api/toml_io.cpp` and (transitively) by the CLI executables.
+`third_party/tomlplusplus/toml.hpp` — third party [toml++](https://github.com/marzer/tomlplusplus) v3.4.0 single-header, used by `src/api/toml_io.cpp` and (transitively) by the CLI executables.
 
 **Key files:**
 
@@ -190,7 +190,7 @@ We claim no rights to the original code.
 ## Coding Note
 
 This modernization project began as an experiment to test coding assistants handling legacy code and porting to different languages.
-It has served as a good test of the limits of current AI, particularly given the large code-base size and complexity of monolithic code.
+It has served as a good test of the changing limits of current AI, particularly given the large code-base size and complexity of monolithic code.
 Initially, leading LLMs and agents could often give reasonable feedback, but struggled to complete tasks correctly, often gave poor suggestions or changed things unnecessarily and frequently got into coding/debugging loops from which they couldn't escape. I often needed to step in and do things correctly or interrupt and redirect.
 Managing context has been and remains an issue (though it is much easier with now-smaller file sizes). But LLMs and agents have developed
 impressively over the last year (Spring 2025 to Spring 2026), to the point where they are much more able to correctly complete large and complex tasks, to include debugging well-obscured bugs, nearly without correction. It has been a fruitful experiment. Hopefully the result will also prove useful.

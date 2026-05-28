@@ -1,3 +1,4 @@
+#include <cmath>
 #include <cstring>
 #include <cstdlib>
 #include <cstdio>
@@ -185,18 +186,38 @@ static std::string make_spinv_cards(const SpinvOptions &so)
     std::ostringstream oss;
     int nvib = (int)so.vibs.size();
 
-    for (int i = 0; i < nvib; ++i) {
+    // Trailing all-default VibStates arise when the original .par had fewer cards
+    // than nvib (legacy_parser fills the remainder with VibState() defaults).
+    // Emitting a card for them would switch setopt from its single-card path
+    // (which handles multi-vib weight distribution via vsym) to the multi-card
+    // path, breaking the weight setup for molecules like ch3oh.
+    auto vib_is_all_default = [](const VibState &v) {
+        return v.spin_degeneracies.empty()
+            && v.knmin == 0
+            && v.knmax == 359
+            && v.iwtpl == 1
+            && v.iwtmn == 1
+            && std::fabs(v.vsym) < 0.5
+            && v.esym_weight == 99
+            && v.stat_weight_axis == 1
+            && !v.symmetric_rotor_quanta;
+    };
+    int last_card = nvib - 1;
+    while (last_card > 0 && vib_is_all_default(so.vibs[last_card]))
+        --last_card;
+
+    for (int i = 0; i <= last_card; ++i) {
         const VibState &vib = so.vibs[i];
-        bool is_last = (i == nvib - 1);
+        bool is_last = (i == last_card);
 
         std::string spin = encode_spinv_spin(vib);
 
-        // lopt: card 1 → ±nvib; subsequent cards → vib state index
+        // lopt: card 1 → ±nvib (total vib states, not cards); subsequent cards → vib state index
         int lopt;
         if (i == 0)
             lopt = so.oblate ? -nvib : nvib;
         else
-            lopt = vib.index;
+            lopt = i;
 
         // vsym: intermediate cards must be < -0.5 (loop-continue signal).
         // Last card: user value clamped to >= -0.4 so it doesn't continue the loop.
