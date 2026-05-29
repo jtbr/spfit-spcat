@@ -18,7 +18,11 @@ extern "C" {
 
 typedef unsigned char bcd_t;
 
+#ifdef __cplusplus
+} // end extern "C"
+
 /* Function Declarations */
+/* All defined in dpi.cpp — may throw C++ exceptions; use C++ linkage */
 struct DpiContext;
 
 /* Public interface functions, formerly in calpgm.h, now encapsulated in SpinvEngine */
@@ -38,8 +42,6 @@ int setfmt_dpi(struct DpiContext *ctx, /*@out@*/ int *iqnfmt, int nfmt);
 int setblk_dpi(struct DpiContext *ctx, FILE *lu, const int npar, bcd_t *idpar, const double *par,
                int *nblkpf, int *negy);
 
-#ifdef __cplusplus
-} // end extern "C"
-#endif
+#endif /* __cplusplus */
 
 #endif /* _DPI_H_ */

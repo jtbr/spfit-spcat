@@ -37,10 +37,9 @@ static VibState vib_from_toml(const toml::table &t)
     if (auto x = t["esym_weight"].value<int64_t>()) v.esym_weight = (int)*x;
     if (auto x = t["symmetric_rotor_quanta"].value<bool>()) v.symmetric_rotor_quanta = *x;
     if (auto *arr = t["spin_degeneracies"].as_array()) {
-        arr->for_each([&](auto &&el) {
-            if constexpr (toml::is_integer<decltype(el)>)
-                v.spin_degeneracies.push_back((int)*el);
-        });
+        for (auto &elem : *arr)
+            if (auto *iv = elem.as_integer())
+                v.spin_degeneracies.push_back((int)iv->get());
     }
     return v;
 }
@@ -73,10 +72,9 @@ static SpinvOptions spinv_from_toml(const toml::table &t)
     if (auto x = t["oblate"].value<bool>())             s.oblate = *x;
     if (auto x = t["nam_file"].value<std::string>())    s.nam_file = *x;
     if (auto *arr = t["vibs"].as_array()) {
-        arr->for_each([&](auto &&el) {
-            if constexpr (toml::is_table<decltype(el)>)
-                s.vibs.push_back(vib_from_toml(*el.as_table()));
-        });
+        for (auto &elem : *arr)
+            if (auto *tb = elem.as_table())
+                s.vibs.push_back(vib_from_toml(*tb));
     }
     return s;
 }
@@ -177,11 +175,9 @@ static LineRecord line_record_from_toml(const toml::table &t)
     LineRecord lr;
     if (auto *arr = t["qn"].as_array()) {
         int i = 0;
-        arr->for_each([&](auto &&el) {
-            if constexpr (toml::is_integer<decltype(el)>) {
-                if (i < (int)lr.qn.size()) lr.qn[(size_t)i++] = (int)*el;
-            }
-        });
+        for (auto &elem : *arr)
+            if (auto *iv = elem.as_integer())
+                if (i < (int)lr.qn.size()) lr.qn[(size_t)i++] = (int)iv->get();
     }
     if (auto x = t["nqn"].value<int64_t>()) lr.nqn = (int)*x;
     if (auto x = t["freq"].value<double>()) lr.freq = *x;
@@ -259,28 +255,24 @@ FitInput load_fit_input_toml(const std::string &path)
         fi.engine_options = engine_options_from_toml(*et);
 
     if (auto *pa = tbl["parameters"].as_array()) {
-        pa->for_each([&](auto &&el) {
-            if constexpr (toml::is_table<decltype(el)>)
-                fi.parameters.push_back(parameter_from_toml(*el.as_table()));
-        });
+        for (auto &elem : *pa)
+            if (auto *tb = elem.as_table())
+                fi.parameters.push_back(parameter_from_toml(*tb));
     }
     if (auto *va = tbl["variance"].as_array()) {
-        va->for_each([&](auto &&el) {
-            if constexpr (toml::is_floating_point<decltype(el)>)
-                fi.variance.push_back(*el);
-        });
+        for (auto &elem : *va)
+            if (auto *fv = elem.as_floating_point())
+                fi.variance.push_back(fv->get());
     }
     // raw_lines: raw .lin text (from legacy round-trip); prefer over lines when present
     if (auto *la = tbl["raw_lines"].as_array()) {
-        la->for_each([&](auto &&el) {
-            if constexpr (toml::is_string<decltype(el)>)
-                fi.raw_lines.push_back(*el);
-        });
+        for (auto &elem : *la)
+            if (auto *sv = elem.as_string())
+                fi.raw_lines.push_back(sv->get());
     } else if (auto *la = tbl["lines"].as_array()) {
-        la->for_each([&](auto &&el) {
-            if constexpr (toml::is_table<decltype(el)>)
-                fi.lines.push_back(line_record_from_toml(*el.as_table()));
-        });
+        for (auto &elem : *la)
+            if (auto *tb = elem.as_table())
+                fi.lines.push_back(line_record_from_toml(*tb));
     }
     return fi;
 }
@@ -301,25 +293,22 @@ CatInput load_cat_input_toml(const std::string &var_path, const std::string &int
         ci.engine_options = engine_options_from_toml(*et);
 
     if (auto *pa = var_tbl["parameters"].as_array()) {
-        pa->for_each([&](auto &&el) {
-            if constexpr (toml::is_table<decltype(el)>)
-                ci.parameters.push_back(var_parameter_from_toml(*el.as_table()));
-        });
+        for (auto &elem : *pa)
+            if (auto *tb = elem.as_table())
+                ci.parameters.push_back(var_parameter_from_toml(*tb));
     }
     if (auto *va = var_tbl["variance"].as_array()) {
-        va->for_each([&](auto &&el) {
-            if constexpr (toml::is_floating_point<decltype(el)>)
-                ci.variance.push_back(*el);
-        });
+        for (auto &elem : *va)
+            if (auto *fv = elem.as_floating_point())
+                ci.variance.push_back(fv->get());
     }
 
     if (auto *ct = int_tbl["control"].as_table())
         ci.control = cat_control_from_toml(*ct);
     if (auto *da = int_tbl["dipoles"].as_array()) {
-        da->for_each([&](auto &&el) {
-            if constexpr (toml::is_table<decltype(el)>)
-                ci.dipoles.push_back(dipole_from_toml(*el.as_table()));
-        });
+        for (auto &elem : *da)
+            if (auto *tb = elem.as_table())
+                ci.dipoles.push_back(dipole_from_toml(*tb));
     }
     return ci;
 }

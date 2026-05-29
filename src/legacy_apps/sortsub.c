@@ -46,7 +46,7 @@ BOOL dokey;
   if (nline <= 0) {
     free(buf0); free(key); return 1;
   }
-  ntot = strlen(buf0); ndline = ntot + 1;
+  ntot = (int)strlen(buf0); ndline = ntot + 1;
   if (ndline < 81)
     ndline = 81;
   if (!dokey) {
@@ -132,7 +132,7 @@ int nlim;
   for (;;) {
     if (fgets(tbuf, ndline, finp) == NULL)
       break;
-    i = strlen(tbuf) - 1;
+    i = (int)strlen(tbuf) - 1;
     if (tbuf[i] == '\n') {
       tbuf[i] = '\0';
     } else {

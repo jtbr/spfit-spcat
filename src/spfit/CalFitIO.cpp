@@ -136,8 +136,8 @@ bool CalFitIO::readInput(const std::string &parFile, const std::string &linFile,
       fputc('\n', lufit_for_logging);
     }
 
-    printf(                    "LINES REQUESTED=%5lu NUMBER OF PARAMETERS=%3d", input.limlin, input.npar);
-    fprintf(lufit_for_logging, "LINES REQUESTED=%5lu NUMBER OF PARAMETERS=%3d", input.limlin, input.npar);
+    printf(                    "LINES REQUESTED=%5zu NUMBER OF PARAMETERS=%3d", input.limlin, input.npar);
+    fprintf(lufit_for_logging, "LINES REQUESTED=%5zu NUMBER OF PARAMETERS=%3d", input.limlin, input.npar);
     printf(                    " NUMBER OF ITERATIONS=%3d\n  MARQUARDT PARAMETER =", input.nitr);
     fprintf(lufit_for_logging, " NUMBER OF ITERATIONS=%3d\n  MARQUARDT PARAMETER =", input.nitr);
     printf(                    "%11.4E max (OBS-CALC)/ERROR =%10.4E\n", input.marqp0, input.xerrmx);

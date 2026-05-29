@@ -152,6 +152,24 @@ typedef struct {   /* Cached data for getqn function to speed up repeated calls 
 } GETQN;
 
 /* Function Declarations */
+
+/* internal functions defined in spinv_linalg_sort.c — keep C linkage */
+int dclr(const int n1, const int n2, double *vec, const int ix);
+int ordham(const int nn, short *mask, double *egy, const short *isblk,
+                  short *iswap);
+int fixham(const int ndm, const int nn, double *t, double *egy,
+                  double *p, const short *iswap);
+BOOL kroll(const int nsizd, double *t, const int nsblk,
+                  const short *sbkptr, const short *kmin);
+int bestk(const int ndm, const int nsize, short *iqnsep, short *ibkptr,
+                  short *itau, short *idx, double *t, double *egy, double *pmix,
+                  double *wk);
+
+#ifdef __cplusplus
+} // end extern "C"
+
+/* All remaining engine functions are defined in .cpp files and may throw C++
+   exceptions — declared with C++ linkage so MSVC does not treat them as noexcept. */
 struct SpinvContext;
 
 /* Public interface functions, formerly in calpgm.h, now encapsulated in SpinvEngine */
@@ -172,8 +190,6 @@ int setblk(struct SpinvContext *ctx, FILE *lu, const int npar, bcd_t *idpar, con
            int *nblkpf, int *negy);
 
 /* internal functions */
-
-int dclr(const int n1, const int n2, double *vec, const int ix);
 int specop(const int neuler, BOOL *newblk, int *nsqj, int *ikq,
                   const int ksi, const int ksj, const int ni, const int nj,
                   const int ncos, double *wk, const short *ix,
@@ -188,15 +204,6 @@ int sznzop(struct SpinvContext* ctx, const int ni, const int nj, const int ksi, 
                   const int *iscom, const int *jscom, const int ncos,
                   double *wk, const short *ix, const short *jx);
 unsigned int blksym(const int *ixcom, const int *jxcom);
-int ordham(const int nn, short *mask, double *egy, const short *isblk,
-                  short *iswap);
-int fixham(const int ndm, const int nn, double *t, double *egy,
-                  double *p, const short *iswap);
-BOOL kroll(const int nsizd, double *t, const int nsblk,
-                  const short *sbkptr, const short *kmin);
-int bestk(const int ndm, const int nsize, short *iqnsep, short *ibkptr,
-                  short *itau, short *idx, double *t, double *egy, double *pmix,
-                  double *wk);
 int getqs(struct SpinvContext* ctx, const int mvs, const int iff, const int nsiz, const int kbgn,
                   int *ixcom, /*@out@*/ int *iscom, /*@out@*/ int *iv);
 int idpars(SPAR * pspar, /*@out@*/ int *ksq, /*@out@*/ int *itp,
@@ -244,8 +251,6 @@ int dircos(struct SpinvContext* ctx, const int *xbra, const int *xket, const int
                   /*@out@*/ int *isunit);
 int ffcal(const int nff, const int kff, /*@out@*/ double *ff);
 
-#ifdef __cplusplus
-} // end extern "C"
-#endif
+#endif /* __cplusplus */
 
 #endif /* _SPINV_INTERNAL_H_ */

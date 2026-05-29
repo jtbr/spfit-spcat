@@ -36,6 +36,10 @@ typedef struct str_itot {
   int ii, ltot, lv1, lv2, neqi;
 } SITOT;
 
+#ifdef __cplusplus
+} // end extern "C"
+
+/* Functions defined in spinit.cpp — may throw C++ exceptions; use C++ linkage */
 struct SpinvContext;
 void getzitot(double *z, int lls, int ii, const int *lscom,
               const int *iscom, const int* jscom, int alpha, int neqi);
@@ -43,8 +47,6 @@ void setzitot(struct SpinvContext *ctx, int lv1, int lv2, int ltot, int ii, int 
 /*@dependent@*/  /*@null@*/
 ITMIX *get_itmix(const int ii, const int nitot);
 
-#ifdef __cplusplus
-} // end extern "C"
-#endif
+#endif /* __cplusplus */
 
 #endif /* _SPINIT_H_ */

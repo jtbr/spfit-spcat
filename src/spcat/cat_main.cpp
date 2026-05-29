@@ -17,6 +17,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifdef _WIN32
+#  define strcasecmp _stricmp
+#endif
 #include "engine/SpinvEngine.hpp"
 #include "engine/DpiEngine.hpp"
 #include "CalCat.hpp"

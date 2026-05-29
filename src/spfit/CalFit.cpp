@@ -540,7 +540,7 @@ void CalFit::processLinesAndSetupBlocks(const CalFitInput &input)
 
 
   // 3. Process Experimental Lines (using this->linein)
-  int current_nline_val = m_limlin;
+  int current_nline_val = (int)m_limlin;
   m_maxf_from_linein = this->linein(input.lineData_raw, &current_nline_val, m_nfmt);
   m_nline = current_nline_val;
   fflush(stdout);
