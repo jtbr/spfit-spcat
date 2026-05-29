@@ -486,7 +486,7 @@ def _toml_dumps(d: dict, prefix: str = "") -> str:
                 deferred_sections.append((full_key, val))
             else:
                 items = ", ".join(_toml_scalar(item) for item in val)
-                lines.append(f"{key} = [{items}]")
+                lines.append(f"{key} = [ {items} ]")
         else:
             lines.append(f"{key} = {_toml_scalar(val)}")
 

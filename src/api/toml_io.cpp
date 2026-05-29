@@ -351,10 +351,36 @@ void save_fit_output_toml(const CalFitOutput &out, const FitInput &src_fi,
         tbl.insert("variance", std::move(var_arr));
     }
 
+    std::ostringstream ss;
+    ss << tbl;
+    std::string toml_str = ss.str();
+
+    // toml++'s float column estimator has a bug that causes large variance arrays to
+    // be formatted multiline irrespective of length. We want them always inline.
+    // Collapse any multiline block to a single inline line so
+    // the output matches toml++'s own inline format ([ v1, v2, ... ]).
+    auto vs = toml_str.find("variance = [");
+    if (vs != std::string::npos) {
+        auto ve = toml_str.find(']', vs);
+        if (ve != std::string::npos) {
+            std::string block;
+            block.reserve(ve - vs);
+            for (size_t i = vs; i < ve; ++i) {
+                if (toml_str[i] == '\n') {
+                    block += ' ';
+                    while (i + 1 < ve && toml_str[i + 1] == ' ') ++i; // skip indent
+                } else {
+                    block += toml_str[i];
+                }
+            }
+            toml_str.replace(vs, ve - vs, block);
+        }
+    }
+
     std::ofstream f(path, std::ios::binary);
     if (!f)
         throw IoError("Cannot write TOML file: " + path, CalErrorCode::FileOpenFailed);
-    f << tbl;
+    f << toml_str;
 }
 
 void save_cat_output_toml(const CalCatOutput &out, const std::string &path)

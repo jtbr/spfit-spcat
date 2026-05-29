@@ -1,8 +1,8 @@
-  HCP                                                   Thu May 28 21:37:41 2026
+  HCP                                                   Sat May 30 01:03:02 2026
 ID= 44502 QSPINROT=       313.4649 MIN, MAX QN=   0  99
 MIN.LOG.STR=    -6.000 MIN.LOG.STR(FRQ/300GHZ)**2=    -8.000 MAX FREQ    10000.0 GHZ, TEMP=   300.00
      1           1  0.39
-.VAR FILE TITLE : HCP                                                    Thu May 28 21:37:41 2026
+.VAR FILE TITLE : HCP                                                    Sat May 30 01:03:02 2026
                               PARAMETERS - A.PRIORI ERROR 
      1      1           100   1.9975994222112E+04    5.867042E-04 B
      2      2           200  -2.1103830474369E-02    1.317962E-06 -DJ
