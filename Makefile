@@ -2,7 +2,9 @@ CC=gcc
 CXX=g++
 #CFLAGS=-g -Od -Wall -Wextra  # debug
 #CFLAGS=-O3 -Wall  # optimized for distribution
-CFLAGS=-O3 -Wall -Wextra -march=native -ffp-contract=off -Isrc -I.  # optimized for speed on current device (-Ofast is faster but math results may differ very slightly)
+# Unlike for CMake builds (which may target other devices than the current one,
+# we optimize for speed on current CPU (-Ofast is faster but math results may differ very slightly)
+CFLAGS=-O3 -Wall -Wextra -march=native -ffp-contract=off -Isrc -I.
 CXXFLAGS=$(CFLAGS)
 EXEQ=spfit spcat calmrg  # dpcat and dpfit are optional variations to spcat and spfit respectively
 EXEA=${EXEQ} moiam stark termval sortn calbak reassign sortegy iambak iamcalc
