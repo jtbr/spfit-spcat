@@ -92,7 +92,7 @@ jobs:
       - uses: docker/setup-qemu-action@v3
         if: runner.os == 'Linux'
 
-      - uses: pypa/cibuildwheel@v2
+      - uses: pypa/cibuildwheel@v3.4
         with:
           package-dir: python/
           output-dir: wheelhouse/
@@ -133,7 +133,10 @@ jobs:
     needs: build-wheels
     if: github.event_name == 'push'   # skip on workflow_dispatch test runs
     runs-on: ubuntu-latest
-    environment: pypi
+    environment:
+      name: pypi
+      url: https://pypi.org/p/pickett
+
     permissions:
       id-token: write   # required for OIDC trusted publisher
 
@@ -144,4 +147,5 @@ jobs:
           merge-multiple: true
           path: dist/
 
-      - uses: pypa/gh-action-pypi-publish@v1
+      - name: Publish package distributions to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
