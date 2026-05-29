@@ -13,14 +13,14 @@ jobs:
   regression:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       # Use Makefile (leaves BLASLIB undefined → dblas.c) with -ffp-contract=off
       # already in CFLAGS, giving bit-identical output vs the v2008 reference baseline.
       - name: Build spfit/spcat
         run: make spfit spcat
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
 

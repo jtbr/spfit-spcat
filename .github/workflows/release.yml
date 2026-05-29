@@ -42,7 +42,7 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install BLAS (Linux)
         if: matrix.blas_setup != ''
@@ -95,7 +95,7 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       # Needed to emulate aarch64 for Linux arm64 wheels
       - uses: docker/setup-qemu-action@v3
