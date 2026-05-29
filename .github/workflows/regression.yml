@@ -1,0 +1,42 @@
+# Regression test suite — informational only, does not block merges.
+# Failures are visible in the PR checks panel but this workflow is not
+# set as a required status check in branch protection rules.
+name: Regression Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Use Makefile (leaves BLASLIB undefined → dblas.c) with -ffp-contract=off
+      # already in CFLAGS, giving bit-identical output vs the v2008 reference baseline.
+      - name: Build spfit/spcat
+        run: make spfit spcat
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # pickett is needed by run_toml_tests.py for TOML serialisation helpers.
+      - name: Install pickett Python package
+        run: pip install ./python
+
+      - name: Legacy regression (55 molecules)
+        working-directory: spfit_spcat_test_suite
+        run: |
+          python3 run_tests.py ci_legacy
+          python3 compare_results.py ci_legacy
+
+      - name: TOML regression
+        working-directory: spfit_spcat_test_suite
+        run: |
+          python3 run_toml_tests.py ci_toml
+          python3 compare_toml_outputs.py ci_toml
+          python3 compare_results.py --no-intermediates ci_toml toml_reference

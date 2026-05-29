@@ -1,0 +1,147 @@
+# Release workflow — triggered by pushing a version tag (e.g. git tag v1.4.0 && git push --tags)
+# or manually via the GitHub Actions UI (workflow_dispatch).
+#
+# Jobs:
+#   build-cli    — native CLI binaries for Linux x86_64, macOS arm64/x86_64, Windows x86_64
+#   build-wheels — Python wheels via cibuildwheel (Linux x86_64+arm64, macOS arm64+x86_64, Win x86_64)
+#   publish-release — uploads CLI tarballs/zips to a GitHub Release (tag push only)
+#   publish-pypi    — uploads wheels to PyPI via OIDC trusted publisher (tag push only)
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:  # enables manual runs from the GitHub Actions UI for testing
+
+jobs:
+  # ── CLI binaries ────────────────────────────────────────────────────────────
+  build-cli:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: linux-x86_64
+            blas_setup: sudo apt-get install -y libopenblas-dev
+            use_blas: ON
+          - os: macos-latest      # Apple Silicon (arm64)
+            target: macos-arm64
+            blas_setup: ''
+            use_blas: ON          # finds Accelerate automatically
+          - os: macos-13          # last Intel runner
+            target: macos-x86_64
+            blas_setup: ''
+            use_blas: ON
+          - os: windows-latest
+            target: windows-x86_64
+            blas_setup: ''
+            use_blas: OFF         # use bundled dblas.c; avoids OpenBLAS packaging complexity
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install BLAS (Linux)
+        if: matrix.blas_setup != ''
+        run: ${{ matrix.blas_setup }}
+
+      - name: Configure
+        run: cmake -B build -DUSE_SYSTEM_BLAS=${{ matrix.use_blas }} -DBUILD_ALL=ON
+
+      - name: Build
+        run: cmake --build build --config Release
+
+      - name: Bundle (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          mkdir -p dist
+          for exe in spfit spcat calmrg calbak stark termval sortn reassign sortegy iambak iamcalc moiam; do
+            [ -f "build/$exe" ] && cp "build/$exe" dist/
+          done
+          tar czf "spfit-spcat-${{ github.ref_name }}-${{ matrix.target }}.tar.gz" -C dist .
+
+      - name: Bundle (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          mkdir -p dist
+          for exe in spfit spcat calmrg calbak stark termval sortn reassign sortegy iambak iamcalc moiam; do
+            [ -f "build/Release/$exe.exe" ] && cp "build/Release/$exe.exe" dist/
+          done
+          cd dist && 7z a "../spfit-spcat-${{ github.ref_name }}-${{ matrix.target }}.zip" .
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cli-${{ matrix.target }}
+          path: spfit-spcat-${{ github.ref_name }}-*
+
+  # ── Python wheels ──────────────────────────────────────────────────────────
+  build-wheels:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Needed to emulate aarch64 for Linux arm64 wheels
+      - uses: docker/setup-qemu-action@v3
+        if: runner.os == 'Linux'
+
+      - uses: pypa/cibuildwheel@v2
+        with:
+          package-dir: python/
+          output-dir: wheelhouse/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheels-${{ matrix.os }}
+          path: wheelhouse/
+
+  # ── GitHub Release ─────────────────────────────────────────────────────────
+  publish-release:
+    needs: [build-cli, build-wheels]
+    if: github.event_name == 'push'   # skip on workflow_dispatch test runs
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: cli-*
+          merge-multiple: true
+          path: release-assets/
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: wheels-*
+          merge-multiple: true
+          path: release-assets/
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: release-assets/*
+          generate_release_notes: true
+
+  # ── PyPI ───────────────────────────────────────────────────────────────────
+  publish-pypi:
+    needs: build-wheels
+    if: github.event_name == 'push'   # skip on workflow_dispatch test runs
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write   # required for OIDC trusted publisher
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: wheels-*
+          merge-multiple: true
+          path: dist/
+
+      - uses: pypa/gh-action-pypi-publish@v1

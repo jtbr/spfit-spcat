@@ -8,14 +8,21 @@ cmake_policy(SET CMP0057 NEW)
 option(BUILD_ALL "Build all executables including legacy utilities (cmake -DBUILD_ALL=ON)" OFF)
 option(BUILD_EXAMPLES "Build C++ programmatic examples (cmake -DBUILD_EXAMPLES=ON)" OFF)
 
-# TODO re-add debug options
-# NOTE: -ffp-contract=off disables fused multiply-add (FMA), which change the accumulation order of BLAS dot
-# products, leading to sign-flipped columns in the packed Cholesky factor. This is not essential (results are
-# physically equivalent), but together with use of dblas.c allows exact matching with v2008_baseline.
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -O3 -march=native -ffp-contract=off")
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -O3 -march=native -ffp-contract=off")
+# NOTE: -ffp-contract=off / /fp:precise disables fused multiply-add (FMA), which changes the
+# accumulation order of BLAS dot products, leading to sign-flipped columns in the packed
+# Cholesky factor. This is not essential (results are physically equivalent), but together
+# with use of dblas.c allows exact matching with v2008_baseline.
+if(MSVC)
+    add_compile_definitions(_USE_MATH_DEFINES _CRT_SECURE_NO_WARNINGS)
+    string(APPEND CMAKE_CXX_FLAGS " /W3 /O2 /fp:precise")
+    string(APPEND CMAKE_C_FLAGS   " /W3 /O2 /fp:precise")
+else()
+    string(APPEND CMAKE_CXX_FLAGS " -Wall -Wextra -O3 -march=native -ffp-contract=off")
+    string(APPEND CMAKE_C_FLAGS   " -Wall -Wextra -O3 -march=native -ffp-contract=off")
+endif()
 
 set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_C_STANDARD 11)
 
 include_directories(src)
 
@@ -83,7 +90,9 @@ set(SOURCE_FILES
     src/api/legacy_parser.cpp
 )
 
-set_source_files_properties(${SOURCE_FILES} PROPERTIES COMPILE_FLAGS "-Wno-missing-field-initializers")
+if(NOT MSVC)
+    set_source_files_properties(${SOURCE_FILES} PROPERTIES COMPILE_FLAGS "-Wno-missing-field-initializers")
+endif()
 #set_source_files_properties(${SOURCE_FILES} PROPERTIES COMPILE_FLAGS "-Wno-unused-function")
 
 # Add executable macro
@@ -107,9 +116,8 @@ macro(add_executable_plus name uses_blas_fallback)
     target_link_libraries(${name} PRIVATE ${BLAS_LIBRARIES})
   endif()
 
-  if ("${name}" MATCHES "^(spfit|spcat)$")
-    target_link_libraries(${name} PRIVATE m stdc++)
-  else()
+  # libm is part of the MSVC CRT; only needed on Unix
+  if(NOT MSVC)
     target_link_libraries(${name} PRIVATE m)
   endif()
   set_property(TARGET ${name} PROPERTY LINKER_LANGUAGE CXX)
@@ -279,7 +287,9 @@ set_property(TARGET pickett_core PROPERTY POSITION_INDEPENDENT_CODE ON)
 if(BLAS_FOUND AND BLAS_LIBRARIES)
   target_link_libraries(pickett_core PUBLIC ${BLAS_LIBRARIES})
 endif()
-target_link_libraries(pickett_core PUBLIC m)
+if(NOT MSVC)
+    target_link_libraries(pickett_core PUBLIC m)
+endif()
 
 # Programmatic C++ examples (cmake -DBUILD_EXAMPLES=ON)
 if(BUILD_EXAMPLES)

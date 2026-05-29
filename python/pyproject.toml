@@ -6,7 +6,7 @@ build-backend = "scikit_build_core.build"
 name = "pickett"
 version = "0.1.0"
 description = "Python bindings for SPFIT/SPCAT spectroscopy software"
-requires-python = ">=3.8"
+requires-python = ">=3.10"
 dependencies = [
     "tomli>=2.0; python_version < '3.11'",
 ]
@@ -27,3 +27,17 @@ dev = [
 
 [tool.pytest.ini_options]
 # conftest.py sets CWD to repo root so tests can use spfit_spcat_test_suite/ paths.
+
+[tool.cibuildwheel]
+# Build CPython 3.9–3.13; skip PyPy, 32-bit Windows/Linux, musl Linux
+build = "cp310-* cp311-* cp312-* cp313-* cp314-*"
+skip  = "pp* *-win32 *-manylinux_i686 *-musllinux*"
+
+[tool.cibuildwheel.linux]
+archs = ["x86_64", "aarch64"]  # aarch64 via QEMU emulation in CI
+
+[tool.cibuildwheel.macos]
+archs = ["arm64", "x86_64"]
+
+[tool.cibuildwheel.windows]
+archs = ["AMD64"]

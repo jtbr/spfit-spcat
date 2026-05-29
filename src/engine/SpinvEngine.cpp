@@ -8,6 +8,7 @@
 #include "SpinvEngine.hpp"
 #include "api/InputSchema.hpp"
 #include "common/CalError.hpp"
+#include "common/compat.hpp"
 
 SpinvEngine::SpinvEngine()
 {

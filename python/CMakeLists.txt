@@ -1,11 +1,19 @@
 cmake_minimum_required(VERSION 3.15)
 project(pickett_python LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_C_STANDARD 11)
 
-# -ffp-contract=off and bundled dblas.c are required for numerical reproducibility
+# -ffp-contract=off / /fp:precise and bundled dblas.c are required for numerical reproducibility
 # (see project CLAUDE.md for details on FMA / Cholesky sign-flip issue).
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -march=native -ffp-contract=off -Wno-missing-field-initializers")
-set(CMAKE_C_FLAGS   "${CMAKE_C_FLAGS}   -O3 -march=native -ffp-contract=off -Wno-missing-field-initializers")
+# Note: -march=native is intentionally absent here so wheels run on any compatible CPU.
+if(MSVC)
+    add_compile_definitions(_USE_MATH_DEFINES _CRT_SECURE_NO_WARNINGS)
+    string(APPEND CMAKE_CXX_FLAGS " /O2 /fp:precise")
+    string(APPEND CMAKE_C_FLAGS   " /O2 /fp:precise")
+else()
+    string(APPEND CMAKE_CXX_FLAGS " -O3 -ffp-contract=off -Wno-missing-field-initializers")
+    string(APPEND CMAKE_C_FLAGS   " -O3 -ffp-contract=off -Wno-missing-field-initializers")
+endif()
 
 find_package(Python 3.8 COMPONENTS Interpreter Development.Module REQUIRED)
 
@@ -73,5 +81,7 @@ nanobind_add_module(_pickett NB_STATIC
     ${API_SRCS}
 )
 
-target_link_libraries(_pickett PRIVATE m)
+if(NOT MSVC)
+    target_link_libraries(_pickett PRIVATE m)
+endif()
 install(TARGETS _pickett LIBRARY DESTINATION pickett)

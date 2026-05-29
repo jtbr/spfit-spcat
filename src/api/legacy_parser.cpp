@@ -4,6 +4,7 @@
 #include "splib/ulib.h"
 #include "splib/calpgm_types.h"
 #include "common/CalError.hpp"
+#include "common/compat.hpp"
 
 #include <cctype>
 #include <cerrno>

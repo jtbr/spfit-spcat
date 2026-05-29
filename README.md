@@ -38,6 +38,25 @@ See [TASKS.md](TASKS.md) for the full modernization roadmap and status.
 
 ## Build and Installation Instructions
 
+### Pre-built binaries
+
+Each [GitHub Release](https://github.com/jtbr/spfit-spcat/releases) includes CLI tarballs/zips for:
+
+| Platform | Archive |
+|----------|---------|
+| Linux x86_64 | `spfit-spcat-<version>-linux-x86_64.tar.gz` |
+| macOS Apple Silicon | `spfit-spcat-<version>-macos-arm64.tar.gz` |
+| macOS Intel | `spfit-spcat-<version>-macos-x86_64.tar.gz` |
+| Windows x86_64 | `spfit-spcat-<version>-windows-x86_64.zip` |
+
+Each archive contains `spfit`, `spcat`, and the full set of auxiliary programs.
+
+### Python package (PyPI)
+
+```sh
+pip install pickett
+```
+
 ### Makefile
 
 ```sh
@@ -67,6 +86,30 @@ To match the v2008 reference outputs exactly, the build must use the bundled `db
 - **Makefile**: leave `BLASLIB` undefined (uses `dblas.o` automatically); `CFLAGS` includes `-ffp-contract=off`
 
 This is necessary because FMA instructions and optimized BLAS libraries change floating-point accumulation order at the ULP level, which can flip the sign of near-zero Householder reflectors in the least-squares solver. The resulting `.var` output is physically equivalent but not bit-identical to the reference. See `TASKS.md` Task 6 for full details.
+
+### CI and releases
+
+Two GitHub Actions workflows run automatically:
+
+**`Regression Tests`** — runs on every push to `main` and on pull requests. Builds with `dblas.c` + `-ffp-contract=off` (required for bit-identical comparison to the v2008 baseline), then runs:
+- Legacy regression: 55-molecule test suite compared against the v2008 reference outputs
+- TOML regression: same molecules via the TOML file path, compared against a committed TOML reference baseline
+
+This workflow is informational — failures are visible but do not block merges.
+
+**`Release`** — triggered by pushing a `v*` tag, or manually from the GitHub Actions UI (Actions → Release → Run workflow) for testing builds without publishing. On a tag push it:
+1. Builds CLI binaries for all four platforms (Linux uses OpenBLAS, macOS uses Accelerate, Windows uses bundled `dblas.c`)
+2. Builds Python wheels via `cibuildwheel` for Linux x86_64+arm64, macOS arm64+x86_64, and Windows x86_64
+3. Creates a GitHub Release with all CLI archives attached
+4. Publishes wheels to PyPI via OIDC trusted publisher
+
+To cut a release:
+```sh
+git tag v1.4.0
+git push origin v1.4.0
+```
+
+**PyPI trusted publisher setup** (one-time, before first release): on pypi.org go to your project → Publishing → add a trusted publisher: owner `jtbr`, repository `spfit-spcat`, workflow `release.yml`, environment `pypi`.
 
 ## Python Package
 

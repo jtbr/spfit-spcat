@@ -5,6 +5,7 @@
 #include "dpi.h"
 #include "api/InputSchema.hpp"
 #include "common/CalError.hpp"
+#include "common/compat.hpp"
 
 DpiEngine::DpiEngine() {
     // Initialize the context with default values
