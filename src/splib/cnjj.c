@@ -25,8 +25,7 @@ int cjjini()
   return 0;
 } /* cjjini */
 
-double c3jj(j1, j2, j3, m1, m2, m3)
-const int j1, j2, j3, m1, m2, m3;
+double c3jj(const int j1, const int j2, const int j3, const int m1, const int m2, const int m3)
 { /*    3J COEFFICIENT CALCULATION */
   double trm, val;
   int jsum, k, k1, k2, jm1, jm2, jm3, lmin, la, lb, lc;
@@ -115,8 +114,7 @@ const int j1, j2, j3, m1, m2, m3;
   return val;
 } /* c3jj */
 
-double c6jj(j1, j2, j3, jj1, jj2, jj3)
-const int j1, j2, j3, jj1, jj2, jj3;
+double c6jj(const int j1, const int j2, const int j3, const int jj1, const int jj2, const int jj3)
 { /* 6J COEFFICIENT CALCULATION    USING INTEGERS = 2 J */
   double trm, val;
   int k, k1, k2, k3, k4, lmin, la, lb, lc;
@@ -182,9 +180,7 @@ const int j1, j2, j3, jj1, jj2, jj3;
   return val;
 }  /* c6jj */
 
-int deljj(jxa, jxb, jxc, val)
-const int jxa, jxb, jxc;
-double *val;
+int deljj(const int jxa, const int jxb, const int jxc, double *val)
 {
   int ia, ib, ic, isum;
 
@@ -212,8 +208,7 @@ double *val;
   return isum;
 } /* deljj */
 
-double c9jj(jj)
-int jj[];
+double c9jj(int jj[])
 { /* 9J COEFFICIENT CALCULATION */
   double val;
   int *jjp;

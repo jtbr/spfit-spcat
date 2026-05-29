@@ -1,8 +1,5 @@
 #include "splib/catutil.h"
-int readqn(qnstr, iqn, n)
-const char *qnstr;
-short *iqn;
-const int n;
+int readqn(const char *qnstr, short *iqn, const int n)
 { /* read n quanta from string to iqn */
   const char *pqn;
   int i, ich, ic, ival;

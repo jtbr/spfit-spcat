@@ -15,9 +15,7 @@ int memfind(int ibgn, int nbuf, const int *key, const char *buf0,
 
 static int ndline;
 
-int sortn(inpname, outname, dokey)
-char *inpname, *outname;
-BOOL dokey;
+int sortn(char *inpname, char *outname, BOOL dokey)
 {
   FILE *finp, *fout, *ftmp, *fscr;
   int *key;
@@ -122,10 +120,7 @@ BOOL dokey;
   return 0;
 }
 
-int fillbuf(finp, tbuf, nlim, pbuf)
-FILE *finp;
-char *tbuf, **pbuf;
-int nlim;
+int fillbuf(FILE *finp, char *tbuf, int nlim, char **pbuf)
 {
   int i, iret, ich;
   iret = 0;
@@ -151,9 +146,7 @@ int nlim;
   return iret;
 }
 
-int bufcmp(b1, b2, key)
-const char *b1, *b2;
-const int *key;
+int bufcmp(const char *b1, const char *b2, const int *key)
 {
   int iret, i, k, ib1, ib2, irev;
   irev = 0;
@@ -180,10 +173,7 @@ const int *key;
   return iret;
 }
 
-int memsort(nline, key, pbuf)
-int nline;
-const int *key;
-char **pbuf;
+int memsort(int nline, const int *key, char **pbuf)
 {                               /* heapsort */
   int left, right, i, j;
   char *pcmp;
@@ -214,11 +204,7 @@ char **pbuf;
   return 0;
 }
 
-int memfind(ibgn, nbuf, key, buf0, pbuf)
-int ibgn, nbuf;
-const int *key;
-const char *buf0;
-char **pbuf;
+int memfind(int ibgn, int nbuf, const int *key, const char *buf0, char **pbuf)
 {
   /* return position n such that buf0 > pbuf[k] for k = ibgn, .., (n - 1) */
   int left, right, k;
@@ -236,9 +222,7 @@ char **pbuf;
   return left;
 }
 
-int getkey(key, tbuf, wbuf)
-int key[];
-char tbuf[], wbuf[];
+int getkey(int key[], char tbuf[], char wbuf[])
 {
   int k, i, init, klast;
   char cmp;

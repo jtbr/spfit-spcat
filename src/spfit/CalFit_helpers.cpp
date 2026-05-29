@@ -37,10 +37,9 @@ int CalFit::qnfmt2(int nqn, short *qnum, char *aqnum)
   int i;
   for (i = 0; i < nqn; ++i)
   {
-    // Ensure aqnum has enough space. sprintf writes null terminator.
-    // Each %3d needs 3 chars + 1 for null if called repeatedly.
-    // It's safer if aqnum points to a sufficiently large buffer.
-    sprintf(aqnum, "%3d", (int)qnum[i]);
+    char tmp[8];
+    snprintf(tmp, sizeof(tmp), "%3d", (int)qnum[i]);
+    memcpy(aqnum, tmp, 3);
     aqnum += 3;
   }
   for (i = nqn; i < 12; ++i)
@@ -155,7 +154,7 @@ int CalFit::parer(double par, double errx, double dif, char *ptmp)
   memcpy(pfmt, chexp, 6);
   pfmt += 6;
   *pfmt = '\0';
-  sprintf(ptmp, fmt, apar, ie, adif);
+  snprintf(ptmp, 64, fmt, apar, ie, adif);
   return 0;
 } // parer
 

@@ -26,10 +26,12 @@ jobs:
             use_blas: ON
           - os: macos-latest      # Apple Silicon (arm64)
             target: macos-arm64
+            osx_arch: arm64
             blas_setup: ''
             use_blas: ON          # finds Accelerate automatically
-          - os: macos-13          # last Intel runner
+          - os: macos-latest      # cross-compiled x86_64 on Apple Silicon runner
             target: macos-x86_64
+            osx_arch: x86_64
             blas_setup: ''
             use_blas: ON
           - os: windows-latest
@@ -47,7 +49,14 @@ jobs:
         run: ${{ matrix.blas_setup }}
 
       - name: Configure
-        run: cmake -B build -DUSE_SYSTEM_BLAS=${{ matrix.use_blas }} -DBUILD_ALL=ON
+        shell: bash
+        env:
+          OSX_ARCH: ${{ matrix.osx_arch }}
+        run: >
+          cmake -B build
+          -DUSE_SYSTEM_BLAS=${{ matrix.use_blas }}
+          -DBUILD_ALL=ON
+          ${OSX_ARCH:+-DCMAKE_OSX_ARCHITECTURES="$OSX_ARCH"}
 
       - name: Build
         run: cmake --build build --config Release

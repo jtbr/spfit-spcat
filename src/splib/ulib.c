@@ -29,10 +29,7 @@ static double zero = 0.;
 static double tiny = 1.e-36;
 static double machep = 1e-15;
 
-int ordblk(ndm, n, iqnsep, t, e, isblk, p, ipasgn)
-const int ndm, n;
-double *t, *e, *p;
-short *iqnsep, *isblk, *ipasgn;
+int ordblk(const int ndm, const int n, short *iqnsep, double *t, double *e, short *isblk, double *p, short *ipasgn)
 {
   static double one = 1.;
   double pbgn, pcmp, etmp, pmax, ptmp, *tbase, *tp;
@@ -269,9 +266,7 @@ short *iqnsep, *isblk, *ipasgn;
   return iperm;
 }                               /* ordblk */
 
-void etswap(ndm, nsize, ix1,ix2,t,e,q)
-const int ndm, nsize, ix1, ix2;
-double *t, *e, *q;
+void etswap(const int ndm, const int nsize, const int ix1, const int ix2, double *t, double *e, double *q)
 {
    double tmp;
    long ndml;
@@ -286,10 +281,7 @@ double *t, *e, *q;
    dswap(nsize, &t[ix1 * ndml], 1, &t[ix2 * ndml], 1);
 }
 
-int hdiag(ndm, n, z, d, e, iqsep)
-const int ndm, n;
-double *z, *d, *e;
-short *iqsep;
+int hdiag(const int ndm, const int n, double *z, double *d, double *e, short *iqsep)
 {
   double f, g, t, bb, *zim, *zk, *zkk, *ebgn, *dbgn;
   int isgn, k, im, nk, nv, nm, ndiag, nz, nvz, nret;
@@ -464,9 +456,7 @@ short *iqsep;
   return nret;
 }                               /* hdiag */
 
-int triag(ndm, n, nz, z, d, e)
-const int ndm, n, nz;
-double *z, *d, *e;
+int triag(const int ndm, const int n, const int nz, double *z, double *d, double *e)
 {
   /* Local variables */
   int i, k, m, nm, m0, itr;
@@ -573,12 +563,7 @@ double *z, *d, *e;
   return k;
 }                               /* triag */
 
-int getpar(lu, luout, nfit, npar, idpar, par, erpar, plbl, plblen)
-FILE *lu, *luout;
-int *nfit, *npar, plblen;
-bcd_t *idpar;
-double *erpar, *par;
-char *plbl;
+int getpar(FILE *lu, FILE *luout, int *nfit, int *npar, bcd_t *idpar, double *par, double *erpar, char *plbl, int plblen)
 { /*  SUBROUTINE TO READ PARAMETERS */
 #define NCARD 130
   char *ic, *tlbl, *sbcd;
@@ -655,11 +640,7 @@ char *plbl;
   return (i - n);
 }                               /* getpar */
 
-int getvar(lu, nfit, var, idpar, erpar, iflg)
-FILE *lu;
-bcd_t *idpar;
-double *var, *erpar;
-const int nfit, iflg;
+int getvar(FILE *lu, const int nfit, double *var, bcd_t *idpar, double *erpar, const int iflg)
 {                               /*  SUBROUTINE TO READ VARIANCE INTO PACKED UPPER TRIANGULAR */
 #define NCARD 130
   static double dval[8] = { 2., 2., 2., 2., 2., 2., 2., 2. };
@@ -729,10 +710,7 @@ const int nfit, iflg;
   return n;
 }                               /* getvar */
 
-int putvar(lu, nfit, var, erpar)
-FILE *lu;
-const int nfit;
-double *var, *erpar;
+int putvar(FILE *lu, const int nfit, double *var, double *erpar)
 {                               /*  SUBROUTINE TO WRITE VARIANCE FROM PACKED UPPER TRIANGULAR */
   double val, *pvar, *pcol;
   int i, j, knt;
@@ -763,9 +741,7 @@ double *var, *erpar;
   return 0;
 }                               /* putvar */
 
-double calerr(nfit, var, derv)
-const int nfit;
-const double *var, *derv;
+double calerr(const int nfit, const double *var, const double *derv)
 {
   double err, sum;
   int n;
@@ -782,9 +758,7 @@ const double *var, *derv;
   return err;
 }                               /* calerr */
 
-int deflin(iqnfmt, idqn)
-int iqnfmt;
-short *idqn;
+int deflin(int iqnfmt, short *idqn)
 {
   short km, i, k, nqn;
 
@@ -803,12 +777,7 @@ short *idqn;
   return nqn;
 }                               /* deflin */
 
-int getlin(lu, nqn, idqn, iqn, xfreq, xerr, xwt, card, ncard)
-FILE *lu;
-const int nqn, ncard;
-short *idqn, *iqn;
-double *xfreq, *xerr, *xwt;
-char *card;
+int getlin(FILE *lu, const int nqn, short *idqn, short *iqn, double *xfreq, double *xerr, double *xwt, char *card, const int ncard)
 {                               /*  read in .LIN card from LU */
   static double terr = 1.e-07;
   static double txwt = 1.e-30;
@@ -1024,11 +993,7 @@ int fgetstr(char *buffer, const int N, FILE *stream)
   return n;
 } /* fgetstr */
 
-int pcard(card, val, nval, fmtlen)
-const char *card;
-double *val;
-const int nval;
-const int *fmtlen;
+int pcard(const char *card, double *val, const int nval, const int *fmtlen)
 {                               /* parses a card for NVAL numbers */
   /*
    * ndec = -2 for comma detected, ndec = -1 indicates looking for

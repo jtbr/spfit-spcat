@@ -15,10 +15,8 @@
 
 static double tiny = 1.e-34;
 static double tmach = 1.e-10;
-int lsqfit(dk, ndm, nr, nvec, marqp, varv,
-           dkold, ediag, enorm, iperm)
-int ndm, nvec, nr, *iperm;
-double *dk, *dkold, *marqp, *varv, *ediag, *enorm;
+int lsqfit(double *dk, int ndm, int nr, int nvec, double *marqp, double *varv,
+           double *dkold, double *ediag, double *enorm, int *iperm)
 { /* function to do a least squares fit */
   /* nr is the number of rows (number of fitted parameters) */
   /* nvec is the number of solution vectors */
@@ -147,9 +145,7 @@ double *dk, *dkold, *marqp, *varv, *ediag, *enorm;
   return 0;
 } /* lsqfit */
 
-int jelim(t, vec, ndm, n, ns)
-double *t, *vec;
-int ndm, n, ns;
+int jelim(double *t, double *vec, int ndm, int n, int ns)
 { /*   do orthogonal transformations to rotate vector VEC into matrix T */
   /*   NDM  = dimensioned column length of T, (NDM >= N + NS) */
   /*   N    = number of columns of T */
@@ -196,9 +192,7 @@ int ndm, n, ns;
   return 0;
 } /* jelim */
 
-int dqrfac(t, ndm, m, n, ns, wk, iperm)
-double *t, *wk;
-int ndm, m, n, ns, *iperm;
+int dqrfac(double *t, int ndm, int m, int n, int ns, double *wk, int *iperm)
 {
   double diag, temp, tcmp, hcmp, sqdiag;
   double *pcol, *pt, *ptt, *pdiag, *pbgn;
@@ -309,9 +303,7 @@ int ndm, m, n, ns, *iperm;
   return nrank;
 } /* dqrfac */
 
-int dqrsolv(t, ndm, nrank, n, ns, iperm)
-double *t;
-int ndm, nrank, n, ns, *iperm;
+int dqrsolv(double *t, int ndm, int nrank, int n, int ns, int *iperm)
 {
   double diag, temp, tcmp, *pcol, *pt, *pdiag, *pbgn;
   long ndml;
@@ -393,9 +385,7 @@ int ndm, nrank, n, ns, *iperm;
   return nrank;
 }     /* dqrsolv */
 
-int lmpar(nr, nc, ns, r, ldr, x, par, wk)
-int nr, nc, ns, ldr;
-double *r, *x, *par, *wk;
+int lmpar(int nr, int nc, int ns, double *r, int ldr, double *x, double *par, double *wk)
 /* this subroutine is a paraphrase of netlib MINPACK routine lmpar.f */
 /* diag is assumed to be unity and no further swapping attempted     */
 /* it returns an optimum Marquardt Levenberg parameter in par[0]     */

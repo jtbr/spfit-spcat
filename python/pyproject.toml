@@ -38,6 +38,7 @@ archs = ["x86_64", "aarch64"]  # aarch64 via QEMU emulation in CI
 
 [tool.cibuildwheel.macos]
 archs = ["arm64", "x86_64"]
+environment = {MACOSX_DEPLOYMENT_TARGET = "10.13"}  # nanobind requires aligned deallocation (macOS 10.13+)
 
 [tool.cibuildwheel.windows]
 archs = ["AMD64"]

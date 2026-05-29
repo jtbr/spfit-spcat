@@ -1,10 +1,7 @@
 #include <math.h>
 #include <stdlib.h>
 
-int ftran(nftx, xpec, nxpec, fc, flg)
-int nftx;
-double *xpec, *fc;
-int nxpec, flg;
+int ftran(int nftx, double *xpec, int nxpec, double *fc, int flg)
 {
   /* dimension of fc >= nft+1 if nft even */
   static double cnorm, cnorm2, *c, *s;
