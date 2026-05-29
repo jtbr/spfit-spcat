@@ -16,6 +16,9 @@ import sys
 TOML_SUFFIXES = [".fitted.toml", ".catalog.toml"]
 MAX_DIFF_LINES = 20
 
+# Molecules only produced under --all (slow); missing outputs are not failures.
+SLOW_MOLECULES = {"clclo2"}
+
 
 def compare_toml_outputs(output_subdir: str, reference_subdir: str = "toml_reference",
                          suite_base_path: str = ".") -> int:
@@ -42,6 +45,9 @@ def compare_toml_outputs(output_subdir: str, reference_subdir: str = "toml_refer
                 if not os.path.exists(ref_file):
                     continue  # not in reference — not expected for this molecule
                 if not os.path.exists(out_file):
+                    if mol_basename in SLOW_MOLECULES:
+                        print(f"  SKIPPED  {mol_basename}/{fname}  (--all only)")
+                        continue
                     print(f"  MISSING  {mol_basename}/{output_subdir}/{fname}")
                     n_differ += 1
                     continue
