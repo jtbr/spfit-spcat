@@ -71,7 +71,7 @@ jobs:
           for exe in spfit spcat calmrg calbak stark termval sortn reassign sortegy iambak iamcalc moiam; do
             [ -f "build/$exe" ] && cp "build/$exe" dist/
           done
-          tar czf "spfit-spcat-${{ github.ref_name }}-${{ matrix.target }}.tar.gz" -C dist .
+          (cd dist && tar czf "../spfit-spcat-${{ github.ref_name }}-${{ matrix.target }}.tar.gz" *)
 
       - name: Bundle (Windows)
         if: runner.os == 'Windows'
@@ -103,7 +103,7 @@ jobs:
           fetch-depth: 0   # setuptools-scm needs full history to derive version from tags
 
       # Needed to emulate aarch64 for Linux arm64 wheels
-      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-qemu-action@v4
         if: runner.os == 'Linux'
 
       - uses: pypa/cibuildwheel@v3.4
