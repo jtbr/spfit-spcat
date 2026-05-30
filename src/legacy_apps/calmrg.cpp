@@ -282,9 +282,9 @@ int main(int argc, char *argv[])
         xfrq = pexpt->frqx;
         xerr = pexpt->errx;
         if (xfrq < 99999999.) {
-          sprintf(tmpstr,"%13.4f%8.4f", xfrq, xerr);
+          snprintf(tmpstr, sizeof(tmpstr), "%13.4f%8.4f", xfrq, xerr);
         } else {
-          sprintf(tmpstr,"%13.3f%8.3f", xfrq, xerr);
+          snprintf(tmpstr, sizeof(tmpstr), "%13.3f%8.3f", xfrq, xerr);
         }
         memcpy(tmpstr + PSTR, line1 + PSTR, PTAG - PSTR);
         memcpy(tmpstr + PTAG, tagstr, KTAG);
@@ -579,7 +579,7 @@ BOOL mrglin(char *line2, char *line)
   }
   if (igup >= 3600)
     return FALSE;
-  sprintf(tmpstr,"%8.4f", str1);
+  snprintf(tmpstr, sizeof(tmpstr), "%8.4f", str1);
   memcpy(line + PSTR, tmpstr, KSTR);
   gupfmt(igup, line + PDGN);
   return TRUE;

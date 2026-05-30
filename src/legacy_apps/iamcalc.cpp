@@ -1295,7 +1295,7 @@ int main(int argc, char *argv[])
         if (idtyp < 99) {
           kflgm = -2; isdip = 1; lu = luint;
         }
-        sprintf(card,"%12.4E  /%s", parp->parerr, parp->labl);
+        snprintf(card, sizeof(card), "%12.4E  /%s", parp->parerr, parp->labl);
         pbgn = strchr(card, '/') - 1; pstr = pbgn + 2;
         txpec[0] = parp->parval;
         pxpecp = parp->ptxpec;
