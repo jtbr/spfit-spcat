@@ -51,10 +51,18 @@ Each [GitHub Release](https://github.com/jtbr/spfit-spcat/releases) includes CLI
 
 Each archive contains `spfit`, `spcat`, and the full set of auxiliary programs.
 
-### Python package (PyPI)
+### Python package
+
+Wheels for each release are attached to the [GitHub Release](https://github.com/jtbr/spfit-spcat/releases) and are indexed for `pip` via GitHub Pages:
 
 ```sh
-pip install pickett
+pip install pickett --extra-index-url https://jtbr.github.io/spfit-spcat/pip/
+```
+
+Or download the `.whl` file matching your platform and Python version directly from the release page and install it:
+
+```sh
+pip install pickett-<version>-<platform>.whl
 ```
 
 ### Makefile
@@ -100,8 +108,8 @@ This workflow is informational — failures are visible but do not block merges.
 **`Release`** — triggered by pushing a `v*` tag, or manually from the GitHub Actions UI (Actions → Release → Run workflow) for testing builds without publishing. On a tag push it:
 1. Builds CLI binaries for all four platforms (Linux uses OpenBLAS, macOS uses Accelerate, Windows uses bundled `dblas.c`)
 2. Builds Python wheels via `cibuildwheel` for Linux x86_64+arm64, macOS arm64+x86_64, and Windows x86_64
-3. Creates a GitHub Release with all CLI archives attached
-4. Publishes wheels to PyPI via OIDC trusted publisher
+3. Creates a GitHub Release with all CLI archives and wheels attached
+4. Regenerates the pip index on the `gh-pages` branch (served via GitHub Pages)
 
 To cut a release:
 ```sh
@@ -109,7 +117,7 @@ git tag v1.4.0
 git push origin v1.4.0
 ```
 
-**PyPI trusted publisher setup** (one-time, before first release): on pypi.org go to your project → Publishing → add a trusted publisher: owner `jtbr`, repository `spfit-spcat`, workflow `release.yml`, environment `pypi`.
+**GitHub Pages setup** (one-time, after first tag push): in the repo go to Settings → Pages → Source → Deploy from branch → `gh-pages` / `/ (root)`.
 
 ## Python Package
 

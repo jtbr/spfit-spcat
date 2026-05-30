@@ -2,10 +2,11 @@
 # or manually via the GitHub Actions UI (workflow_dispatch).
 #
 # Jobs:
-#   build-cli    — native CLI binaries for Linux x86_64, macOS arm64/x86_64, Windows x86_64
-#   build-wheels — Python wheels via cibuildwheel (Linux x86_64+arm64, macOS arm64+x86_64, Win x86_64)
-#   publish-release — uploads CLI tarballs/zips to a GitHub Release (tag push only)
-#   publish-pypi    — uploads wheels to PyPI via OIDC trusted publisher (tag push only)
+#   build-cli       — native CLI binaries for Linux x86_64, macOS arm64/x86_64, Windows x86_64
+#   build-wheels    — Python wheels via cibuildwheel (Linux x86_64+arm64, macOS arm64+x86_64, Win x86_64)
+#   publish-release — uploads CLI tarballs/zips + wheels to a GitHub Release (tag push only)
+#   update-pip-index — regenerates the PEP 503 simple index on gh-pages from all release wheels
+#   publish-pypi    — (disabled) uploads wheels to PyPI via OIDC trusted publisher
 name: Release
 
 on:
@@ -140,6 +141,44 @@ jobs:
         with:
           files: release-assets/*
           generate_release_notes: true
+
+  # ── pip simple index (GitHub Pages) ────────────────────────────────────────
+  update-pip-index:
+    needs: publish-release
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Generate pip index
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: python3 scripts/gen_pip_index.py
+
+      - name: Push to gh-pages
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if git ls-remote --exit-code origin gh-pages; then
+            git worktree add gh-pages-dir origin/gh-pages
+          else
+            git worktree add --orphan -b gh-pages gh-pages-dir
+            touch gh-pages-dir/.nojekyll
+          fi
+          # Replace pip/ subdirectory only; root is free for a future docs site
+          rm -rf gh-pages-dir/pip
+          cp -r pip gh-pages-dir/
+          cd gh-pages-dir
+          git add -A
+          git diff --cached --quiet && echo "Index unchanged." && exit 0
+          git commit -m "Update pip index for ${{ github.ref_name }}"
+          git push origin HEAD:gh-pages
 
   # ── PyPI ───────────────────────────────────────────────────────────────────
   # Disabled for now — wheels are attached to the GitHub Release instead.

@@ -4,13 +4,25 @@ Python bindings for [SPFIT/SPCAT](../README.md) — the standard spectral fittin
 and catalog-generation programs for rotational spectroscopy — built with
 [nanobind](https://github.com/wjakob/nanobind).
 
-## Prerequisites
+## Installation
+
+Pre-built wheels for Linux, macOS, and Windows are attached to each [GitHub Release](https://github.com/jtbr/spfit-spcat/releases) and indexed for `pip`:
+
+```sh
+pip install pickett --extra-index-url https://jtbr.github.io/spfit-spcat/pip/
+```
+
+Or download the `.whl` file matching your platform and Python version directly from the release page.
+
+## Building from source
+
+### Prerequisites
 
 - CMake ≥ 3.15
 - A C++17 compiler (e.g. `gcc`)
 - Python ≥ 3.8
 
-## Build and install
+### Build and install
 
 ```sh
 # From the python/ directory — recommended for development
