@@ -1,10 +1,10 @@
 [build-system]
-requires = ["scikit-build-core>=0.4", "nanobind"]
+requires = ["scikit-build-core>=0.4", "nanobind", "setuptools-scm"]
 build-backend = "scikit_build_core.build"
 
 [project]
 name = "pickett"
-version = "0.2.0"
+dynamic = ["version"]
 description = "Python bindings for SPFIT/SPCAT (calpgm suite) spectroscopy software"
 requires-python = ">=3.10"
 dependencies = [
@@ -17,6 +17,12 @@ test = ["pytest", "numpy"]
 [tool.scikit-build]
 cmake.build-type = "Release"
 wheel.packages = ["pickett"]
+metadata.version.provider = "scikit_build_core.metadata.setuptools_scm"
+
+[tool.setuptools_scm]
+root = ".."  # git repo root is one level above python/
+# version tags: v1.2.3 → 1.2.3; v1.2.3-alpha4 → 1.2.3a4 (PEP 440)
+tag_regex = "^v(?P<version>.+)$"
 
 [dependency-groups]
 dev = [

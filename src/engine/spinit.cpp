@@ -381,7 +381,7 @@ ITMIX *get_itmix(const int ii, const int neqi)
   EITMIX *pitmix;
   double *eigval, *twk, *eigvec, *eiga, *eigb;
   short  *swk, *qn, *qn0, *ix, *ixx, *iqsep;
-  double val, sum, sumsq, cfac;
+  double val, sum, /* sumsq, */ cfac;
   size_t nl;
   int itot, nt, ns, nm1, nm2, nitot, nodd, neven, i, k, nx, ntot;
   int ia, ib, ioff, kk, j, nq, neigv, ibgn, iend, ktot, kcmp;
@@ -575,7 +575,7 @@ ITMIX *get_itmix(const int ii, const int neqi)
       if (i == ioff) continue;
       qn0 = pitmix->qn; cfac = 1. / zifc[ia];
       eiga = &pitmix->eigvec[i * ioff];
-      eigb = &eigvec[k * nitot]; sumsq = 0.;
+      eigb = &eigvec[k * nitot]; /* sumsq = 0.; */
       for (j = 0; j < nitot; ++j) {
         sum = 0.;
         for (i = 0; i < ioff; ++i) {
@@ -587,7 +587,7 @@ ITMIX *get_itmix(const int ii, const int neqi)
           }
         }
         sum *= cfac;
-        eigb[j] = sum; sumsq += sum * sum;
+        eigb[j] = sum; /* sumsq += sum * sum; */
       }
       // printf("Itot %3d, %10.6f\n", (int)qn[nm2], sumsq);
     }

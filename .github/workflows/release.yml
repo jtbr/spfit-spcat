@@ -43,6 +43,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0   # setuptools-scm needs full history to derive version from tags
 
       - name: Install BLAS (Linux)
         if: matrix.blas_setup != ''
@@ -80,7 +82,7 @@ jobs:
           done
           cd dist && 7z a "../spfit-spcat-${{ github.ref_name }}-${{ matrix.target }}.zip" .
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: cli-${{ matrix.target }}
           path: spfit-spcat-${{ github.ref_name }}-*
@@ -96,6 +98,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0   # setuptools-scm needs full history to derive version from tags
 
       # Needed to emulate aarch64 for Linux arm64 wheels
       - uses: docker/setup-qemu-action@v3
@@ -106,7 +110,7 @@ jobs:
           package-dir: python/
           output-dir: wheelhouse/
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: wheels-${{ matrix.os }}
           path: wheelhouse/
@@ -120,41 +124,46 @@ jobs:
       contents: write
 
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v7
         with:
           pattern: cli-*
           merge-multiple: true
           path: release-assets/
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v7
         with:
           pattern: wheels-*
           merge-multiple: true
           path: release-assets/
 
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v3
         with:
           files: release-assets/*
           generate_release_notes: true
 
   # ── PyPI ───────────────────────────────────────────────────────────────────
-  publish-pypi:
-    needs: build-wheels
-    if: github.event_name == 'push'   # skip on workflow_dispatch test runs
-    runs-on: ubuntu-latest
-    environment:
-      name: pypi
-      url: https://pypi.org/p/pickett
-
-    permissions:
-      id-token: write   # required for OIDC trusted publisher
-
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          pattern: wheels-*
-          merge-multiple: true
-          path: dist/
-
-      - name: Publish package distributions to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
+  # Disabled for now — wheels are attached to the GitHub Release instead.
+  # To re-enable: uncomment this job and set up a PyPI trusted publisher
+  # (pypi.org → project → Publishing → add trusted publisher:
+  #   Owner: jtbr  Repository: spfit-spcat  Workflow: release.yml  Environment: pypi)
+  #
+  # publish-pypi:
+  #   needs: build-wheels
+  #   if: github.event_name == 'push'   # skip on workflow_dispatch test runs
+  #   runs-on: ubuntu-latest
+  #   environment:
+  #     name: pypi
+  #     url: https://pypi.org/p/pickett
+  #
+  #   permissions:
+  #     id-token: write   # required for OIDC trusted publisher
+  #
+  #   steps:
+  #     - uses: actions/download-artifact@v7
+  #       with:
+  #         pattern: wheels-*
+  #         merge-multiple: true
+  #         path: dist/
+  #
+  #     - name: Publish package distributions to PyPI
+  #       uses: pypa/gh-action-pypi-publish@release/v1
