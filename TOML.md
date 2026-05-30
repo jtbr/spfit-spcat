@@ -7,7 +7,7 @@ work and for archiving.
 
 For the Python/C++ API that reads and writes these files, see [`API.md`](API.md).
 For the underlying spectroscopic conventions and parameter/dipole ID schemes,
-see [`spinv.md`](spinv.md) (SPFIT/SPCAT) or [`dpi.md`](dpi.md) (DPFIT/DPCAT).
+see [`spinv.md`](spinv.md) (SPFIT/SPCAT) or [`dpi.md`](dpi.md) (DPFIT/DPCAT). For CLI usage instructions, skip to [CLI auto-detection](#cli-auto-detection), below.
 
 ---
 
@@ -393,9 +393,11 @@ spcat mol
 ```
 
 Detection logic for `spfit`: if `mol.toml` exists in the working directory,
-TOML mode is used; the `.par` and `.lin` files are ignored (a warning is printed
+TOML mode is used; any legacy input `.par` and `.lin` files are ignored (a warning is printed
 if they also exist).  For `spcat`: if both `mol.fitted.toml` and
-`mol.dipoles.toml` exist, TOML mode is used.
+`mol.dipoles.toml` exist, TOML mode is used and `.var` and `.int` are ignored.
+
+See [above](#files-produced-in-each-mode) for which files are written in each mode.
 
 ### Migrating from legacy files with `--toml-out`
 
@@ -410,8 +412,7 @@ spfit --toml-out mol
 spcat --toml-out mol
 ```
 
-For a full migration including `mol.toml` and `mol.dipoles.toml` input files, use the
-Python helpers:
+For a full migration including creating `mol.toml` and `mol.dipoles.toml` input files, use the Python helpers:
 
 ```python
 import pickett
@@ -426,12 +427,6 @@ write_toml("mol.toml", fit_input_to_dict(fi))
 
 ci = pickett.parse_cat_files("mol.var", "mol.int")
 write_toml("mol.dipoles.toml", cat_input_to_dict(ci))
-```
-
-`--toml-out` can be combined with `--dpi` or `--spinv` in any order:
-
-```sh
-spfit --dpi --toml-out mol
 ```
 
 ---
